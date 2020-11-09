@@ -1,17 +1,9 @@
 //
-// CRLib - Simple library for STL replacement in private projects.
-// Copyright © 2020 YaPB Development Team <team@yapb.ru>.
+// YaPB - Counter-Strike Bot based on PODBot by Markus Klinge.
+// Copyright © 2004-2020 YaPB Project <yapb@jeefo.net>.
 //
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
+// SPDX-License-Identifier: MIT
 //
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU General Public License for more details.
-// 
 
 #pragma once
 
@@ -272,8 +264,10 @@ public:
    }
 
    void shuffle () {
-      for (size_t i = length_; i >= 1; --i) {
-         cr::swap (contents_[i - 1], contents_[rg.int_ (i, length_ - 2)]);
+      int32 shuffleLength = length <int32> ();
+
+      for (int32 i = shuffleLength; i >= 1; --i) {
+         cr::swap (contents_[i - 1], contents_[rg.get (i, shuffleLength - 2)]);
       }
    }
 
@@ -352,11 +346,11 @@ public:
    }
 
    const T &random () const {
-      return contents_[rg.int_ <size_t> (0, length_ - 1)];
+      return contents_[rg.get (0, length <int32> () - 1)];
    }
 
    T &random () {
-      return contents_[rg.int_ <size_t> (0u, length_ - 1u)];
+      return contents_[rg.get (0, length <int32> () - 1)];
    }
 
    T *data () {
@@ -413,4 +407,3 @@ public:
 template <typename T> using SmallArray = Array <T, ReservePolicy::Single, 64>;
 
 CR_NAMESPACE_END
-

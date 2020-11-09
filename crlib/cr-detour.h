@@ -1,17 +1,9 @@
 ﻿//
-// CRLib - Simple library for STL replacement in private projects.
-// Copyright © 2020 YaPB Development Team <team@yapb.ru>.
+// YaPB - Counter-Strike Bot based on PODBot by Markus Klinge.
+// Copyright © 2004-2020 YaPB Project <yapb@jeefo.net>.
 //
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
+// SPDX-License-Identifier: MIT
 //
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU General Public License for more details.
-// 
 
 #pragma once
 
@@ -186,7 +178,23 @@ public:
       detour_ = nullptr;
    }
 
+private:
+   class DetourSwitch final {
+   private:
+      Detour <T> *detour_;
+
+   public:
+      DetourSwitch (Detour *detour) : detour_ (detour) {
+         detour_->restore ();
+      }
+
+      ~DetourSwitch () {
+         detour_->detour ();
+      }
+   };
+
 public:
+   
    void install (void *detour, const bool enable = false) {
       if (!original_) {
          return;
@@ -228,11 +236,8 @@ public:
    }
 
    template <typename... Args > decltype (auto) operator () (Args &&...args) {
-      restore ();
-      auto res = reinterpret_cast <T *> (original_) (args...);
-      detour ();
-
-      return res;
+      DetourSwitch sw (this);
+      return reinterpret_cast <T *> (original_) (args...);
    }
 };
 

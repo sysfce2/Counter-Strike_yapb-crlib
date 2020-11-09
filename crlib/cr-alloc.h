@@ -1,17 +1,9 @@
 //
-// CRLib - Simple library for STL replacement in private projects.
-// Copyright © 2020 YaPB Development Team <team@yapb.ru>.
+// YaPB - Counter-Strike Bot based on PODBot by Markus Klinge.
+// Copyright © 2004-2020 YaPB Project <yapb@jeefo.net>.
 //
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
+// SPDX-License-Identifier: MIT
 //
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU General Public License for more details.
-// 
 
 #pragma once
 
@@ -34,7 +26,7 @@ public:
 
 public:
    template <typename T> T *allocate (const size_t length = 1) {
-      auto memory = reinterpret_cast <T *> (malloc (length * sizeof (T)));
+      auto memory = reinterpret_cast <T *> (malloc (cr::max <size_t> (1u, length * sizeof (T))));
 
       if (!memory) {
          plat.abort ();
@@ -91,5 +83,11 @@ template <typename T> T &Singleton <T>::instance () {
    static const UniquePtr <T> instance_ { alloc.create <T> () };
    return *instance_;
 }
+
+// declare destructor for pure-virtual classes
+#define CR_DECLARE_DESTRUCTOR()        \
+   void operator delete (void *ptr) {  \
+      alloc.deallocate (ptr);          \
+   }                                   \
 
 CR_NAMESPACE_END

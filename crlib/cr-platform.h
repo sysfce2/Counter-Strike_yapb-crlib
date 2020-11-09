@@ -1,17 +1,9 @@
 //
-// CRLib - Simple library for STL replacement in private projects.
-// Copyright © 2020 YaPB Development Team <team@yapb.ru>.
+// YaPB - Counter-Strike Bot based on PODBot by Markus Klinge.
+// Copyright © 2004-2020 YaPB Project <yapb@jeefo.net>.
 //
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
+// SPDX-License-Identifier: MIT
 //
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU General Public License for more details.
-// 
 
 #pragma once
 
@@ -102,6 +94,16 @@ CR_NAMESPACE_BEGIN
 #  define __PLACEMENT_NEW_INLINE 1
 #endif
 
+// disabled gcc warnings
+#if defined (CR_CXX_GCC)
+#  pragma GCC diagnostic ignored "-Wignored-attributes"
+#endif
+
+// avoid linking to GLIBC_2.27
+#if defined (CR_LINUX) && !defined (CR_CXX_INTEL)
+   __asm__ (".symver powf, powf@GLIBC_2.0");
+#endif
+
 CR_NAMESPACE_END
 
 #if defined(CR_WINDOWS)
@@ -134,6 +136,8 @@ CR_NAMESPACE_END
 #  include <android/log.h>
 #endif
 
+#include <time.h>
+
 CR_NAMESPACE_BEGIN
 
 // helper struct for platform detection
@@ -145,6 +149,8 @@ struct Platform : public Singleton <Platform> {
    bool hfp = false;
    bool x64 = false;
    bool arm = false;
+
+   char appName[64] = {};
 
    Platform () {
 #if defined(CR_WINDOWS)
@@ -175,6 +181,11 @@ struct Platform : public Singleton <Platform> {
       arm = true;
       android = true;
 #endif
+   }
+
+   // set the app name
+   void setAppName (const char *name) {
+      snprintf (appName, cr::bufsize (appName), "%s", name);
    }
 
    // helper platform-dependant functions
@@ -227,12 +238,14 @@ struct Platform : public Singleton <Platform> {
       QueryPerformanceFrequency (&freq);
       QueryPerformanceCounter (&count);
 
-      return static_cast <float> (count.QuadPart) / static_cast <float> (freq.QuadPart);
+      return static_cast <float> (count.QuadPart / freq.QuadPart);
 #else
       timeval tv;
-      gettimeofday (&tv, NULL);
+      gettimeofday (&tv, nullptr);
 
-      return static_cast <float> (tv.tv_sec) + (static_cast <float> (tv.tv_usec)) / 1000000.0;
+      static auto startTime = tv.tv_sec;
+
+      return static_cast <float> (tv.tv_sec - startTime);
 #endif
    }
 
@@ -240,12 +253,12 @@ struct Platform : public Singleton <Platform> {
       fprintf (stderr, "%s\n", msg);
 
 #if defined (CR_ANDROID)
-      __android_log_write (ANDROID_LOG_ERROR, "crlib.fatal", msg);
+      __android_log_write (ANDROID_LOG_ERROR, appName, msg);
 #endif
 
 #if defined(CR_WINDOWS)
       DestroyWindow (GetForegroundWindow ());
-      MessageBoxA (GetActiveWindow (), msg, "crlib.fatal", MB_ICONSTOP);
+      MessageBoxA (GetActiveWindow (), msg, appName, MB_ICONSTOP);
 #endif
       ::abort ();
    }

@@ -1,16 +1,8 @@
 //
-// CRLib - Simple library for STL replacement in private projects.
-// Copyright © 2020 YaPB Development Team <team@yapb.ru>.
+// YaPB - Counter-Strike Bot based on PODBot by Markus Klinge.
+// Copyright © 2004-2020 YaPB Project <yapb@jeefo.net>.
 //
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU General Public License for more details.
+// SPDX-License-Identifier: MIT
 // 
 
 #pragma once
@@ -111,8 +103,15 @@ private:
       return hash_ (key) % length;
    }
 
-   void rehash () {
-      auto capacity = (capacity_ << 1);
+   void rehash (size_t targetCapacity) {
+      if (length_ + targetCapacity < capacity_) {
+         return;
+      }
+      auto capacity = capacity_ ? capacity_ : 3;
+
+      while (length_ + targetCapacity > capacity) {
+         capacity *= 2;
+      }
       auto contents = cr::makeUnique <Entries> (capacity);
 
       for (size_t i = 0; i < capacity_; ++i) {
@@ -196,7 +195,7 @@ public:
       for (size_t i = 0; i < capacity_; ++i) {
          contents_[i].used = false;
       }
-      rehash ();
+      rehash (0);
    }
 
    void foreach (Lambda <void (const K &, const V &)> callback) {
@@ -209,8 +208,8 @@ public:
 
 public:
    V &operator [] (const K &key) {
-      if ((length_ << 1) > capacity_) {
-         rehash ();
+      if (length_ >= capacity_) {
+         rehash (length_ << 1);
       }
       auto result = put (key, contents_, capacity_);
 

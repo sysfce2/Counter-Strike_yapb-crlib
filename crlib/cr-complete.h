@@ -1,17 +1,9 @@
 //
-// CRLib - Simple library for STL replacement in private projects.
-// Copyright © 2020 YaPB Development Team <team@yapb.ru>.
+// YaPB - Counter-Strike Bot based on PODBot by Markus Klinge.
+// Copyright © 2004-2020 YaPB Project <yapb@jeefo.net>.
 //
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
+// SPDX-License-Identifier: MIT
 //
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU General Public License for more details.
-// 
 
 #pragma once
 
@@ -20,6 +12,7 @@
 #include <crlib/cr-basic.h>
 #include <crlib/cr-alloc.h>
 #include <crlib/cr-array.h>
+#include <crlib/cr-deque.h>
 #include <crlib/cr-binheap.h>
 #include <crlib/cr-files.h>
 #include <crlib/cr-lambda.h>
