@@ -7,8 +7,7 @@
 
 #pragma once
 
-#include <crlib/cr-alloc.h>
-#include <crlib/cr-uniqueptr.h>
+#include <crlib/cr-memory.h>
 #include <crlib/cr-twin.h>
 
 CR_NAMESPACE_BEGIN
@@ -16,8 +15,8 @@ CR_NAMESPACE_BEGIN
 template <typename T> class Deque : private DenyCopying {
 private:
    size_t capacity_ {};
+   T *contents_ {};
 
-   UniquePtr <T[]> contents_ {};
    Twin <size_t, size_t> index_ {};
 
 private:
@@ -56,34 +55,41 @@ private:
 
    void extendCapacity () {
       auto capacity = capacity_ ? capacity_ * 2 : 8;
-      auto contents = cr::makeUnique <T[]> (sizeof (T) * capacity);
+      auto contents = Memory::get <T> (sizeof (T) * capacity);
+
+      auto transfer = [] (T &dst, T &src) {
+         Memory::construct (&dst, cr::move (src));
+         Memory::destruct (&src);
+      };
 
       if (index_.first < index_.second) {
          for (size_t i = 0; i < index_.second - index_.first; ++i) {
-            contents[i] = cr::move (contents_[index_.first + i]);
+            transfer (contents[i], contents_[index_.first + i]);
          }
          index_.second = index_.second - index_.first;
          index_.first = 0;
       }
       else {
          for (size_t i = 0; i < capacity_ - index_.first; ++i) {
-            contents[i] = cr::move (contents_[index_.first + i]);
+            transfer (contents[i], contents_[index_.first + i]);
          }
 
          for (size_t i = 0; i < index_.second; ++i) {
-            contents[capacity_ - index_.first + i] = cr::move (contents_[i]);
+            transfer (contents[capacity_ - index_.first + i], contents_[i]);
          }
          index_.second = index_.second + (capacity_ - index_.first);
          index_.first = 0;
       }
-      contents_ = cr::move (contents);
+      Memory::release (contents_);
+
+      contents_ = contents;
       capacity_ = capacity;
    }
 
    void destroy () {
       auto destruct = [&] (size_t start, size_t end) {
          for (size_t i = start; i < end; ++i) {
-            alloc.destruct (&contents_[i]);
+            Memory::destruct (&contents_[i]);
          }
       };
 
@@ -94,7 +100,7 @@ private:
          destruct (index_.first, capacity_);
          destruct (0, index_.second);
       }
-      contents_ = nullptr;
+      Memory::release (contents_);
    }
 
    void reset () {
@@ -108,7 +114,7 @@ public:
    explicit Deque () : capacity_ (0), contents_ (nullptr)
    { }
 
-   Deque (Deque &&rhs) : contents_ (cr::move (rhs.contents_)), capacity_ (rhs.capacity_) {
+   Deque (Deque &&rhs) : contents_ (rhs.contents_), capacity_ (rhs.capacity_) {
       index_.first (rhs.index_.first);
       index_.second (rhs.index_.second);
 
@@ -127,17 +133,17 @@ public:
    template <typename ...Args> void emplaceLast (Args &&...args) {
       auto rear = pickRearIndex ();
 
-      alloc.construct (&contents_[index_.second], cr::forward <Args> (args)...);
+      Memory::construct (&contents_[index_.second], cr::forward <Args> (args)...);
       index_.second = rear;
    }
 
    template <typename ...Args> void emplaceFront (Args &&...args) {
       index_.first = pickFrontIndex ();
-      alloc.construct (&contents_[index_.first], cr::forward <Args> (args)...);
+      Memory::construct (&contents_[index_.first], cr::forward <Args> (args)...);
    }
 
    void discardFront () {
-      alloc.destruct (&contents_[index_.first]);
+      Memory::destruct (&contents_[index_.first]);
 
       if (index_.first == capacity_ - 1) {
          index_.first = 0;
@@ -154,7 +160,7 @@ public:
       else {
          index_.second--;
       }
-      alloc.destruct (&contents_[index_.second]);
+      Memory::destruct (&contents_[index_.second]);
    }
 
    T popFront () {
@@ -210,7 +216,7 @@ public:
    Deque &operator = (Deque &&rhs) {
       destroy ();
 
-      contents_ = cr::move (rhs.contents_);
+      contents_ = rhs.contents_;
       capacity_ = rhs.capacity_;
 
       index_.first = rhs.index_.first;

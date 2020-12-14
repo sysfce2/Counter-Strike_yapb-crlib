@@ -71,6 +71,8 @@ public:
       int ch = 0;
       SmallArray <char> data (255);
 
+      line.clear ();
+
       while ((ch = get ()) != EOF && !eof ()) {
          data.push (static_cast <char> (ch));
 
@@ -78,9 +80,10 @@ public:
             break;
          }
       }
-      line.assign (data.data (), data.length ());
-
-      return !eof ();
+      if (!data.empty ()) {
+         line.assign (data.data (), data.length ());
+      }
+      return !line.empty ();
    }
 
    template <typename ...Args> size_t puts (const char *fmt, Args &&...args) {
@@ -180,8 +183,8 @@ private:
    FreeFunction freeFun_ = nullptr;
 
 public:
-   inline MemFileStorage () = default;
-   inline ~MemFileStorage () = default;
+   explicit MemFileStorage () = default;
+   ~MemFileStorage () = default;
 
 public:
    void initizalize (LoadFunction loader, FreeFunction unloader) {
@@ -212,14 +215,14 @@ public:
          return nullptr;
       }
       *size = static_cast <int> (file.length ());
-      auto data = alloc.allocate <uint8> (*size);
+      auto data = Memory::get <uint8> (*size);
 
       file.read (data, *size);
       return data;
    }
 
    static void defaultUnload (void *buffer) {
-      alloc.deallocate (buffer);
+      Memory::release (buffer);
    }
 
    static String loadToString (StringRef filename) {
@@ -282,10 +285,7 @@ public:
       if (!contents_ || seek_ >= length_) {
          return Eof;
       }
-      auto ch = contents_[seek_];
-      ++seek_;
-
-      return static_cast <char> (ch);
+      return static_cast <char> (contents_[seek_++]);
    }
 
    char *getString (char *buffer, size_t count) {
@@ -315,16 +315,20 @@ public:
       char ch;
       SmallArray <char> data (255);
 
-      while ((ch = get ()) != Eof) {
+      line.clear ();
+
+      while ((ch = get ()) != Eof && !eof ()) {
          data.push (ch);
 
          if (ch == '\n') {
             break;
          }
       }
-      line.assign (data.data (), data.length ());
 
-      return !eof ();
+      if (!data.empty ()) {
+         line.assign (data.data (), data.length ());
+      }
+      return !line.empty ();
    }
 
    size_t read (void *buffer, size_t size, size_t count = 1) {
