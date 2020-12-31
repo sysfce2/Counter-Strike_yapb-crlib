@@ -1,6 +1,6 @@
 //
 // YaPB - Counter-Strike Bot based on PODBot by Markus Klinge.
-// Copyright © 2004-2020 YaPB Project <yapb@jeefo.net>.
+// Copyright © 2004-2021 YaPB Project <yapb@jeefo.net>.
 //
 // SPDX-License-Identifier: MIT
 //
@@ -339,7 +339,6 @@ public:
    bool downloadFile (StringRef url, StringRef localPath, int32 timeout = DefaultSocketTimeout) {
       if (plat.win && !initialized_) {
          plat.abort ("Sockets not initialized.");
-         return false;
       }
 
       if (File::exists (localPath)) {
@@ -410,7 +409,6 @@ public:
    bool uploadFile (StringRef url, StringRef localPath, const int32 timeout = DefaultSocketTimeout) {
       if (plat.win && !initialized_) {
          plat.abort ("Sockets not initialized.");
-         return false;
       }
 
       if (!File::exists (localPath)) {
