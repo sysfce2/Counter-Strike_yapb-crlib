@@ -55,20 +55,23 @@ CR_NAMESPACE_BEGIN
 #  error "Can't configure export macros. Compiler unrecognized."
 #endif
 
-#if defined(__x86_64) || defined(__x86_64__) || defined(__amd64__) || defined(__amd64) || (defined(_MSC_VER) && defined(_M_X64))
+#if defined(__x86_64) || defined(__x86_64__) || defined(__amd64__) || defined(__amd64) || defined (__aarch64__) || (defined(_MSC_VER) && defined(_M_X64))
 #  define CR_ARCH_X64
 #elif defined(__i686) || defined(__i686__) || defined(__i386) || defined(__i386__) || defined(i386) || (defined(_MSC_VER) && defined(_M_IX86))
 #  define CR_ARCH_X86
 #endif
 
 #if defined(__arm__)
-#  define CR_ARCH_ARM
-#  if defined(__aarch64__)
-#     define CR_ARCH_ARM64
-#  endif
-#endif 
+#  define CR_ARCH_ARM32
+#elif defined(__aarch64__)
+#  define CR_ARCH_ARM64
+#endif
 
-#if (defined(CR_ARCH_X86) || defined(CR_ARCH_X64)) && !defined(CR_DEBUG)
+#if defined (CR_ARCH_ARM32) || defined (CR_ARCH_ARM64)
+#   define CR_ARCH_ARM
+#endif
+
+#if !defined (CR_ARCH_ARM) && !defined(CR_DEBUG)
 #  define CR_HAS_SSE
 #endif
 
@@ -78,6 +81,10 @@ CR_NAMESPACE_BEGIN
 #  else
 #     define CR_ALIGN16 __attribute__((aligned(16)))
 #  endif
+#endif
+
+#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+#  define CR_ARCH_CPU_BIG_ENDIAN
 #endif
 
 // disable warnings regarding intel compiler
@@ -100,7 +107,7 @@ CR_NAMESPACE_BEGIN
 #endif
 
 // avoid linking to GLIBC_2.27
-#if defined (CR_LINUX) && !defined (CR_CXX_INTEL)
+#if defined (CR_LINUX) && !defined (CR_CXX_INTEL) && !defined (CR_ARCH_ARM)
    __asm__ (".symver powf, powf@GLIBC_2.0");
 #endif
 
@@ -161,7 +168,7 @@ struct Platform : public Singleton <Platform> {
       android = true;
 
 #  if defined (CR_ANDROID_HARD_FP)
-         hfp = true;
+      hfp = true;
 #  endif
 #endif
 
@@ -179,7 +186,6 @@ struct Platform : public Singleton <Platform> {
 
 #if defined(CR_ARCH_ARM)
       arm = true;
-      android = true;
 #endif
    }
 
@@ -289,7 +295,11 @@ struct Platform : public Singleton <Platform> {
          free (buffer);
       }
 #else
-      strncpy (result, getenv (var), cr::bufsize (result));
+      auto data = getenv (var);
+
+      if (data) {
+         strncpy (result, data, cr::bufsize (result));
+      }
 #endif
       return result;
    }
