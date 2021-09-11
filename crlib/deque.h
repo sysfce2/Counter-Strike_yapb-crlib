@@ -7,8 +7,8 @@
 
 #pragma once
 
-#include <crlib/cr-memory.h>
-#include <crlib/cr-twin.h>
+#include <crlib/memory.h>
+#include <crlib/twin.h>
 
 CR_NAMESPACE_BEGIN
 

@@ -127,4 +127,4 @@ public:
 CR_NAMESPACE_END
 
 // platform-dependant-stuff
-#include <crlib/cr-platform.h>
+#include <crlib/platform.h>

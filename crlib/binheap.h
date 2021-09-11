@@ -7,7 +7,7 @@
 
 #pragma once
 
-#include <crlib/cr-array.h>
+#include <crlib/array.h>
 
 CR_NAMESPACE_BEGIN
 

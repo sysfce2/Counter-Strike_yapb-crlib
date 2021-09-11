@@ -7,7 +7,7 @@
 
 #pragma once
 
-#include <crlib/cr-basic.h>
+#include <crlib/basic.h>
 
 #if defined (CR_HAS_SSE)
 #  include <pmmintrin.h>

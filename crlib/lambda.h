@@ -7,8 +7,8 @@
 
 #pragma once
 
-#include <crlib/cr-memory.h>
-#include <crlib/cr-uniqueptr.h>
+#include <crlib/memory.h>
+#include <crlib/uniqueptr.h>
 
 CR_NAMESPACE_BEGIN
 

@@ -10,11 +10,11 @@
 #include <string.h>
 #include <ctype.h>
 
-#include <crlib/cr-basic.h>
-#include <crlib/cr-memory.h>
-#include <crlib/cr-movable.h>
-#include <crlib/cr-uniqueptr.h>
-#include <crlib/cr-array.h>
+#include <crlib/basic.h>
+#include <crlib/memory.h>
+#include <crlib/movable.h>
+#include <crlib/uniqueptr.h>
+#include <crlib/array.h>
 
 CR_NAMESPACE_BEGIN
 

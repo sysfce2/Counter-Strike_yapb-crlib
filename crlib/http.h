@@ -9,13 +9,13 @@
 
 #include <stdio.h>
 
-#include <crlib/cr-string.h>
-#include <crlib/cr-files.h>
-#include <crlib/cr-logger.h>
-#include <crlib/cr-twin.h>
-#include <crlib/cr-platform.h>
-#include <crlib/cr-uniqueptr.h>
-#include <crlib/cr-random.h>
+#include <crlib/string.h>
+#include <crlib/files.h>
+#include <crlib/logger.h>
+#include <crlib/twin.h>
+#include <crlib/platform.h>
+#include <crlib/uniqueptr.h>
+#include <crlib/random.h>
 
 #if defined (CR_LINUX) || defined (CR_OSX)
 #  include <netinet/in.h>

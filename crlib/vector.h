@@ -7,7 +7,7 @@
 
 #pragma once
 
-#include <crlib/cr-math.h>
+#include <crlib/math.h>
 
 CR_NAMESPACE_BEGIN
 

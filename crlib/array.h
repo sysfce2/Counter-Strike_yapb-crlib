@@ -7,10 +7,10 @@
 
 #pragma once
 
-#include <crlib/cr-basic.h>
-#include <crlib/cr-memory.h>
-#include <crlib/cr-movable.h>
-#include <crlib/cr-random.h>
+#include <crlib/basic.h>
+#include <crlib/memory.h>
+#include <crlib/movable.h>
+#include <crlib/random.h>
 
 #include <initializer_list>
 

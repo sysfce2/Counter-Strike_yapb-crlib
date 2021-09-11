@@ -7,8 +7,8 @@
 
 #pragma once
 
-#include <crlib/cr-basic.h>
-#include <crlib/cr-movable.h>
+#include <crlib/basic.h>
+#include <crlib/movable.h>
 
 CR_NAMESPACE_BEGIN
 

@@ -7,10 +7,10 @@
 
 #pragma once
 
-#include <crlib/cr-basic.h>
-#include <crlib/cr-array.h>
-#include <crlib/cr-string.h>
-#include <crlib/cr-twin.h>
+#include <crlib/basic.h>
+#include <crlib/array.h>
+#include <crlib/string.h>
+#include <crlib/twin.h>
 
 CR_NAMESPACE_BEGIN
 

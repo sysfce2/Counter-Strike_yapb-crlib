@@ -9,8 +9,8 @@
 
 #include <time.h>
 
-#include <crlib/cr-files.h>
-#include <crlib/cr-lambda.h>
+#include <crlib/files.h>
+#include <crlib/lambda.h>
 
 CR_NAMESPACE_BEGIN
 

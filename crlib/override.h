@@ -7,8 +7,8 @@
 
 #pragma once
 
-#include <crlib/cr-memory.h>
-#include <crlib/cr-platform.h>
+#include <crlib/memory.h>
+#include <crlib/platform.h>
 
 void *operator new (size_t size) {
    return cr::Memory::get <void *> (size);

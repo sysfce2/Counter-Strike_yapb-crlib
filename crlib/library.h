@@ -7,8 +7,8 @@
 
 #pragma once
 
-#include <crlib/cr-basic.h>
-#include <crlib/cr-string.h>
+#include <crlib/basic.h>
+#include <crlib/string.h>
 
 #if defined (CR_LINUX) || defined (CR_OSX)
 #  include <dlfcn.h>

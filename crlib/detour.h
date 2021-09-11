@@ -7,7 +7,7 @@
 
 #pragma once
 
-#include <crlib/cr-basic.h>
+#include <crlib/basic.h>
 
 #if !defined (CR_WINDOWS)
 #  include <sys/mman.h>

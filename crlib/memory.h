@@ -7,9 +7,9 @@
 
 #pragma once
 
-#include <crlib/cr-basic.h>
-#include <crlib/cr-movable.h>
-#include <crlib/cr-platform.h>
+#include <crlib/basic.h>
+#include <crlib/movable.h>
+#include <crlib/platform.h>
 
 // provide placment new to avoid stdc++ <new> header
 inline void *operator new (const size_t, void *ptr) noexcept {
