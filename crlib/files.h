@@ -163,7 +163,7 @@ private:
          close ();
       }
 
-#if defined (CR_WINDOWS)
+#if defined (CR_CXX_MSVC)
       fopen_s (&handle_, filename.chars (), mode.chars ());
 #else
       handle_ = fopen (filename.chars (), mode.chars ());
