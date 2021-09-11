@@ -890,7 +890,7 @@ public:
    }
 
    template <typename U> U *copy (U *dst, const U *src, size_t len) noexcept {
-#if defined(CR_WINDOWS)
+#if defined(CR_CXX_MSVC)
       strncpy_s (dst, len, src, len - 1);
       return dst;
 #else
@@ -899,7 +899,7 @@ public:
    }
 
    template <typename U> U *concat (U *dst, const U *src, size_t len) noexcept {
-#if defined(CR_WINDOWS)
+#if defined(CR_CXX_MSVC)
       strncat_s (dst, len, src, len - 1);
       return dst;
 #else

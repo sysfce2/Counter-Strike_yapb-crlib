@@ -286,7 +286,7 @@ struct Platform : public Singleton <Platform> {
       static char result[256];
       bzero (result, sizeof (result));
 
-#if defined(CR_WINDOWS) && !defined(CR_CXX_GCC)
+#if defined(CR_CXX_MSVC)
       char *buffer = nullptr;
       size_t size = 0;
 
