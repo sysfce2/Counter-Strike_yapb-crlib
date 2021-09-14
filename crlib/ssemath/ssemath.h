@@ -112,10 +112,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define SSEMATH_BUILD  0
 #endif
 
-#define _USE_MATH_DEFINES
-
-#include <math.h>
-
 #ifndef SSE_INLINE
 
 #if defined( __GNUC__ )

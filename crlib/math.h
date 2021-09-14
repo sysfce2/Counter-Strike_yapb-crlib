@@ -8,6 +8,8 @@
 #pragma once
 
 #include <crlib/basic.h>
+
+#define _USE_MATH_DEFINES
 #include <math.h>
 
 CR_NAMESPACE_BEGIN
