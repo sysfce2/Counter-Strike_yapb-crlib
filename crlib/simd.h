@@ -39,6 +39,10 @@ private:
    };
 
 public:
+#if defined (CR_CXX_MSVC)
+#   pragma warning(push)
+#   pragma warning(disable:4201)
+#endif
    union {
       __m128 m;
 
@@ -46,6 +50,9 @@ public:
          float x, y, z, w;
       };
    };
+#if defined (CR_CXX_MSVC)
+#   pragma warning(pop) 
+#endif
 
    SimdVec3Wrap (const float &x, const float &y, const float &z) {
       m = _mm_set_ps (0.0f, z, y, x);
