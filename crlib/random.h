@@ -18,7 +18,9 @@ private:
    uint64 state_ { static_cast <uint64> (time (nullptr)) };
 
 public:
-   explicit Random () = default;
+   explicit Random () {
+      warmup ();
+   }
    ~Random () = default;
 
 private:
@@ -31,6 +33,12 @@ private:
 
    uint32 wyrand32 () {
       return static_cast <uint32> (wyrand64 ());
+   }
+
+   void warmup () {
+      for (auto i = 0; i < 32; ++i) {
+         state_ ^= wyrand64 ();
+      }
    }
 
 private:

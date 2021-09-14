@@ -11,48 +11,6 @@
 
 CR_NAMESPACE_BEGIN
 
-// small simd operations for 3d vector
-#if defined (CR_HAS_SSE)
-
-template <typename T> class CR_ALIGN16 SimdWrap {
-private:
-   __m128 wrap_dp_sse2 (__m128 v1, __m128 v2) {
-      auto mul = _mm_mul_ps (v1, v2);
-      auto res = _mm_add_ps (_mm_shuffle_ps (v2, mul, _MM_SHUFFLE (1, 0, 0, 0)), mul);
-
-      mul = _mm_add_ps (_mm_shuffle_ps (mul, res, _MM_SHUFFLE (0, 3, 0, 0)), res);
-
-      return _mm_shuffle_ps (mul, mul, _MM_SHUFFLE (2, 2, 2, 2));
-   }
-
-public:
-   union {
-      __m128 m;
-
-      struct {
-         T x, y, z;
-      } vec;
-   };
-
-   SimdWrap (const T &x, const T &y, const T &z) {
-      m = _mm_set_ps (0.0f, z, y, x);
-   }
-
-   SimdWrap (const T &x, const T &y) {
-      m = _mm_set_ps (0.0f, 0.0f, y, x);
-   }
-
-   SimdWrap (__m128 m) : m (m)
-   { }
-
-public:
-   SimdWrap normalize () {
-      return { _mm_div_ps (m, _mm_sqrt_ps (wrap_dp_sse2 (m, m))) };
-   }
-};
-
-#endif
-
 // 3dmath vector
 template <typename T> class Vec3D {
 public:
@@ -71,7 +29,7 @@ public:
    { }
 
 #if defined (CR_HAS_SSE)
-   Vec3D (const SimdWrap <T> &rhs) : x (rhs.vec.x), y (rhs.vec.y), z (rhs.vec.z)
+   Vec3D (const SimdVec3Wrap &rhs) : x (rhs.x), y (rhs.y), z (rhs.z)
    { }
 #endif
 
@@ -183,11 +141,23 @@ public:
 
 public:
    T length () const {
+#if defined (CR_HAS_SSE)
+      return SimdVec3Wrap { x, y, z }.length ();
+#else
       return cr::sqrtf (lengthSq ());
+#endif
    }
 
    T length2d () const {
       return cr::sqrtf (cr::square (x) + cr::square (y));
+   }
+
+   T length2d2 () const {
+#if defined (CR_HAS_SSE)
+      return SimdVec3Wrap { x, y }.length ();
+#else
+      return cr::sqrtf (cr::square (x) + cr::square (y));
+#endif
    }
 
    T lengthSq () const {
@@ -200,7 +170,7 @@ public:
 
    Vec3D normalize () const {
 #if defined (CR_HAS_SSE)
-      return SimdWrap <T> { x, y, z }.normalize ();
+      return SimdVec3Wrap { x, y, z }.normalize ();
 #else
       auto len = length () + cr::kFloatCmpEpsilon;
 
@@ -214,7 +184,7 @@ public:
 
    Vec3D normalize2d () const {
 #if defined (CR_HAS_SSE)
-      return SimdWrap <T> { x, y }.normalize ();
+      return SimdVec3Wrap { x, y }.normalize ();
 #else
       auto len = length2d () + cr::kFloatCmpEpsilon;
 
@@ -264,36 +234,28 @@ public:
    }
 
    void angleVectors (Vec3D *forward, Vec3D *right, Vec3D *upward) const {
-      enum { pitch, yaw, roll, unused, max };
+#if defined (CR_HAS_SSE)
+      static SimdVec3Wrap s, c;
+      SimdVec3Wrap { x, y, z }.angleVectors (s, c);
+#else
+      static Vector s, c, r;
 
-      T sines[max] = { 0.0f, 0.0f, 0.0f, 0.0f };
-      T cosines[max] = { 0.0f, 0.0f, 0.0f, 0.0f };
+      r = { cr::deg2rad (x), cr::deg2rad (y), cr::deg2rad (z) };
 
-      // compute the sine and cosine compontents
-      cr::sincosf (cr::deg2rad (x), cr::deg2rad (y), cr::deg2rad (z), sines, cosines);
+      s = { cr::sinf (r.x), cr::sinf (r.y), cr::sinf (r.z) };
+      c = { cr::cosf (r.x), cr::cosf (r.y), cr::cosf (r.z) };
+#endif
 
       if (forward) {
-         *forward = {
-            cosines[pitch] * cosines[yaw],
-            cosines[pitch] * sines[yaw],
-            -sines[pitch]
-         };
+         *forward = { c.x * c.y, c.x * s.y, -s.x };
       }
 
       if (right) {
-         *right = {
-            -sines[roll] * sines[pitch] * cosines[yaw] + cosines[roll] * sines[yaw],
-            -sines[roll] * sines[pitch] * sines[yaw] - cosines[roll] * cosines[yaw],
-            -sines[roll] * cosines[pitch]
-         };
+         *right = { -s.z * s.x * c.y + c.z * s.y, -s.z * s.x * s.y - c.z * c.y, -s.z * c.x };
       }
 
       if (upward) {
-         *upward = {
-            cosines[roll] * sines[pitch] * cosines[yaw] + sines[roll] * sines[yaw],
-            upward->y = cosines[roll] * sines[pitch] * sines[yaw] - sines[roll] * cosines[yaw],
-            upward->z = cosines[roll] * cosines[pitch]
-         };
+         *upward = { c.z * s.x * c.y + s.z * s.y, c.z * s.x * s.y - s.z * c.y, c.z * c.x };
       }
    }
 

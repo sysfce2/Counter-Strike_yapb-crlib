@@ -8,11 +8,6 @@
 #pragma once
 
 #include <crlib/basic.h>
-
-#if defined (CR_HAS_SSE)
-#  include <pmmintrin.h>
-#endif
-
 #include <math.h>
 
 CR_NAMESPACE_BEGIN
@@ -20,12 +15,15 @@ CR_NAMESPACE_BEGIN
 constexpr float kFloatEpsilon = 0.01f;
 constexpr float kFloatEqualEpsilon = 0.001f;
 constexpr float kFloatCmpEpsilon = 1.192092896e-07f;
-
-constexpr float kMathPi = 3.141592653589793115997963468544185161590576171875f;
-constexpr float kMathPiHalf = kMathPi * 0.5f;
-
+constexpr float kMathPi = 3.141592653589793f;
 constexpr float kDegreeToRadians = kMathPi / 180.0f;
 constexpr float kRadiansToDegree = 180.0f / kMathPi;
+
+CR_NAMESPACE_END
+
+#include <crlib/simd.h>
+
+CR_NAMESPACE_BEGIN
 
 constexpr bool fzero (const float e) {
    return cr::abs (e) < kFloatEpsilon;
@@ -55,80 +53,81 @@ constexpr float anglesDifference (const float a, const float b) {
    return normalizeAngles (a - b);
 }
 
+#if defined (CR_HAS_SSE)
+template <> inline float min (const float &a, const float &b) {
+   return _mm_cvtss_f32 (_mm_min_ss (_mm_load_ss (&a), _mm_load_ss (&b)));
+}
+
+template <> inline float max (const float &a, const float &b) {
+   return _mm_cvtss_f32 (_mm_max_ss (_mm_load_ss (&a), _mm_load_ss (&b)));
+}
+
+template <> inline float clamp (const float &x, const float &a, const float &b) {
+   return _mm_cvtss_f32 (_mm_min_ss (_mm_max_ss (_mm_load_ss (&x), _mm_load_ss (&a)), _mm_load_ss (&b)));
+}
+#endif
+
 inline float sinf (const float value) {
+#if defined (CR_HAS_SSE)
+   return _mm_cvtss_f32 (ssemath::sin_ps (_mm_load_ss (&value)));
+#else
    return ::sinf (value);
+#endif
 }
 
 inline float cosf (const float value) {
+#if defined (CR_HAS_SSE)
+   return _mm_cvtss_f32 (ssemath::cos_ps (_mm_load_ss (&value)));
+#else
    return ::cosf (value);
-}
-
-inline float atanf (const float value) {
-   return ::atanf (value);
+#endif
 }
 
 inline float atan2f (const float y, const float x) {
+#if defined (CR_HAS_SSE)
+   return _mm_cvtss_f32 (ssemath::atan2_ps (_mm_load_ss (&y), _mm_load_ss (&x)));
+#else
    return ::atan2f (y, x);
+#endif
 }
 
 inline float powf (const float x, const float y) {
+#if defined (CR_HAS_SSE)
+   return _mm_cvtss_f32 (ssemath::pow_ps (_mm_load_ss (&x), _mm_load_ss (&y)));
+#else
    return ::powf (x, y);
+#endif
 }
 
 inline float sqrtf (const float value) {
+#if defined (CR_HAS_SSE)
+   return _mm_cvtss_f32 (_mm_sqrt_ss (_mm_load_ss (&value)));
+#else
    return ::sqrtf (value);
+#endif
 }
 
 inline float tanf (const float value) {
+#if defined (CR_HAS_SSE)
+   return _mm_cvtss_f32 (ssemath::tan_ps (_mm_load_ss (&value)));
+#else
    return ::tanf (value);
+#endif
 }
 
 inline float ceilf (const float value) {
+#if defined (CR_HAS_SSE)
+   return _mm_cvtss_f32 (ssemath::ceil_ps (_mm_load_ss (&value)));
+#else
    return ::ceilf (value);
+#endif
 }
 
-inline void sincosf (const float x, const float y, const float z, float *sines, float *cosines) {
+inline float log10 (const float value) {
 #if defined (CR_HAS_SSE)
-   auto set = _mm_set_ps (x, y, z, 0.0f);
-
-   auto _mm_sin = [] (__m128 rad) -> __m128 {
-      static auto pi2 = _mm_set_ps1 (kMathPi * 2);
-      static auto rp1 = _mm_set_ps1 (4.0f / kMathPi);
-      static auto rp2 = _mm_set_ps1 (-4.0f / (kMathPi * kMathPi));
-      static auto val = _mm_cmpnlt_ps (rad, _mm_set_ps1 (kMathPi));
-      static auto csi = _mm_castsi128_ps (_mm_set1_epi32 (0x80000000));
-
-      val = _mm_and_ps (val, pi2);
-      rad = _mm_sub_ps (rad, val);
-      val = _mm_cmpngt_ps (rad, _mm_set_ps1 (-kMathPi));
-      val = _mm_and_ps (val, pi2);
-      rad = _mm_add_ps (rad, val);
-      val = _mm_mul_ps (_mm_andnot_ps (csi, rad), rp2);
-      val = _mm_add_ps (val, rp1);
-
-      auto si = _mm_mul_ps (val, rad);
-
-      val = _mm_mul_ps (_mm_andnot_ps (csi, si), si);
-      val = _mm_sub_ps (val, si);
-      val = _mm_mul_ps (val, _mm_set_ps1 (0.225f));
-
-      return _mm_add_ps (val, si);
-   };
-   static auto hpi = _mm_set_ps1 (kMathPiHalf);
-
-   auto s = _mm_sin (set);
-   auto c = _mm_sin (_mm_add_ps (set, hpi));
-
-   _mm_store_ps (sines, _mm_shuffle_ps (s, s, _MM_SHUFFLE (0, 1, 2, 3)));
-   _mm_store_ps (cosines, _mm_shuffle_ps (c, c, _MM_SHUFFLE (0, 1, 2, 3)));
+   return _mm_cvtss_f32 (ssemath::log10_ps (_mm_load_ss (&value)));
 #else
-   sines[0] = cr::sinf (x);
-   sines[1] = cr::sinf (y);
-   sines[2] = cr::sinf (z);
-
-   cosines[0] = cr::cosf (x);
-   cosines[1] = cr::cosf (y);
-   cosines[2] = cr::cosf (z);
+   return ::log10f (value);
 #endif
 }
 
