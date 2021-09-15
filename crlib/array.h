@@ -65,13 +65,6 @@ private:
       }
    }
 
-   void transferElements (T *dest, T *src, size_t length) noexcept {
-      for (size_t i = 0; i < length; ++i) {
-         Memory::construct (&dest[i], cr::move (src[i]));
-         Memory::destruct (&src[i]);
-      }
-   }
-
    void destroy () {
       destructElements ();
       Memory::release (contents_);
@@ -101,7 +94,7 @@ public:
       auto data = Memory::get <T> (capacity);
 
       if (contents_) {
-         transferElements (data, contents_, length_);
+         Memory::transfer (data, contents_, length_);
          Memory::release (contents_);
       }
 
@@ -310,8 +303,8 @@ public:
       }
 
       auto data = Memory::get <T> (length_);
-      transferElements (data, contents_, length_);
 
+      Memory::transfer (data, contents_, length_);
       Memory::release (contents_);
 
       contents_ = data;

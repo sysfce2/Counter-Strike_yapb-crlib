@@ -430,7 +430,6 @@ public:
 
       length_ = length;
       chars_[length_] = kNullChar;
-
       return *this;
    }
 

@@ -47,6 +47,13 @@ public:
    template <typename T> static void destruct (T *memory) {
       memory->~T ();
    }
+
+   template <typename T> static void transfer (T *dest, T *src, size_t length) noexcept {
+      for (size_t i = 0; i < length; ++i) {
+         construct (&dest[i], cr::move (src[i]));
+         destruct (&src[i]);
+      }
+   }
 };
 
 CR_NAMESPACE_END

@@ -241,7 +241,7 @@ struct Platform : public Singleton <Platform> {
 
    float seconds () {
 #if defined(CR_WINDOWS)
-      LARGE_INTEGER count, freq;
+      LARGE_INTEGER count {}, freq {};
 
       count.QuadPart = 0;
       freq.QuadPart = 0;
@@ -276,15 +276,7 @@ struct Platform : public Singleton <Platform> {
 
    // anologue of memset
    template <typename U> void bzero (U *ptr, size_t len) noexcept {
-#if defined (CR_WINDOWS)
-      memset (ptr, 0, len);
-#else
-      auto zeroing = reinterpret_cast <uint8 *> (ptr);
-
-      for (size_t i = 0; i < len; ++i) {
-         zeroing[i] = 0;
-      }
-#endif
+      memset (reinterpret_cast <void *> (ptr), 0, len);
    }
 
    const char *env (const char *var) {
