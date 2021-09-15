@@ -223,7 +223,7 @@ public:
       if (cr::fzero (x) && cr::fzero (y)) {
          return 0.0f;
       }
-      return cr::rad2deg (cr:: atan2f (y, x));
+      return cr::rad2deg (cr::atan2f (y, x));
    }
 
    Vec3D angles () const {
