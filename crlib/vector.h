@@ -238,7 +238,7 @@ public:
       static SimdVec3Wrap s, c;
       SimdVec3Wrap { x, y, z }.angleVectors (s, c);
 #else
-      static Vector s, c, r;
+      static Vec3D s, c, r;
 
       r = { cr::deg2rad (x), cr::deg2rad (y), cr::deg2rad (z) };
 

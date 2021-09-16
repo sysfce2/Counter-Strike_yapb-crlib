@@ -86,20 +86,15 @@ public:
 };
 
 // singleton for objects
-template<typename T> class Singleton : public DenyCopying {
+template <typename T> class Singleton : public DenyCopying {
 protected:
-   Singleton () 
-   { }
+   Singleton () = default;
+   ~Singleton () = default;
 
 public:
-   static T &instance () {
+   static  T &instance () {
       static T __instance {};
       return __instance;
-   }
-
-public:
-   T *operator -> () {
-      return &instance ();
    }
 };
 

@@ -859,14 +859,14 @@ public:
    }
 
    template <typename U, typename ...Args> U *format (const U *fmt, Args &&...args) noexcept {
-      auto buffer = Singleton <StringBuffer>::instance ()->chars ();
+      auto buffer = chars ();
       fmtwrap.exec (buffer, StaticBufferSize, fmt, args...);
 
       return buffer;
    }
 
    template <typename U> U *format (const U *fmt) noexcept {
-      auto buffer = Singleton <StringBuffer>::instance ()->chars ();
+      auto buffer = chars ();
       copy (buffer, fmt, StaticBufferSize);
 
       return buffer;

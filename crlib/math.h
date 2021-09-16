@@ -27,11 +27,29 @@ CR_NAMESPACE_END
 
 CR_NAMESPACE_BEGIN
 
-constexpr bool fzero (const float e) {
+#if defined (CR_HAS_SSE)
+template <> inline float abs (const float &x) {
+   return _mm_cvtss_f32 (ssemath::fabs_ps (_mm_load_ss (&x)));
+}
+
+template <> inline float min (const float &a, const float &b) {
+   return _mm_cvtss_f32 (_mm_min_ss (_mm_load_ss (&a), _mm_load_ss (&b)));
+}
+
+template <> inline float max (const float &a, const float &b) {
+   return _mm_cvtss_f32 (_mm_max_ss (_mm_load_ss (&a), _mm_load_ss (&b)));
+}
+
+template <> inline float clamp (const float &x, const float &a, const float &b) {
+   return _mm_cvtss_f32 (_mm_min_ss (_mm_max_ss (_mm_load_ss (&x), _mm_load_ss (&a)), _mm_load_ss (&b)));
+}
+#endif
+
+static inline bool fzero (const float e) {
    return cr::abs (e) < kFloatEpsilon;
 }
 
-constexpr bool fequal (const float a, const float b) {
+static inline bool fequal (const float a, const float b) {
    return cr:: abs (a - b) < kFloatEqualEpsilon;
 }
 
@@ -54,20 +72,6 @@ constexpr float normalizeAngles (const float a) {
 constexpr float anglesDifference (const float a, const float b) {
    return normalizeAngles (a - b);
 }
-
-#if defined (CR_HAS_SSE)
-template <> inline float min (const float &a, const float &b) {
-   return _mm_cvtss_f32 (_mm_min_ss (_mm_load_ss (&a), _mm_load_ss (&b)));
-}
-
-template <> inline float max (const float &a, const float &b) {
-   return _mm_cvtss_f32 (_mm_max_ss (_mm_load_ss (&a), _mm_load_ss (&b)));
-}
-
-template <> inline float clamp (const float &x, const float &a, const float &b) {
-   return _mm_cvtss_f32 (_mm_min_ss (_mm_max_ss (_mm_load_ss (&x), _mm_load_ss (&a)), _mm_load_ss (&b)));
-}
-#endif
 
 inline float sinf (const float value) {
 #if defined (CR_HAS_SSE)
