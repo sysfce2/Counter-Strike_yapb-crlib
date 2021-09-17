@@ -10,7 +10,7 @@
 #include <crlib/basic.h>
 
 #if defined (CR_HAS_SSE)
-#  include CR_INRIN_INCLUDE
+#  include CR_INTRIN_INCLUDE
 #endif
 
 CR_NAMESPACE_BEGIN
@@ -41,7 +41,7 @@ private:
 public:
 #if defined (CR_CXX_MSVC)
 #   pragma warning(push)
-#   pragma warning(disable:4201)
+#   pragma warning(disable: 4201)
 #endif
    union {
       __m128 m;
@@ -71,10 +71,6 @@ public:
 public:
    SimdVec3Wrap normalize () {
       return { _mm_div_ps (m, _mm_sqrt_ps (_mm_dp_ps_2 (m, m))) };
-   }
-
-   float length () {
-      return _mm_cvtss_f32 (_mm_sqrt_ps (_mm_dp_ps_2 (m, m)));
    }
 
    void angleVectors (SimdVec3Wrap &sines, SimdVec3Wrap &cosines) {

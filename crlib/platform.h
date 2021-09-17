@@ -74,9 +74,9 @@ CR_NAMESPACE_BEGIN
 #if !defined(CR_DISABLE_SSE) && !defined(CR_DEBUG)
 #  define CR_HAS_SSE
 #  if !defined (CR_ARCH_ARM)
-#     define CR_INRIN_INCLUDE <emmintrin.h>
+#     define CR_INTRIN_INCLUDE <emmintrin.h>
 #  else
-#     define CR_INRIN_INCLUDE <crlib/ssemath/sse2neon.h>
+#     define CR_INTRIN_INCLUDE <crlib/ssemath/sse2neon.h>
 #  endif
 #endif
 

@@ -141,27 +141,27 @@ public:
 
 public:
    T length () const {
-#if defined (CR_HAS_SSE)
-      return SimdVec3Wrap { x, y, z }.length ();
-#else
       return cr::sqrtf (lengthSq ());
-#endif
    }
 
    T length2d () const {
       return cr::sqrtf (cr::square (x) + cr::square (y));
    }
 
-   T length2d2 () const {
-#if defined (CR_HAS_SSE)
-      return SimdVec3Wrap { x, y }.length ();
-#else
-      return cr::sqrtf (cr::square (x) + cr::square (y));
-#endif
-   }
-
    T lengthSq () const {
       return cr::square (x) + cr::square (y) + cr::square (z);
+   }
+
+   T distance (const Vec3D &rhs) const {
+      return (*this - rhs).length ();
+   }
+
+   T distance2d (const Vec3D &rhs) const {
+      return (*this - rhs).length2d ();
+   }
+
+   T distanceSq (const Vec3D &rhs) const {
+      return (*this - rhs).lengthSq ();
    }
 
    Vec3D get2d () const {
