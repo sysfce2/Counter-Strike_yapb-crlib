@@ -279,6 +279,14 @@ struct Platform : public Singleton <Platform> {
       memset (reinterpret_cast <void *> (ptr), 0, len);
    }
 
+   void loctime (tm *_tm, const time_t *_time) {
+#if defined (CR_WINDOWS)
+      localtime_s (_tm, _time);
+#else
+      localtime_r (_time, _tm);
+#endif
+   }
+
    const char *env (const char *var) {
       static char result[256];
       bzero (result, sizeof (result));

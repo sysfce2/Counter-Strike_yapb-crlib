@@ -54,11 +54,7 @@ private:
       time_t ticks = time (&ticks);
       tm timeinfo {};
 
-#if defined (CR_WINDOWS)
-      localtime_s (&timeinfo, &ticks);
-#else
-      localtime_r (&ticks, &timeinfo);
-#endif
+      plat.loctime (&timeinfo, &ticks);
 
       auto timebuf = strings.chars ();
       strftime (timebuf, StringBuffer::StaticBufferSize, "%Y-%m-%d %H:%M:%S", &timeinfo);
