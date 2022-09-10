@@ -149,7 +149,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define DECLARE_SSEMATH_PS( Name, Val ) \
     static const float SSEMATH_PS_##Name[ 4 ]     __attribute__( ( aligned( 16 ) ) ) = { Val, Val, Val, Val };
 #define DECLARE_SSEMATH_PI32( Name, Val ) \
-    static const int   SSEMATH_PI32_##Name[ 4 ]   __attribute__( ( aligned( 16 ) ) ) = { Val, Val, Val, Val };
+    static const unsigned long   SSEMATH_PI32_##Name[ 4 ]   __attribute__( ( aligned( 16 ) ) ) = { (unsigned long) Val, (unsigned long) Val, (unsigned long) Val, (unsigned long) Val };
 
 #endif
 
