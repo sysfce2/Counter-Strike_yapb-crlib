@@ -21,6 +21,7 @@ public:
 private:
    String filename_;
    PrintFunction printFun_;
+   bool disableLogWrite_ = false;
 
 public:
    explicit SimpleLogger () = default;
@@ -51,6 +52,10 @@ public:
 
 private:
    void logToFile (const char *level, const char *msg) {
+      if (disableLogWrite_) {
+         return;
+      }
+
       time_t ticks = time (&ticks);
       tm timeinfo {};
 
@@ -99,6 +104,11 @@ public:
    void initialize (StringRef filename, PrintFunction printFunction) {
       printFun_ = cr::move (printFunction);
       filename_ = filename;
+      disableLogWrite_ = false;
+   }
+
+   void disableLogWrite(bool enable) {
+      disableLogWrite_ = enable;
    }
 };
 
