@@ -32,12 +32,6 @@ private:
       return _mm_shuffle_ps (ref, ref, _MM_SHUFFLE (2, 2, 2, 2));
    }
 
-private:
-   static constexpr float d2r[4] = {
-      kDegreeToRadians, kDegreeToRadians,
-      kDegreeToRadians, kDegreeToRadians
-   };
-
 public:
 #if defined (CR_CXX_MSVC)
 #   pragma warning(push)
@@ -74,6 +68,10 @@ public:
    }
 
    void angleVectors (SimdVec3Wrap &sines, SimdVec3Wrap &cosines) {
+      static constexpr float d2r[4] = {
+         kDegreeToRadians, kDegreeToRadians,
+         kDegreeToRadians, kDegreeToRadians
+      };
       ssemath::sincos_ps (_mm_mul_ps (m, _mm_load_ps (d2r)), sines.m, cosines.m);
    }
 };
