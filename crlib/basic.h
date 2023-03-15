@@ -93,7 +93,7 @@ protected:
 
 public:
    static  T &instance () {
-      static T __instance {};
+      static T __instance;
       return __instance;
    }
 };

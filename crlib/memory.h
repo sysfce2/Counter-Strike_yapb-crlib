@@ -12,9 +12,11 @@
 #include <crlib/platform.h>
 
 // provide placment new to avoid stdc++ <new> header
+#if !defined(CR_COMPAT_STL)
 inline void *operator new (const size_t, void *ptr) noexcept {
    return ptr;
 }
+#endif
 
 CR_NAMESPACE_BEGIN
 
