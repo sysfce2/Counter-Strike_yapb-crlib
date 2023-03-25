@@ -114,6 +114,7 @@ CR_NAMESPACE_BEGIN
 // avoid linking to GLIBC_2.27
 #if defined (CR_LINUX) && !defined (CR_CXX_INTEL) && !defined (CR_ARCH_ARM)
    __asm__ (".symver powf, powf@GLIBC_2.0");
+   __asm__ (".symver dlsym, dlsym@GLIBC_2.0");
 #endif
 
 CR_NAMESPACE_END
