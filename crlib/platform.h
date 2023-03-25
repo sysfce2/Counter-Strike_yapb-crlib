@@ -111,14 +111,19 @@ CR_NAMESPACE_BEGIN
 #  pragma GCC diagnostic ignored "-Wignored-attributes"
 #endif
 
+#if defined (CR_ARCH_ARM)
+#  define GLIBC_VERSION_MIN "2.17"
+#else
+#  define GLIBC_VERSION_MIN "2.0"
+#endif
+
 // avoid linking to high GLIBC versions
-#if defined (CR_LINUX) && !defined (CR_CXX_INTEL) && !defined (CR_ARCH_ARM)
-   __asm__ (".symver powf, powf@GLIBC_2.0");
-   __asm__ (".symver powf, powf@GLIBC_2.0");
-   __asm__ (".symver dlsym, dlsym@GLIBC_2.0");
-   __asm__ (".symver dladdr, dladdr@GLIBC_2.0");
-   __asm__ (".symver dlclose, dlclose@GLIBC_2.0");
-   __asm__ (".symver dlopen, dlopen@GLIBC_2.0");
+#if defined (CR_LINUX) && !defined (CR_CXX_INTEL)
+   __asm__ (".symver powf, powf@GLIBC_" GLIBC_VERSION_MIN);
+   __asm__ (".symver dlsym, dlsym@GLIBC_" GLIBC_VERSION_MIN);
+   __asm__ (".symver dladdr, dladdr@GLIBC_" GLIBC_VERSION_MIN);
+   __asm__ (".symver dlclose, dlclose@GLIBC_" GLIBC_VERSION_MIN);
+   __asm__ (".symver dlopen, dlopen@GLIBC_" GLIBC_VERSION_MIN);
 #endif
 
 CR_NAMESPACE_END
