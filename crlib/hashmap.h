@@ -105,13 +105,13 @@ private:
       return hash_ (key) % length;
    }
 
-   void rehash (size_t targetCapacity) {
-      if (length_ + targetCapacity < capacity_) {
+   void rehash (size_t amount) {
+      if (length_ + amount < capacity_) {
          return;
       }
       auto capacity = capacity_ ? capacity_ : 3;
 
-      while (length_ + targetCapacity > capacity) {
+      while (length_ + amount > capacity) {
          capacity *= 2;
       }
       auto contents = cr::makeUnique <Entries> (capacity);

@@ -25,6 +25,10 @@ CR_NAMESPACE_BEGIN
 #     endif
 #endif
 
+#if !defined (CR_DEBUG) && (defined(DEBUG) || defined(_DEBUG))
+#  define CR_DEBUG
+#endif
+
 // detects the compiler
 #if defined(_MSC_VER)
 #  define CR_CXX_MSVC _MSC_VER
@@ -32,10 +36,6 @@ CR_NAMESPACE_BEGIN
 
 #if defined(__clang__)
 #  define CR_CXX_CLANG __clang__
-#endif
-
-#if defined(__INTEL_COMPILER)
-#  define CR_CXX_INTEL __INTEL_COMPILER
 #endif
 
 #if defined(__GNUC__)
@@ -71,7 +71,7 @@ CR_NAMESPACE_BEGIN
 #   define CR_ARCH_ARM
 #endif
 
-#if !defined(CR_DISABLE_SSE) && !defined(CR_DEBUG)
+#if !defined(CR_DISABLE_SSE)
 #  define CR_HAS_SSE
 #  if !defined (CR_ARCH_ARM)
 #     define CR_INTRIN_INCLUDE <emmintrin.h>
@@ -92,33 +92,22 @@ CR_NAMESPACE_BEGIN
 #  define CR_ARCH_CPU_BIG_ENDIAN
 #endif
 
-// disable warnings regarding intel compiler
-#if defined(CR_CXX_INTEL)
-#  pragma warning (disable : 3280) // declaration hides member "XXX" (declared at line XX)
-#  pragma warning (disable : 2415) // variable "XXX" of static storage duration was declared but never referenced
-#  pragma warning (disable : 873)  // function "operator new(size_t={unsigned int}, void *)" has no corresponding operator delete (to be called if an exception is thrown during initialization of an allocated object)
-#  pragma warning (disable : 383)  // value copied to temporary, reference to temporary used
-#  pragma warning (disable : 11074 11075) // remarks about inlining bla-bla-bla
-#endif
-
 // msvc provides us placement new by default
 #if defined (CR_CXX_MSVC)
 #  define __PLACEMENT_NEW_INLINE 1
 #endif
 
-// disabled gcc warnings
-#if defined (CR_CXX_GCC)
-#  pragma GCC diagnostic ignored "-Wignored-attributes"
-#endif
-
+// set the minimal glibc as we can
 #if defined (CR_ARCH_ARM)
 #  define GLIBC_VERSION_MIN "2.17"
+#elif defined (CR_ARCH_X64) && !defined (CR_ARCH_ARM)
+#  define GLIBC_VERSION_MIN "2.12"
 #else
 #  define GLIBC_VERSION_MIN "2.0"
 #endif
 
 // avoid linking to high GLIBC versions
-#if defined (CR_LINUX) && !defined (CR_CXX_INTEL)
+#if defined (CR_LINUX)
    __asm__ (".symver powf, powf@GLIBC_" GLIBC_VERSION_MIN);
    __asm__ (".symver dlsym, dlsym@GLIBC_" GLIBC_VERSION_MIN);
    __asm__ (".symver dladdr, dladdr@GLIBC_" GLIBC_VERSION_MIN);

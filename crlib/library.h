@@ -23,7 +23,13 @@ CR_NAMESPACE_BEGIN
 // handling dynamic library loading
 class SharedLibrary final : public DenyCopying {
 public:
+#if defined (CR_WINDOWS)
+   using Handle = HMODULE;
+   using Func = FARPROC;
+#else
    using Handle = void *;
+   using Func = void *;
+#endif
 
 private:
    Handle handle_ = nullptr;
@@ -63,7 +69,7 @@ public:
       return handle_ != nullptr;
    }
 
-   bool locate (Handle address) {
+   bool locate (void *address) {
       unloadable_ = false;
 
 #if defined (CR_WINDOWS)

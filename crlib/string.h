@@ -492,7 +492,7 @@ public:
    }
 
    const char *chars () const {
-      return chars_ ? chars_.get () : &kNullChar;
+      return chars_ ? chars_.get () : "\0";
    }
 
    size_t length () const {
@@ -508,7 +508,7 @@ public:
    }
 
    void clear () {
-      assign (&kNullChar);
+      assign ("\0");
    }
 
    StringRef str () const {

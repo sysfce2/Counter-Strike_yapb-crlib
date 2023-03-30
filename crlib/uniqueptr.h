@@ -92,7 +92,7 @@ public:
 
 template <typename T> class UniquePtr <T[]> final : public DenyCopying {
 private:
-   T *ptr_ { };
+   T *ptr_ {};
 
 public:
    UniquePtr () = default;
@@ -198,7 +198,11 @@ template <typename T, typename... Args> typename detail::UniqueIf <T>::SingleObj
 
 template <typename T> typename detail::UniqueIf <T>::UnknownBound makeUnique (size_t size) {
    using Type = typename detail::ClearExtent <T>::Type;
-   return UniquePtr<T> (new Type[size] ());
+
+#if defined (CR_CXX_GCC)
+   assert (size > 0 && size < PTRDIFF_MAX);
+#endif
+   return UniquePtr <T> (new Type[size] ());
 }
 
 template <typename T, typename... Args> typename detail::UniqueIf <T>::KnownBound makeUnique (Args &&...) = delete;

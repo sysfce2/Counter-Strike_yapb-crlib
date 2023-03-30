@@ -97,7 +97,6 @@ public:
          Memory::transfer (data, contents_, length_);
          Memory::release (contents_);
       }
-
       contents_ = data;
       capacity_ = capacity;
 
@@ -313,11 +312,11 @@ public:
       return true;
    }
 
-   const T &at (size_t index) const {
+   template <typename U> const T &at (U index) const {
       return contents_[index];
    }
 
-   T &at (size_t index) {
+   template <typename U> T &at (U index) {
       return contents_[index];
    }
 
@@ -368,11 +367,11 @@ public:
    }
 
 public:
-   const T &operator [] (size_t index) const {
+   template <typename U> const T &operator [] (U index) const {
       return at (index);
    }
 
-   T &operator [] (size_t index) {
+   template <typename U> T &operator [] (U index) {
       return at (index);
    }
 

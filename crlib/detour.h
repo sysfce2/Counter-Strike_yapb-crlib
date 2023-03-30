@@ -98,7 +98,7 @@ private:
    void *original_ = nullptr;
    void *detour_ = nullptr;
 
-   Array <uint8> savedBytes_ { };
+   Array <uint8> savedBytes_ {};
    Array <uint8> jmpBuffer_
 
 #ifdef CR_ARCH_X64

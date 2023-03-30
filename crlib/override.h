@@ -10,28 +10,31 @@
 #include <crlib/memory.h>
 #include <crlib/platform.h>
 
+using crmem = cr::Memory;
+
+// override all the operators to get rid of linking to stdc++
 void *operator new (size_t size) {
-   return cr::Memory::get <void *> (size);
+   return crmem::get <void *> (size);
 }
 
 void *operator new [] (size_t size) {
-   return cr::Memory::get <void *> (size);
+   return crmem::get <void *> (size);
 }
 
 void operator delete (void *ptr) noexcept {
-   cr::Memory::release (ptr);
+   crmem::release (ptr);
 }
 
 void operator delete [] (void *ptr) noexcept {
-   cr::Memory::release (ptr);
+   crmem::release (ptr);
 }
 
 void operator delete (void *ptr, size_t) noexcept {
-   cr::Memory::release (ptr);
+   crmem::release (ptr);
 }
 
 void operator delete [] (void *ptr, size_t) noexcept {
-   cr::Memory::release (ptr);
+   crmem::release (ptr);
 }
 
 CR_LINKAGE_C void __cxa_pure_virtual () {
