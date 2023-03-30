@@ -113,7 +113,7 @@ inline float floorf (const float value) {
 #if defined (CR_HAS_SSE)
    return _mm_cvtss_f32 (cr::ssemath::floor_ps (_mm_load_ss (&value)));
 #else
-   return ::log10f (value);
+   return ::floorf (value);
 #endif
 }
 
