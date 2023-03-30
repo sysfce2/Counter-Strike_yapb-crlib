@@ -205,8 +205,8 @@ public:
    }
 
    Vec3D clampAngles () {
-      x = cr::normalizeAngles (x);
-      y = cr::normalizeAngles (y);
+      x = cr::wrapAngle (x);
+      y = cr::wrapAngle (y);
       z = 0.0f;
 
       return *this;

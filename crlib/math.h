@@ -45,34 +45,6 @@ template <> inline float clamp (const float &x, const float &a, const float &b) 
 }
 #endif
 
-static inline bool fzero (const float e) {
-   return cr::abs (e) < kFloatEpsilon;
-}
-
-static inline bool fequal (const float a, const float b) {
-   return cr:: abs (a - b) < kFloatEqualEpsilon;
-}
-
-constexpr float rad2deg (const float r) {
-   return r * kRadiansToDegree;
-}
-
-constexpr float deg2rad (const float d) {
-   return d * kDegreeToRadians;
-}
-
-constexpr float modAngles (const float a) {
-   return 360.0f / 65536.0f * (static_cast <int> (a * (65536.0f / 360.0f)) & 65535);
-}
-
-constexpr float normalizeAngles (const float a) {
-   return 360.0f / 65536.0f * (static_cast <int> ((a + 180.0f) * (65536.0f / 360.0f)) & 65535) - 180.0f;
-}
-
-constexpr float anglesDifference (const float a, const float b) {
-   return normalizeAngles (a - b);
-}
-
 inline float sinf (const float value) {
 #if defined (CR_HAS_SSE)
    return _mm_cvtss_f32 (ssemath::sin_ps (_mm_load_ss (&value)));
@@ -135,6 +107,46 @@ inline float log10 (const float value) {
 #else
    return ::log10f (value);
 #endif
+}
+
+inline float floorf (const float value) {
+#if defined (CR_HAS_SSE)
+   return _mm_cvtss_f32 (cr::ssemath::floor_ps (_mm_load_ss (&value)));
+#else
+   return ::log10f (value);
+#endif
+}
+
+static inline bool fzero (const float e) {
+   return cr::abs (e) < kFloatEpsilon;
+}
+
+static inline bool fequal (const float a, const float b) {
+   return cr::abs (a - b) < kFloatEqualEpsilon;
+}
+
+constexpr float rad2deg (const float r) {
+   return r * kRadiansToDegree;
+}
+
+constexpr float deg2rad (const float d) {
+   return d * kDegreeToRadians;
+}
+
+template <int Degree> float _wrapAngleFn (float x) {
+   return x - 2.0f * static_cast <float> (Degree) * cr::floorf (x / (2.0f * static_cast <float> (Degree)) + 0.5f);
+}
+
+static inline float wrapAngle360 (float a) {
+   return _wrapAngleFn <360> (a);
+}
+
+static inline float wrapAngle (const float a) {
+   return _wrapAngleFn <180> (a);
+}
+
+static inline float anglesDifference (const float a, const float b) {
+   return wrapAngle (a - b);
 }
 
 CR_NAMESPACE_END

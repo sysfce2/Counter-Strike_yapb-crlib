@@ -24,7 +24,7 @@ namespace ssemath {
 // simple wrapper for vector
 class CR_ALIGN16 SimdVec3Wrap final {
 private:
-   __m128 _mm_dp_ps_2 (__m128 v1, __m128 v2) {
+   __m128 _mm_dp_ps_sse2 (__m128 v1, __m128 v2) {
       const auto mul = _mm_mul_ps (v1, v2);
       const auto res = _mm_add_ps (_mm_shuffle_ps (v2, mul, _MM_SHUFFLE (1, 0, 0, 0)), mul);
       const auto ref = _mm_add_ps (_mm_shuffle_ps (mul, res, _MM_SHUFFLE (0, 3, 0, 0)), res);
@@ -64,7 +64,11 @@ public:
 
 public:
    SimdVec3Wrap normalize () {
-      return { _mm_div_ps (m, _mm_sqrt_ps (_mm_dp_ps_2 (m, m))) };
+#if defined(CR_ARCH_ARM)
+      return { _mm_div_ps (m, _mm_sqrt_ps (_mm_dp_ps (m, m, 0xFF))) };
+#else
+      return { _mm_div_ps (m, _mm_sqrt_ps (_mm_dp_ps_sse2 (m, m))) };
+#endif
    }
 
    void angleVectors (SimdVec3Wrap &sines, SimdVec3Wrap &cosines) {
