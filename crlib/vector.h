@@ -234,16 +234,16 @@ public:
    }
 
    void angleVectors (Vec3D *forward, Vec3D *right, Vec3D *upward) const {
-#if defined (CR_HAS_SSE)
+#if defined (CR_HAS_SSE) && !defined (CR_ARCH_ARM)
       static SimdVec3Wrap s, c;
       SimdVec3Wrap { x, y, z }.angleVectors (s, c);
 #else
       static Vec3D s, c, r;
-
       r = { cr::deg2rad (x), cr::deg2rad (y), cr::deg2rad (z) };
 
-      s = { cr::sinf (r.x), cr::sinf (r.y), cr::sinf (r.z) };
-      c = { cr::cosf (r.x), cr::cosf (r.y), cr::cosf (r.z) };
+      cr::sincosf (r.x, s.x, c.x);
+      cr::sincosf (r.y, s.y, c.y);
+      cr::sincosf (r.z, s.z, c.z);
 #endif
 
       if (forward) {

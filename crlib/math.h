@@ -117,6 +117,23 @@ inline float floorf (const float value) {
 #endif
 }
 
+static inline void sincosf (const float &x, float &s, float &c) {
+#if defined (CR_HAS_SSE)
+   __m128 _s, _c;
+   ssemath::sincos_ps (_mm_load_ss (&x), _s, _c);
+
+   s = _mm_cvtss_f32 (_s);
+   c = _mm_cvtss_f32 (_c);
+#else
+   c = cr::cosf (x);
+   s = cr::sqrtf (static_cast <float> (1) - c * c);
+
+   if (static_cast <int> (x / cr::kMathPi) & 1) {
+      s = -s;
+   }
+#endif
+}
+
 static inline bool fzero (const float e) {
    return cr::abs (e) < kFloatEpsilon;
 }
