@@ -126,7 +126,7 @@ static inline void sincosf (const float &x, float &s, float &c) {
    c = _mm_cvtss_f32 (_c);
 #else
    c = cr::cosf (x);
-   s = cr::sqrtf (static_cast <float> (1) - c * c);
+   s = cr::sqrtf (static_cast <float> (1) - square (c));
 
    if (static_cast <int> (x / cr::kMathPi) & 1) {
       s = -s;

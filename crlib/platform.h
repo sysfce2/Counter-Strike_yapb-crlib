@@ -71,6 +71,7 @@ CR_NAMESPACE_BEGIN
 #   define CR_ARCH_ARM
 #endif
 
+
 #if !defined(CR_DISABLE_SSE)
 #  define CR_HAS_SSE
 #  if !defined (CR_ARCH_ARM)
@@ -118,18 +119,10 @@ CR_NAMESPACE_BEGIN
 CR_NAMESPACE_END
 
 #if defined(CR_WINDOWS)
-#  define WIN32_LEAN_AND_MEAN 
+#  define WIN32_LEAN_AND_MEAN
+#  define NOMINMAX
 #  include <windows.h>
 #  include <direct.h>
-
-#  if defined (max) 
-#     undef max
-#  endif
-
-#  if defined (min) 
-#     undef min
-#  endif
-
 #else
 #  include <unistd.h>
 #  include <strings.h>
