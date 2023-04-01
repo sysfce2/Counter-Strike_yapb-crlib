@@ -28,7 +28,13 @@ public:
 
 public:
    template <typename T> static T *get (const size_t length = 1) {
-      auto memory = reinterpret_cast <T *> (malloc (cr::max <size_t> (1u, length * sizeof (T))));
+      auto size = cr::max <size_t> (1u, length * sizeof (T));
+#if defined (CR_CXX_GCC)
+      if (size >= PTRDIFF_MAX) {
+         plat.abort ();
+      }
+#endif
+      auto memory = reinterpret_cast <T *> (malloc (size));
 
       if (!memory) {
          plat.abort ();

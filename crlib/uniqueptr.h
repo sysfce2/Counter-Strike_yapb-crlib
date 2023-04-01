@@ -198,10 +198,6 @@ template <typename T, typename... Args> typename detail::UniqueIf <T>::SingleObj
 
 template <typename T> typename detail::UniqueIf <T>::UnknownBound makeUnique (size_t size) {
    using Type = typename detail::ClearExtent <T>::Type;
-
-#if defined (CR_CXX_GCC)
-   assert (size > 0 && size < PTRDIFF_MAX);
-#endif
    return UniquePtr <T> (new Type[size] ());
 }
 
