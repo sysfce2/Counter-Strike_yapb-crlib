@@ -15,7 +15,7 @@ CR_NAMESPACE_BEGIN
 template <typename> class Lambda;
 template <typename R, typename ...Args> class Lambda <R (Args...)> {
 private:
-   enum : uint32 {
+   enum : uint32_t {
       LamdaSmallBufferLength = sizeof (void *) * 16
    };
 
@@ -26,8 +26,8 @@ private:
       virtual ~LambdaFunctorWrapper () = default;
 
    public:
-      virtual void move (uint8 *to) = 0;
-      virtual void small (uint8 *to) const = 0;
+      virtual void move (uint8_t *to) = 0;
+      virtual void small (uint8_t *to) const = 0;
 
       virtual R invoke (Args &&...) = 0;
       virtual UniquePtr <LambdaFunctorWrapper> clone () const = 0;
@@ -47,11 +47,11 @@ private:
       ~LambdaFunctor () override = default;
 
    public:
-      void move (uint8 *to) override {
+      void move (uint8_t *to) override {
          new (to) LambdaFunctor <T> (cr::move (callable_));
       }
 
-      void small (uint8 *to) const override {
+      void small (uint8_t *to) const override {
          new (to) LambdaFunctor <T> (callable_);
       }
 
@@ -66,7 +66,7 @@ private:
 
    union {
       UniquePtr <LambdaFunctorWrapper> functor_;
-      uint8 small_[LamdaSmallBufferLength] {};
+      uint8_t small_[LamdaSmallBufferLength] {};
    };
 
    bool ssoObject_ = false;

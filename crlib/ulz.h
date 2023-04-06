@@ -14,13 +14,13 @@ CR_NAMESPACE_BEGIN
 // see https://github.com/encode84/ulz/
 class ULZ final : public Singleton <ULZ> {
 public:
-   enum : int32 {
+   enum : int32_t {
       Excess = 16,
       UncompressFailure = -1
    };
 
 private:
-   enum : int32 {
+   enum : int32_t {
       WindowBits = 17,
       WindowSize = cr::bit (WindowBits),
       WindowMask = WindowSize - 1,
@@ -35,8 +35,8 @@ private:
 
 
 private:
-   SmallArray <int32> hashTable_;
-   SmallArray <int32> prevTable_;
+   SmallArray <int32_t> hashTable_;
+   SmallArray <int32_t> prevTable_;
 
 public:
    explicit ULZ () {
@@ -47,30 +47,30 @@ public:
    ~ULZ () = default;
 
 public:
-   int32 compress (uint8 *in, int32 inputLength, uint8 *out) {
+   int32_t compress (uint8_t *in, int32_t inputLength, uint8_t *out) {
       for (auto &htb : hashTable_) {
          htb = EmptyHash;
       }
       auto op = out;
 
-      int32 anchor = 0;
-      int32 cur = 0;
+      int32_t anchor = 0;
+      int32_t cur = 0;
 
       while (cur < inputLength) {
-         const int32 maxMatch = inputLength - cur;
+         const int32_t maxMatch = inputLength - cur;
 
-         int32 bestLength = 0;
-         int32 dist = 0;
+         int32_t bestLength = 0;
+         int32_t dist = 0;
 
          if (maxMatch >= MinMatch) {
-            const auto limit = cr::max <int32> (cur - WindowSize, EmptyHash);
+            const auto limit = cr::max <int32_t> (cur - WindowSize, EmptyHash);
 
-            int32 chainLength = MaxChain;
-            int32 lookup = hashTable_[hash32 (&in[cur])];
+            int32_t chainLength = MaxChain;
+            int32_t lookup = hashTable_[hash32 (&in[cur])];
 
             while (lookup > limit) {
-               if (in[lookup + bestLength] == in[cur + bestLength] && load <uint32> (&in[lookup]) == load <uint32> (&in[cur])) {
-                  int32 length = MinMatch;
+               if (in[lookup + bestLength] == in[cur + bestLength] && load <uint32_t> (&in[lookup]) == load <uint32_t> (&in[cur])) {
+                  int32_t length = MinMatch;
 
                   while (length < maxMatch && in[lookup + length] == in[cur + length]) {
                      ++length;
@@ -100,14 +100,14 @@ public:
          if (bestLength >= MinMatch && bestLength < maxMatch && (cur - anchor) != 6) {
             const auto next = cur + 1;
             const auto target = bestLength + 1;
-            const auto limit = cr::max <int32> (next - WindowSize, EmptyHash);
+            const auto limit = cr::max <int32_t> (next - WindowSize, EmptyHash);
 
-            int32 chainLength = MaxChain;
-            int32 lookup = hashTable_[hash32 (&in[next])];
+            int32_t chainLength = MaxChain;
+            int32_t lookup = hashTable_[hash32 (&in[next])];
 
             while (lookup > limit) {
-               if (in[lookup + bestLength] == in[next + bestLength] && load <uint32> (&in[lookup]) == load <uint32> (&in[next])) {
-                  int32 length = MinMatch;
+               if (in[lookup + bestLength] == in[next + bestLength] && load <uint32_t> (&in[lookup]) == load <uint32_t> (&in[next])) {
+                  int32_t length = MinMatch;
 
                   while (length < target && in[lookup + length] == in[next + length]) {
                      ++length;
@@ -128,7 +128,7 @@ public:
 
          if (bestLength >= MinMatch) {
             const auto length = bestLength - MinMatch;
-            const auto token = ((dist >> 12) & 16) + cr::min <int32> (length, 15);
+            const auto token = ((dist >> 12) & 16) + cr::min <int32_t> (length, 15);
 
             if (anchor != cur) {
                const auto run = cur - anchor;
@@ -150,7 +150,7 @@ public:
             if (length >= 15) {
                encode (op, length - 15);
             }
-            store16 (op, static_cast <uint16> (dist));
+            store16 (op, static_cast <uint16_t> (dist));
             op += 2;
 
             while (bestLength-- != 0) {
@@ -182,10 +182,10 @@ public:
          copy (op, &in[anchor], run);
          op += run;
       }
-      return static_cast <int32> (op - out);
+      return static_cast <int32_t> (op - out);
    }
 
-   int32 uncompress (uint8 *in, int32 inputLength, uint8 *out, int32 outLength) {
+   int32_t uncompress (uint8_t *in, int32_t inputLength, uint8_t *out, int32_t outLength) {
       auto op = out;
       auto ip = in;
 
@@ -223,7 +223,7 @@ public:
          if ((opEnd - op) < length) {
             return UncompressFailure;
          }
-         const auto dist = ((token & 16) << 12) + load <uint16> (ip);
+         const auto dist = ((token & 16) << 12) + load <uint16_t> (ip);
          ip += 2;
 
          auto cp = op - dist;
@@ -237,7 +237,7 @@ public:
             op += length;
          }
          else {
-            for (int32 i = 0; i < 4; ++i) {
+            for (int32_t i = 0; i < 4; ++i) {
                *op++ = *cp++;
             }
 
@@ -246,7 +246,7 @@ public:
             }
          }
       }
-      return static_cast <int32> (ip == ipEnd) ? static_cast <int32> (op - out) : UncompressFailure;
+      return static_cast <int32_t> (ip == ipEnd) ? static_cast <int32_t> (op - out) : UncompressFailure;
    }
 
 private:
@@ -257,45 +257,45 @@ private:
       return ret;
    }
 
-   void store16 (void *ptr, uint16 val) {
-      memcpy (ptr, &val, sizeof (uint16));
+   void store16 (void *ptr, uint16_t val) {
+      memcpy (ptr, &val, sizeof (uint16_t));
    }
 
    void copy64 (void *dst, void *src) {
-      memcpy (dst, src, sizeof (uint64));
+      memcpy (dst, src, sizeof (uint64_t));
    }
 
-   uint32 hash32 (void *ptr) {
-      return (load <uint32> (ptr) * 0x9e3779b9) >> (32 - HashBits);
+   uint32_t hash32 (void *ptr) {
+      return (load <uint32_t> (ptr) * 0x9e3779b9) >> (32 - HashBits);
    }
 
-   void copy (uint8 *dst, uint8 *src, int32 count) {
+   void copy (uint8_t *dst, uint8_t *src, int32_t count) {
       copy64 (dst, src);
 
-      for (int32 i = 8; i < count; i += 8) {
+      for (int32_t i = 8; i < count; i += 8) {
          copy64 (dst + i, src + i);
       }
    }
 
-   void add (uint8 *&dst, int32 val) {
-      *dst++ = static_cast <uint8> (val);
+   void add (uint8_t *&dst, int32_t val) {
+      *dst++ = static_cast <uint8_t> (val);
    }
 
-   void encode (uint8 *&ptr, uint32 val) {
+   void encode (uint8_t *&ptr, uint32_t val) {
       while (val >= 128) {
          val -= 128;
 
          *ptr++ = 128 + (val & 127);
          val >>= 7;
       }
-      *ptr++ = static_cast <uint8> (val);
+      *ptr++ = static_cast <uint8_t> (val);
    }
 
-   uint32 decode (uint8 *&ptr) {
-      uint32 val = 0;
+   uint32_t decode (uint8_t *&ptr) {
+      uint32_t val = 0;
 
-      for (int32 i = 0; i <= 21; i += 7) {
-         const uint32 cur = *ptr++;
+      for (int32_t i = 0; i <= 21; i += 7) {
+         const uint32_t cur = *ptr++;
          val += cur << i;
 
          if (cur < 128) {

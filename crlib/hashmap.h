@@ -17,26 +17,26 @@ CR_NAMESPACE_BEGIN
 template <typename T> struct Hash;
 
 template <> struct Hash <String> {
-   uint32 operator () (const String &key) const noexcept {
+   uint32_t operator () (const String &key) const noexcept {
       return key.hash ();
    }
 };
 
 template <> struct Hash <StringRef> {
-   uint32 operator () (const StringRef &key) const noexcept {
+   uint32_t operator () (const StringRef &key) const noexcept {
       return key.hash ();
    }
 };
 
 template <> struct Hash <const char *> {
-   uint32 operator () (const char *key) const noexcept {
+   uint32_t operator () (const char *key) const noexcept {
       return StringRef::fnv1a32 (key);
    }
 };
 
-template <> struct Hash <int32> {
-   uint32 operator () (int32 key) const noexcept {
-      auto result = static_cast <uint32> (key);
+template <> struct Hash <int32_t> {
+   uint32_t operator () (int32_t key) const noexcept {
+      auto result = static_cast <uint32_t> (key);
 
       result = ((result >> 16) ^ result) * 0x119de1f3;
       result = ((result >> 16) ^ result) * 0x119de1f3;
@@ -47,8 +47,8 @@ template <> struct Hash <int32> {
 };
 
 template <typename T> struct EmptyHash {
-   uint32 operator () (T key) const noexcept {
-      return static_cast <uint32> (key);
+   uint32_t operator () (T key) const noexcept {
+      return static_cast <uint32_t> (key);
    }
 };
 

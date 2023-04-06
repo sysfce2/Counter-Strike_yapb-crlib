@@ -39,11 +39,14 @@ public:
 #endif
    union {
       __m128 m;
+      float *f;
 
       struct {
          float x, y, z, w;
       };
+
    };
+
 #if defined (CR_CXX_MSVC)
 #   pragma warning(pop) 
 #endif
@@ -72,7 +75,7 @@ public:
    }
 
    void angleVectors (SimdVec3Wrap &sines, SimdVec3Wrap &cosines) {
-      static constexpr float d2r[4] = {
+      static constexpr CR_ALIGN16 float d2r[] = {
          kDegreeToRadians, kDegreeToRadians,
          kDegreeToRadians, kDegreeToRadians
       };

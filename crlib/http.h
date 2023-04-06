@@ -158,8 +158,8 @@ namespace detail {
 
 class Socket final : public DenyCopying {
 private:
-   int32 socket_;
-   uint32 timeout_;
+   int32_t socket_;
+   uint32_t timeout_;
 
 public:
    Socket () : socket_ (-1), timeout_ (2)
@@ -190,13 +190,13 @@ public:
          return false;
       }
 
-      auto getTimeouts = [&]() -> Twin <char *, int32> {
+      auto getTimeouts = [&]() -> Twin <char *, int32_t> {
 #if defined (CR_WINDOWS)
          DWORD tv = timeout_ * 1000;
 #else
          timeval tv { static_cast <time_t> (timeout_), 0 };
 #endif
-         return { reinterpret_cast <char *> (&tv), static_cast <int32> (sizeof (tv)) };
+         return { reinterpret_cast <char *> (&tv), static_cast <int32_t> (sizeof (tv)) };
       };
       auto timeouts = getTimeouts ();
 
@@ -208,7 +208,7 @@ public:
          logger.message ("Unable to set SO_SNDTIMEO.");
       }
 
-      if (::connect (socket_, result->ai_addr, static_cast <int32> (result->ai_addrlen)) == -1) {
+      if (::connect (socket_, result->ai_addr, static_cast <int32_t> (result->ai_addrlen)) == -1) {
          disconnect ();
          freeaddrinfo (result);
 
@@ -219,7 +219,7 @@ public:
       return true;
    }
 
-   void setTimeout (uint32 timeout) {
+   void setTimeout (uint32_t timeout) {
       timeout_ = timeout;
    }
 
@@ -235,16 +235,16 @@ public:
    }
 
 public:
-   template <typename U> int32 send (const U *buffer, int32 length) const {
+   template <typename U> int32_t send (const U *buffer, int32_t length) const {
       return ::send (socket_, reinterpret_cast <const char *> (buffer), length, 0);
    }
 
-   template <typename U> int32 recv (U *buffer, int32 length) {
+   template <typename U> int32_t recv (U *buffer, int32_t length) {
       return ::recv (socket_, reinterpret_cast <char *> (buffer), length, 0);
    }
 
 public:
-   static int32 CR_STDCALL sendto (int socket, const void *message, size_t length, int flags, const struct sockaddr *dest, int32 destLength) {
+   static int32_t CR_STDCALL sendto (int socket, const void *message, size_t length, int flags, const struct sockaddr *dest, int32_t destLength) {
 #if defined (CR_WINDOWS)
       WSABUF buffer = { static_cast <ULONG> (length), const_cast <char *> (reinterpret_cast <const char *> (message)) };
       DWORD sendLength = 0;
@@ -253,7 +253,7 @@ public:
          errno = WSAGetLastError ();
          return -1;
       }
-      return static_cast <int32> (sendLength);
+      return static_cast <int32_t> (sendLength);
 #else
       iovec iov = { const_cast <void *> (message), length };
       msghdr msg {};
@@ -271,7 +271,7 @@ public:
 // simple http client for downloading/uploading files only
 class HttpClient final : public Singleton <HttpClient> {
 private:
-   enum : int32 {
+   enum : int32_t {
       MaxReceiveErrors = 12,
       DefaultSocketTimeout = 32
    };
@@ -279,7 +279,7 @@ private:
 private:
    String userAgent_ = "crlib";
    HttpClientResult statusCode_ = HttpClientResult::Undefined;
-   int32 chunkSize_ = 4096;
+   int32_t chunkSize_ = 4096;
    bool initialized_ = false;
 
 public:
@@ -287,9 +287,9 @@ public:
    ~HttpClient () = default;
 
 private:
-   HttpClientResult parseResponseHeader (Socket *socket, uint8 *buffer) {
+   HttpClientResult parseResponseHeader (Socket *socket, uint8_t *buffer) {
       bool isFinished = false;
-      int32 pos = 0, symbols = 0, errors = 0;
+      int32_t pos = 0, symbols = 0, errors = 0;
 
       // prase response header
       while (!isFinished && pos < chunkSize_) {
@@ -336,7 +336,7 @@ public:
    }
 
    // simple blocked download
-   bool downloadFile (StringRef url, StringRef localPath, int32 timeout = DefaultSocketTimeout) {
+   bool downloadFile (StringRef url, StringRef localPath, int32_t timeout = DefaultSocketTimeout) {
       if (plat.win && !initialized_) {
          plat.abort ("Sockets not initialized.");
       }
@@ -369,12 +369,12 @@ public:
       request.appendf ("User-Agent: %s\r\n", userAgent_);
       request.appendf ("Host: %s\r\n\r\n", uri.host);
 
-      if (socket->send (request.chars (), static_cast <int32> (request.length ())) < 1) {
+      if (socket->send (request.chars (), static_cast <int32_t> (request.length ())) < 1) {
          statusCode_ = HttpClientResult::SocketError;
 
          return false;
       }
-      SmallArray <uint8> buffer (chunkSize_);
+      SmallArray <uint8_t> buffer (chunkSize_);
       statusCode_ = parseResponseHeader (socket.get (), buffer.data ());
 
       if (statusCode_ != HttpClientResult::Ok) {
@@ -388,8 +388,8 @@ public:
          statusCode_ = HttpClientResult::Undefined;
          return false;
       }
-      int32 length = 0;
-      int32 errors = 0;
+      int32_t length = 0;
+      int32_t errors = 0;
 
       for (;;) {
          length = socket->recv (buffer.data (), chunkSize_);
@@ -406,7 +406,7 @@ public:
       return true;
    }
 
-   bool uploadFile (StringRef url, StringRef localPath, const int32 timeout = DefaultSocketTimeout) {
+   bool uploadFile (StringRef url, StringRef localPath, const int32_t timeout = DefaultSocketTimeout) {
       if (plat.win && !initialized_) {
          plat.abort ("Sockets not initialized.");
       }
@@ -460,22 +460,22 @@ public:
       request.appendf ("Content-Length: %d\r\n\r\n", file.length () + start.length () + end.length ());
 
       // send the main request
-      if (socket->send (request.chars (), static_cast <int32> (request.length ())) < 1) {
+      if (socket->send (request.chars (), static_cast <int32_t> (request.length ())) < 1) {
          statusCode_ = HttpClientResult::SocketError;
          return false;
       }
 
       // send boundary start
-      if (socket->send (start.chars (), static_cast <int32> (start.length ())) < 1) {
+      if (socket->send (start.chars (), static_cast <int32_t> (start.length ())) < 1) {
          statusCode_ = HttpClientResult::SocketError;
 
          return false;
       }
-      SmallArray <uint8> buffer (chunkSize_);
-      int32 length = 0;
+      SmallArray <uint8_t> buffer (chunkSize_);
+      int32_t length = 0;
 
       for (;;) {
-         length = static_cast <int32> (file.read (buffer.data (), 1, chunkSize_));
+         length = static_cast <int32_t> (file.read (buffer.data (), 1, chunkSize_));
 
          if (length > 0) {
             socket->send (buffer.data (), length);
@@ -486,7 +486,7 @@ public:
       }
 
       // send boundary end
-      if (socket->send (end.chars (), static_cast <int32> (end.length ())) < 1) {
+      if (socket->send (end.chars (), static_cast <int32_t> (end.length ())) < 1) {
          statusCode_ = HttpClientResult::SocketError;
          return false;
       }
@@ -504,7 +504,7 @@ public:
       return statusCode_;
    }
 
-   void setChunkSize (int32 chunkSize) {
+   void setChunkSize (int32_t chunkSize) {
       chunkSize_ = chunkSize;
    }
 };

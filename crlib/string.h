@@ -36,7 +36,7 @@ private:
    const char *cast (const class StringRef &value);
 
 public:
-   template <typename ...Args> int32 exec (char *buffer, const size_t maxSize, const char *fmt, Args &&...args) {
+   template <typename ...Args> int32_t exec (char *buffer, const size_t maxSize, const char *fmt, Args &&...args) {
       if (buffer) {
          buffer[0] = kNullChar;
       }
@@ -56,8 +56,8 @@ private:
    }
 
 public:
-   static constexpr uint32 fnv1a32 (const char *str, uint32 hash = 0x811c9dc5) {
-      return !*str ? hash : fnv1a32 (str + 1, (hash ^ static_cast <uint8> (*str)) * 0x01000193);
+   static constexpr uint32_t fnv1a32 (const char *str, uint32_t hash = 0x811c9dc5) {
+      return !*str ? hash : fnv1a32 (str + 1, (hash ^ static_cast <uint8_t> (*str)) * 0x01000193);
    }
 
 public:
@@ -124,12 +124,12 @@ public:
       return *this == rhs;
    }
 
-   constexpr uint32 hash () const {
+   constexpr uint32_t hash () const {
       return fnv1a32 (chars ());
    }
 
 public:
-   int32 int_ () const {
+   int32_t int_ () const {
       return atoi (chars ());
    }
 
@@ -615,7 +615,7 @@ public:
    }
 
 public:
-   uint32 hash () const {
+   uint32_t hash () const {
       return str ().hash ();
    }
 
@@ -684,7 +684,7 @@ public:
    }
 
 public:
-   int32 int_ () const {
+   int32_t int_ () const {
       return str ().int_ ();
    }
 
@@ -913,24 +913,24 @@ CR_EXPOSE_GLOBAL_SINGLETON (StringBuffer, strings);
 // some limited utf8 stuff
 class Utf8Tools : public Singleton <Utf8Tools> {
 private:
-   enum : int32 {
+   enum : int32_t {
       Utf8MaxChars = 706
    };
 
 private:
    // sample implementation from unicode home page: https://web.archive.org/web/19970105220809/http://www.stonehand.com/unicode/standard/fss-utf.html
    struct Utf8Table {
-      int32 cmask, cval, shift;
+      int32_t cmask, cval, shift;
       long lmask, lval;
 
-      Utf8Table (int32 cmask, int32 cval, int32 shift, long lmask, long lval) :
+      Utf8Table (int32_t cmask, int32_t cval, int32_t shift, long lmask, long lval) :
          cmask (cmask), cval (cval), shift (shift), lmask (lmask), lval (lval) {
 
       }
    };
 
    struct Utf8CaseTable {
-      int32 from, to;
+      int32_t from, to;
    };
 
 private:
@@ -1039,8 +1039,8 @@ private:
       utfTable_.emplace (0xfe, 0xfc, 5 * 6, 0x7fffffff, 0x4000000); // 6 byte sequence
    }
 
-   int32 multiByteToWideChar (wchar_t *wide, const char *mbs) {
-      int32 len = 0;
+   int32_t multiByteToWideChar (wchar_t *wide, const char *mbs) {
+      int32_t len = 0;
 
       auto ch = *mbs;
       auto lval = static_cast <int> (ch);
@@ -1068,12 +1068,12 @@ private:
       return -1;
    }
 
-   int32 wideCharToMultiByte (char *mbs, wchar_t wide) {
+   int32_t wideCharToMultiByte (char *mbs, wchar_t wide) {
       if (!mbs) {
          return 0;
       }
       long lmask = wide;
-      int32 len = 0;
+      int32_t len = 0;
 
       for (const auto &table : utfTable_) {
          len++;
@@ -1103,8 +1103,8 @@ public:
 
 public:
    wchar_t toUpper (wchar_t ch) {
-      int32 bottom = 0;
-      int32 top = Utf8MaxChars - 1;
+      int32_t bottom = 0;
+      int32_t top = Utf8MaxChars - 1;
 
       while (bottom <= top) {
          const auto mid = (bottom + top) / 2;
@@ -1127,7 +1127,7 @@ public:
       String result (in);
 
       auto ptr = const_cast <char *> (result.chars ());
-      int32 len = 0;
+      int32_t len = 0;
 
       while (*ptr) {
          wchar_t wide = 0;

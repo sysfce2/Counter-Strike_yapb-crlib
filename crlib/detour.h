@@ -76,7 +76,7 @@ public:
 // simple detour class for x86/x64
 template <typename T> class Detour final : public DenyCopying {
 private:
-   enum : uint32 {
+   enum : uint32_t {
       PtrSize = sizeof (void *),
 
 #if defined (CR_ARCH_X64)
@@ -87,9 +87,9 @@ private:
    };
 
 #if defined (CR_ARCH_X64)
-   using uintptr = uint64;
+   using uintptr = uint64_t;
 #else
-   using uintptr = uint32;
+   using uintptr = uint32_t;
 #endif
 
 private:
@@ -98,8 +98,8 @@ private:
    void *original_ = nullptr;
    void *detour_ = nullptr;
 
-   Array <uint8> savedBytes_ {};
-   Array <uint8> jmpBuffer_
+   Array <uint8_t> savedBytes_ {};
+   Array <uint8_t> jmpBuffer_
 
 #ifdef CR_ARCH_X64
    { 0x48, 0xb8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xe0 };
@@ -115,7 +115,7 @@ private:
    bool overwritten_ { false };
 
 private:
-   bool overwriteMemory (const Array <uint8> &to, const bool overwritten) noexcept {
+   bool overwriteMemory (const Array <uint8_t> &to, const bool overwritten) noexcept {
       overwritten_ = overwritten;
 
       AutoLock lock (&cs_);
@@ -176,10 +176,10 @@ public:
       (void) module;
       (void) name;
 
-      auto ptr = reinterpret_cast <uint8 *> (address);
+      auto ptr = reinterpret_cast <uint8_t *> (address);
 
-      while (*reinterpret_cast <uint16 *> (ptr) == 0x25ff) {
-         ptr = **reinterpret_cast <uint8 ***> (ptr + 2);
+      while (*reinterpret_cast <uint16_t *> (ptr) == 0x25ff) {
+         ptr = **reinterpret_cast <uint8_t ***> (ptr + 2);
       }
 
       original_ = ptr;

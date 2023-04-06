@@ -175,7 +175,7 @@ private:
 // wrapper for memory file for loading data into the memory
 class MemFileStorage : public Singleton <MemFileStorage> {
 private:
-   using LoadFunction = Lambda <uint8 * (const char *, int *)>;
+   using LoadFunction = Lambda <uint8_t * (const char *, int *)>;
    using FreeFunction = Lambda <void (void *)>;
 
 private:
@@ -193,7 +193,7 @@ public:
    }
 
 public:
-   uint8 *load (StringRef file, int *size) {
+   uint8_t *load (StringRef file, int *size) {
       if (loadFun_) {
          return loadFun_ (file.chars (), size);
       }
@@ -207,7 +207,7 @@ public:
    }
 
 public:
-   static uint8 *defaultLoad (const char *path, int *size) {
+   static uint8_t *defaultLoad (const char *path, int *size) {
       File file (path, "rb");
 
       if (!file) {
@@ -215,7 +215,7 @@ public:
          return nullptr;
       }
       *size = static_cast <int> (file.length ());
-      auto data = Memory::get <uint8> (*size);
+      auto data = Memory::get <uint8_t> (*size);
 
       file.read (data, *size);
       return data;
@@ -226,7 +226,7 @@ public:
    }
 
    static String loadToString (StringRef filename) {
-      int32 result = 0;
+      int32_t result = 0;
       auto buffer = defaultLoad (filename.chars (), &result);
 
       if (result > 0 && buffer) {
@@ -246,7 +246,7 @@ private:
    };
 
 private:
-   uint8 *contents_ = nullptr;
+   uint8_t *contents_ = nullptr;
    size_t length_ {};
    size_t seek_ {};
 
