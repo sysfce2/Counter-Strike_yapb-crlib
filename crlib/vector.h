@@ -169,7 +169,7 @@ public:
    }
 
    Vec3D normalize () const {
-#if defined (CR_HAS_SSE) && !defined (CR_ARCH_ARM)
+#if defined (CR_HAS_SSE)
       return SimdVec3Wrap { x, y, z }.normalize ();
 #else
       auto len = length () + cr::kFloatCmpEpsilon;
@@ -183,7 +183,7 @@ public:
    }
 
    Vec3D normalize2d () const {
-#if defined (CR_HAS_SSE) && !defined (CR_ARCH_ARM)
+#if defined (CR_HAS_SSE)
       return SimdVec3Wrap { x, y }.normalize ();
 #else
       auto len = length2d () + cr::kFloatCmpEpsilon;
