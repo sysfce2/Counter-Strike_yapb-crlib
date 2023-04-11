@@ -263,7 +263,12 @@ struct Platform : public Singleton <Platform> {
       DestroyWindow (GetForegroundWindow ());
       MessageBoxA (GetActiveWindow (), msg, appName, MB_ICONSTOP);
 #endif
+
+#if defined(CR_DEBUG) && defined(CR_CXX_MSVC)
+      DebugBreak ();
+#else
       ::abort ();
+#endif
    }
 
    // anologue of memset
