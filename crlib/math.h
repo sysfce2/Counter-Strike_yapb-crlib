@@ -166,4 +166,21 @@ static inline float anglesDifference (const float a, const float b) {
    return wrapAngle (a - b);
 }
 
+// approximation functions
+namespace apx {
+   inline float sqrtf (const float value) {
+   #if defined (CR_ARCH_ARM)
+      return cr::sqrtf (value);
+   #else
+      union {
+         float f;
+         uint32_t u;
+      } val { value };
+
+      val.u = (val.u >> 1U) + 0x1fbb4000;
+      return val.f;
+   #endif
+   }
+}
+
 CR_NAMESPACE_END

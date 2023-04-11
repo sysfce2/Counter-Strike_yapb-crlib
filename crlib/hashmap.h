@@ -106,7 +106,7 @@ private:
    }
 
    void rehash (size_t amount) {
-      if (length_ + amount < capacity_) {
+      if (amount > 0 && length_ + amount < capacity_) {
          return;
       }
       auto capacity = capacity_ ? capacity_ : 3;

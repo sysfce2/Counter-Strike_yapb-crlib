@@ -37,7 +37,7 @@ public:
       auto memory = reinterpret_cast <T *> (malloc (size));
 
       if (!memory) {
-         plat.abort ();
+         plat.abort (strings.format ("Failed to allocate %d megabytes of memory. Closing down.", size / 1024 / 1024));
       }
       return memory;
    }
