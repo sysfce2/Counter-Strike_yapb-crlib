@@ -268,15 +268,10 @@ public:
       }
    }
 
-   template <typename U> bool extend (U &&rhs) {
-      if (length_ == 0) {
-         *this = cr::move (rhs);
-      }
-      else {
-         for (size_t i = 0; i < rhs.length (); ++i) {
-            if (!push (cr::move (rhs[i]))) {
-               return false;
-            }
+   template <typename U> bool extend (const U &rhs) {
+      for (size_t i = 0; i < rhs.length (); ++i) {
+         if (!emplace (rhs[i])) {
+            return false;
          }
       }
       return true;
