@@ -141,11 +141,11 @@ public:
 
 public:
    T length () const {
-      return apx::sqrtf (lengthSq ());
+      return cr::sqrtf (lengthSq ());
    }
 
    T length2d () const {
-      return apx::sqrtf (cr::square (x) + cr::square (y));
+      return cr::sqrtf (cr::square (x) + cr::square (y));
    }
 
    T lengthSq () const {
