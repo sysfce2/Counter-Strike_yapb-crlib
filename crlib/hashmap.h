@@ -53,181 +53,297 @@ template <typename T> struct EmptyHash {
 };
 
 namespace detail {
+   enum class HashEntryStatus : uint8_t {
+      Empty,
+      Occupied,
+      Deleted
+   };
+
    template <typename K, typename V> struct HashEntry final : DenyCopying {
-   public:
       K key {};
-      V value {};
-      bool used { false };
+      V val {};
+      HashEntryStatus status { HashEntryStatus::Empty };
 
    public:
       HashEntry () = default;
       ~HashEntry () = default;
 
    public:
-      HashEntry (HashEntry &&rhs) noexcept : used (rhs.used), key (cr::move (rhs.key)), value (cr::move (rhs.value))
-      { }
+      HashEntry (HashEntry &&rhs) noexcept : key (cr::move (rhs.key)), val (cr::move (rhs.val)), status (rhs.status) {}
 
    public:
       HashEntry &operator = (HashEntry &&rhs) noexcept {
          if (this != &rhs) {
             key = cr::move (rhs.key);
-            value = cr::move (rhs.value);
-            used = rhs.used;
+            val = cr::move (rhs.val);
+            status = rhs.status;
          }
          return *this;
       }
    };
-}
+};
 
-template <typename K, typename V, typename H = Hash <K>> class HashMap final : public DenyCopying {
-public:
-   using Entries = detail::HashEntry <K, V> [];
+template <typename K, typename V, typename H = Hash <K>> class HashMap {
+private:
+   using Entry = detail::HashEntry <K, V>;
+   using Status = detail::HashEntryStatus;
+
+   H hash_;
+   size_t length_ {};
+   Array <Entry> contents_;
 
 private:
-   size_t capacity_ {};
-   size_t length_ {};
-   H hash_;
-
-   UniquePtr <Entries> contents_;
+   static constexpr size_t kInitialSize = 3;
+   static constexpr float kLoadFactor = static_cast <float> (kInitialSize) / 6.0f;
+   static constexpr int32_t kGrowFractor = static_cast <int32_t> (kLoadFactor * 6.0f);
+   static constexpr int32_t kInvalidDeleteIndex = -1;
 
 public:
-   explicit HashMap (const size_t capacity = 3) : capacity_ (capacity), length_ (0) {
-      contents_ = cr::makeUnique <Entries> (capacity);
+   HashMap () {
+      contents_.resize (kInitialSize);
    }
 
-   HashMap (HashMap &&rhs) noexcept : contents_ (cr::move (rhs.contents_)), hash_ (cr::move (rhs.hash_)), capacity_ (rhs.capacity_), length_ (rhs.length_)
-   { }
-
+   HashMap (HashMap &&rhs) noexcept : contents_ (cr::move (rhs.contents_)), length_ (rhs.length_), hash_ (cr::move (hash_)) {}
    ~HashMap () = default;
 
+   HashMap (const std::initializer_list <Twin <K, V>> &list) {
+      contents_.resize (list.size ());
+
+      for (const auto &elem : list) {
+         insert (elem.first, elem.second);
+      }
+   }
+
 private:
-   size_t getIndex (const K &key, size_t length) const {
-      return hash_ (key) % length;
+   void rehash () {
+      length_ = 0;
+
+      Array <Entry> contents;
+      contents.resize (contents_.length () * kGrowFractor);
+
+      cr::swap (contents_, contents);
+
+      for (auto &entry : contents) {
+         if (entry.status == Status::Occupied) {
+            insert (entry.key, cr::move (entry.val));
+         }
+      }
    }
 
-   void rehash (size_t amount) {
-      if (amount > 0 && length_ + amount < capacity_) {
-         return;
-      }
-      auto capacity = capacity_ ? capacity_ : 3;
-
-      while (length_ + amount > capacity) {
-         capacity *= 2;
-      }
-      auto contents = cr::makeUnique <Entries> (capacity);
-
-      for (size_t i = 0; i < capacity_; ++i) {
-         if (contents_[i].used) {
-            auto result = put (contents_[i].key, contents, capacity);
-            contents[result.second].value = cr::move (contents_[i].value);
-         }
-      }
-      contents_ = cr::move (contents);
-      capacity_ = capacity;
+   size_t getIndex (const K &key) {
+      return hash_ (key) % contents_.length ();
    }
 
-   Twin <bool, size_t> put (const K &key, UniquePtr <Entries> &contents, const size_t capacity) {
-      size_t index = getIndex (key, capacity);
+   void setIndexOccupied (const int32_t index, const K &key, V &&val) {
+      contents_[index].key = key;
+      contents_[index].val = cr::move (val);
+      contents_[index].status = Status::Occupied;
 
-      for (size_t i = 0; i < capacity; ++i) {
-         if (!contents[index].used) {
-            contents[index].key = key;
-            contents[index].used = true;
+      ++length_;
 
-            return { true, index };
-         }
-
-         if (contents[index].key == key) {
-            return { false, index };
-         }
-         index++;
-
-         if (index == capacity) {
-            index = 0;
-         }
+      if (!contents_.empty () && (static_cast<float> (length_) / static_cast <float> (contents_.length ())) > kLoadFactor) {
+         rehash ();
       }
-      return { false, 0 };
+   }
+
+   V &insertEmpty (const K &key) {
+      insert (key, cr::move (V ()));
+      size_t index = getIndex (key);
+
+      while (contents_[index].status == Status::Occupied && contents_[index].key != key) {
+         index = (++index % contents_.length ());
+      }
+      return contents_[index].val;
    }
 
 public:
-   bool empty () const {
-      return !length_;
-   }
+   V &operator [] (K key) {
+      const size_t index = getIndex (key);
 
-   size_t length () const {
-      return length_;
-   }
+      switch (contents_[index].status) {
+      case Status::Empty:
+         return insertEmpty (key);
 
-   bool has (const K &key) const  {
-      if (empty ()) {
-         return false;
+      case Status::Deleted:
+         for (size_t i = 1; i < contents_.length (); i++) {
+            const size_t probeIndex = (index + i) % contents_.length ();
+            auto &entry = contents_[probeIndex];
+
+            if (entry.status == Status::Empty) {
+               return insertEmpty (key);
+            }
+
+            if (entry.status == Status::Occupied && entry.key == key) {
+               return entry.val;
+            }
+         }
+         return insertEmpty (key);
+
+      case Status::Occupied:
+         if (contents_[index].key == key) {
+            return contents_[index].val;
+         }
+         int32_t deleteIndex = kInvalidDeleteIndex;
+
+         for (size_t i = 1; i < contents_.length (); i++) {
+            const size_t probeIndex = (index + i) % contents_.length ();
+            auto &entry = contents_[probeIndex];
+
+            if (entry.status == Status::Empty) {
+               return insertEmpty (key);
+            }
+            if (entry.status == Status::Deleted && deleteIndex == kInvalidDeleteIndex) {
+               deleteIndex = probeIndex;
+            }
+
+            if (entry.status == Status::Occupied && entry.key == key) {
+               return entry.val;
+            }
+         }
+         return insertEmpty (key);
       }
-      size_t index = getIndex (key, capacity_);
+   }
 
-      for (size_t i = 0; i < capacity_; ++i) {
-         if (contents_[index].used && contents_[index].key == key) {
+   bool insert (const K &key, V val) {
+      const size_t index = getIndex (key);
+
+      switch (contents_[index].status) {
+      case Status::Empty:
+         setIndexOccupied (index, key, cr::move (val));
+         return true;
+
+      case Status::Deleted:
+         for (size_t i = 1; i < contents_.length (); i++) {
+            const size_t probeIndex = (index + i) % contents_.length ();
+            auto &entry = contents_[probeIndex];
+
+            if (entry.status == Status::Empty) {
+               break;
+            }
+
+            if (entry.status == Status::Occupied && entry.key == key) {
+               return false;
+            }
+         }
+         setIndexOccupied (index, key, cr::move (val));
+         return true;
+
+      case Status::Occupied:
+         if (contents_[index].key == key) {
+            return false;
+         }
+         int32_t deleteIndex = kInvalidDeleteIndex;
+
+         for (size_t i = 1; i < contents_.length (); i++) {
+            const size_t probeIndex = (index + i) % contents_.length ();
+            auto &entry = contents_[probeIndex];
+
+            if (entry.status == Status::Empty) {
+               setIndexOccupied (deleteIndex == kInvalidDeleteIndex ? probeIndex : deleteIndex, key, cr::move (val));
+               return true;
+            }
+            if (entry.status == Status::Deleted && deleteIndex == kInvalidDeleteIndex) {
+               deleteIndex = probeIndex;
+            }
+
+            if (entry.status == Status::Occupied && entry.key == key) {
+               return false;
+            }
+         }
+
+         if (deleteIndex != kInvalidDeleteIndex) {
+            setIndexOccupied (deleteIndex, key, cr::move (val));
             return true;
          }
-         if (++index == capacity_) {
-            break;
-         }
       }
-      return false;
+      return true;
    }
 
-   void erase (const K &key) {
-      size_t index = getIndex (key, capacity_);
+   size_t erase (const K &key) {
+      size_t index = getIndex (key);
 
-      for (size_t i = 0; i < capacity_; ++i) {
-         if (contents_[index].used && contents_[index].key == key) {
-            contents_[index].used = false;
+      switch (contents_[index].status) {
+      case Status::Empty:
+         return 0;
+
+      case Status::Deleted:
+         for (size_t i = 1; i < contents_.length (); i++) {
+            const size_t probeIndex = (index + i) % contents_.length ();
+            auto &entry = contents_[probeIndex];
+
+            if (entry.status == Status::Empty) {
+               return 0;
+            }
+
+            if (entry.status == Status::Occupied && entry.key == key) {
+               entry.status = Status::Deleted;
+               --length_;
+
+               return 1;
+            }
+         }
+         return 0;
+
+      case Status::Occupied:
+         if (contents_[index].key == key) {
+            contents_[index].status = Status::Deleted;
             --length_;
 
-            break;
+            return 1;
          }
-         if (++index == capacity_) {
-            break;
+
+         for (size_t i = 1; i < contents_.length (); i++) {
+            const size_t probeIndex = (index + i) % contents_.length ();
+            auto &entry = contents_[probeIndex];
+
+            if (entry.status == Status::Empty) {
+               return 0;
+            }
+
+            if (entry.status == Status::Occupied && entry.key == key) {
+               entry.status = Status::Deleted;
+               --length_;
+
+               return 1;
+            }
          }
+         return 0;
       }
    }
 
    void clear () {
-      length_ = 0;
+      contents_.clear ();
+      contents_.resize (kInitialSize);
 
-      for (size_t i = 0; i < capacity_; ++i) {
-         contents_[i].used = false;
-      }
-      rehash (0);
+      length_ = 0;
+   }
+
+   constexpr size_t length () const {
+      return length_;
+   }
+
+   constexpr bool empty () const {
+      return !!length_;
+   }
+
+   bool exists (const K &key) {
+      const size_t index = getIndex (key);
+      return contents_[index].status == Status::Occupied && contents_[index].key == key;
    }
 
    void foreach (Lambda <void (const K &, const V &)> callback) {
-      for (size_t i = 0; i < capacity_; ++i) {
-         if (contents_[i].used) {
-            callback (contents_[i].key, contents_[i].value);
+      for (const auto &entry : contents_) {
+         if (entry.status == Status::Occupied) {
+            callback (entry.key, entry.val);
          }
       }
    }
 
 public:
-   V &operator [] (const K &key) {
-      if (length_ >= capacity_) {
-         rehash (length_ << 1);
-      }
-      auto result = put (key, contents_, capacity_);
-
-      if (result.first) {
-         ++length_;
-      }
-      return contents_[result.second].value;
-   }
-
    HashMap &operator = (HashMap &&rhs) noexcept {
       if (this != &rhs) {
          contents_ = cr::move (rhs.contents_);
-         hash_ = cr::move (rhs.hash_);
-
          length_ = rhs.length_;
-         capacity_ = rhs.capacity_;
       }
       return *this;
    }
