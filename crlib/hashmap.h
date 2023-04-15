@@ -110,7 +110,7 @@ public:
       contents_.resize (list.size ());
 
       for (const auto &elem : list) {
-         insert (elem.first, elem.second);
+         insert (elem.first, cr::move (elem.second));
       }
    }
 
@@ -141,7 +141,10 @@ private:
 
       ++length_;
 
-      if (!contents_.empty () && (static_cast<float> (length_) / static_cast <float> (contents_.length ())) > kLoadFactor) {
+      const auto length = static_cast<float> (length_);
+      const auto capacity = static_cast <float> (contents_.length ());
+
+      if (!contents_.empty () && length / capacity >= kLoadFactor) {
          rehash ();
       }
    }
@@ -157,7 +160,7 @@ private:
    }
 
 public:
-   V &operator [] (K key) {
+   V &operator [] (const K &key) {
       const size_t index = getIndex (key);
 
       switch (contents_[index].status) {
@@ -183,7 +186,6 @@ public:
          if (contents_[index].key == key) {
             return contents_[index].val;
          }
-         int32_t deleteIndex = kInvalidDeleteIndex;
 
          for (size_t i = 1; i < contents_.length (); i++) {
             const size_t probeIndex = (index + i) % contents_.length ();
@@ -191,9 +193,6 @@ public:
 
             if (entry.status == Status::Empty) {
                return insertEmpty (key);
-            }
-            if (entry.status == Status::Deleted && deleteIndex == kInvalidDeleteIndex) {
-               deleteIndex = probeIndex;
             }
 
             if (entry.status == Status::Occupied && entry.key == key) {
@@ -311,6 +310,23 @@ public:
       }
    }
 
+   bool exists (const K &key) {
+      size_t index = getIndex (key);
+
+      while (contents_[index].status == Status::Occupied && contents_[index].key != key) {
+         index = (++index % contents_.length ());
+      }
+      return contents_[index].status == Status::Occupied;
+   }
+
+   void foreach (Lambda <void (const K &, const V &)> callback) {
+      for (const auto &entry : contents_) {
+         if (entry.status == Status::Occupied) {
+            callback (entry.key, entry.val);
+         }
+      }
+   }
+
    void clear () {
       contents_.clear ();
       contents_.resize (kInitialSize);
@@ -324,19 +340,6 @@ public:
 
    constexpr bool empty () const {
       return !!length_;
-   }
-
-   bool exists (const K &key) {
-      const size_t index = getIndex (key);
-      return contents_[index].status == Status::Occupied && contents_[index].key == key;
-   }
-
-   void foreach (Lambda <void (const K &, const V &)> callback) {
-      for (const auto &entry : contents_) {
-         if (entry.status == Status::Occupied) {
-            callback (entry.key, entry.val);
-         }
-      }
    }
 
 public:
