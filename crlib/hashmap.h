@@ -201,6 +201,7 @@ public:
          }
          return insertEmpty (key);
       }
+      return insertEmpty (key);
    }
 
    bool insert (const K &key, V val) {
