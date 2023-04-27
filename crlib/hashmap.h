@@ -130,7 +130,7 @@ private:
       }
    }
 
-   size_t getIndex (const K &key) {
+   size_t getIndex (const K &key) const {
       return hash_ (key) % contents_.length ();
    }
 
@@ -311,7 +311,7 @@ public:
       }
    }
 
-   bool exists (const K &key) {
+   bool exists (const K &key) const {
       size_t index = getIndex (key);
 
       while (contents_[index].status == Status::Occupied && contents_[index].key != key) {

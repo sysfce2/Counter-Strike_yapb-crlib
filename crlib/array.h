@@ -36,6 +36,14 @@ public:
       }
    }
 
+   Array (const size_t amount, const T &defaultValue) {
+      size_t left = amount;
+
+      while (left--) {
+         emplace (defaultValue);
+      }
+   }
+
    Array (const size_t amount) {
       reserve (amount);
    }
@@ -246,6 +254,15 @@ public:
       return object;
    }
 
+   void fill (const T &value) {
+      size_t oldLength = length_;
+      clear ();
+
+      while (oldLength--) {
+         emplace (value);
+      }
+   }
+
    void discard () {
       erase (length_ - 1, 1);
    }
@@ -332,10 +349,16 @@ public:
    }
 
    const T &random () const {
+      if (length_ <= 1) {
+         return contents_[0];
+      }
       return contents_[rg.get (0, length <int32_t> () - 1)];
    }
 
    T &random () {
+      if (length_ <= 1) {
+         return contents_[0];
+      }
       return contents_[rg.get (0, length <int32_t> () - 1)];
    }
 

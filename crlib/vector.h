@@ -145,11 +145,11 @@ public:
    }
 
    T length2d () const {
-      return cr::sqrtf (cr::square (x) + cr::square (y));
+      return cr::sqrtf (cr::sqrf (x) + cr::sqrf (y));
    }
 
    T lengthSq () const {
-      return cr::square (x) + cr::square (y) + cr::square (z);
+      return cr::sqrf (x) + cr::sqrf (y) + cr::sqrf (z);
    }
 
    T distance (const Vec3D &rhs) const {

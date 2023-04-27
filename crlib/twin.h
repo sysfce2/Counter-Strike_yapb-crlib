@@ -19,9 +19,9 @@ public:
    B second;
 
 public:
-   template <typename T, typename U> Twin (T &&a, U &&b) : first (cr::forward <T> (a)), second (cr::forward <U> (b)) { }
-   template <typename T, typename U> Twin (const Twin <T, U> &rhs) : first (rhs.first), second (rhs.second) { }
-   template <typename T, typename U> Twin (Twin <T, U> &&rhs) noexcept : first (cr::move (rhs.first)), second (cr::move (rhs.second)) { }
+   template <typename T, typename U> Twin (T &&a, U &&b) : first (cr::forward <T> (a)), second (cr::forward <U> (b)) {}
+   template <typename T, typename U> Twin (const Twin <T, U> &rhs) : first (rhs.first), second (rhs.second) {}
+   template <typename T, typename U> Twin (Twin <T, U> &&rhs) noexcept : first (cr::move (rhs.first)), second (cr::move (rhs.second)) {}
 
 public:
    explicit Twin () = default;
@@ -42,14 +42,29 @@ public:
       return *this;
    }
 
-   // specialized operators for binary heap, do not use as it's test only second element
 public:
-   friend bool operator < (const Twin &a, const Twin &b) {
-      return a.second < b.second;
+   bool operator < (const Twin <A, B> &rhs) const {
+      return first < rhs.first || (first == rhs.first && second < rhs.second);
    }
 
-   friend bool operator > (const Twin &a, const Twin &b) {
-      return b.second < a.second;
+   bool operator > (const Twin <A, B> &rhs) const {
+      return first > rhs.first || (first == rhs.first && second > rhs.second);
+   }
+
+   bool operator <= (const Twin<A, B> &rhs) const {
+      return first < rhs.first || (first == rhs.first && second <= rhs.second);
+   }
+
+   bool operator >= (const Twin <A, B> &rhs) const {
+      return first > rhs.first || (first == rhs.first && second >= rhs.second);
+   }
+
+   bool operator == (const Twin <A, B> &rhs) const {
+      return first == rhs.first && second == rhs.second;
+   }
+
+   bool operator != (const Twin <A, B> &rhs) const {
+      return first != rhs.first || second != rhs.second;
    }
 };
 

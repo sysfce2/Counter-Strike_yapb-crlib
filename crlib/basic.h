@@ -43,7 +43,7 @@ template <typename T>  constexpr T max (const T &a, const T &b) {
    return a > b ? a : b;
 }
 
-template <typename T> constexpr T square (const T &value) {
+template <typename T> constexpr T sqrf (const T &value) {
    return value * value;
 }
 
@@ -55,9 +55,13 @@ template <typename T> const T &fix (const T &type) {
    return type;
 }
 
-//
-// base classes
-//
+template <typename T, typename U> struct IsSameType {
+   static constexpr bool value = false;
+};
+
+template <typename T> struct IsSameType <T, T> {
+   static constexpr bool value = true;
+};
 
 // simple non-copying base class
 class DenyCopying {
