@@ -11,69 +11,80 @@
 
 CR_NAMESPACE_BEGIN
 
-// based on: https://github.com/jeudesprits/PSWyhash/blob/master/Sources/CWyhash/include/wyhash.h
-class Random : public Singleton <Random> {
+// random number generator, credits goes to https://prng.di.unimi.it/xoshiro128starstar.c
+class Xoshiro128 final : public Singleton <Xoshiro128> {
 private:
-   uint64_t div_ { static_cast <uint64_t> (1) << 32ull };
-   uint64_t state_ { static_cast <uint64_t> (time (nullptr)) };
+   uint32_t states_[4] {};
+   uint32_t states2_[4] {};
+   uint64_t limit_ { static_cast <uint64_t> (1) << 32ull };
+
+private:
+   constexpr uint32_t rotl32 (const uint32_t x, int32_t k) {
+      return (x << k) | (x >> (32 - k));
+   }
+
+   constexpr uint32_t splitmix32 (uint32_t &x) {
+      uint32_t z = (x += 0x9e3779b9);
+      z = (z ^ (z >> 16)) * 0x85ebca6b;
+      z = (z ^ (z >> 13)) * 0xc2b2ae35;
+      return z ^ (z >> 16);
+   }
+
+   constexpr void seeder (uint32_t *state) {
+      uint32_t seed = 0;
+
+      state[0] = splitmix32 (seed);
+      state[1] = splitmix32 (seed);
+      state[2] = splitmix32 (seed);
+      state[3] = splitmix32 (seed);
+   }
+
+private:
+   constexpr uint32_t scramble (uint32_t *states, const uint32_t result) {
+      const uint32_t t = states[1] << 9;
+
+      states[2] ^= states[0];
+      states[3] ^= states[1];
+      states[1] ^= states[2];
+      states[0] ^= states[3];
+      states[2] ^= t;
+      states[3] = rotl32 (states[3], 11);
+
+      return result;
+   }
+
+   template <typename U> constexpr uint32_t next () {
+      if constexpr (is_same <U, int32_t>::value) {
+         return scramble (states_, rotl32 (states_[0] + states_[3], 7) + states_[0]);
+      }
+      return scramble (states2_, states2_[0] + states2_[3]);
+   }
 
 public:
-   explicit Random () {
-      warmup ();
-   }
-   ~Random () = default;
-
-private:
-   uint64_t wyrand64 () {
-      constexpr uint64_t wyp0 = 0xa0761d6478bd642full, wyp1 = 0xe7037ed1a0b428dbull;
-      state_ += wyp0;
-
-      return mul (state_ ^ wyp1, state_);
+   constexpr explicit Xoshiro128 () {
+      seeder (states_);
+      seeder (states2_);
    }
 
-   uint32_t wyrand32 () {
-      return static_cast <uint32_t> (wyrand64 ());
-   }
-
-   void warmup () {
-      for (auto i = 0; i < 32; ++i) {
-         state_ ^= wyrand64 ();
-      }
-   }
-
-private:
-   uint64_t rotr (uint64_t v, uint32_t k) {
-      return (v >> k) | (v << (64 - k));
-   }
-
-   uint64_t mul (uint64_t a, uint64_t b) {
-      uint64_t hh = (a >> 32) * (b >> 32);
-      uint64_t hl = (b >> 32) * static_cast <uint32_t> (b);
-
-      uint64_t lh = static_cast <uint32_t> (a) * (b >> 32);
-      uint64_t ll = static_cast <uint64_t> (static_cast <double> (a) * static_cast <double> (b));
-
-      return rotr (hl, 32) ^ rotr (lh, 32) ^ hh ^ ll;
-   }
-
+public:
 public:
    template <typename U, typename Void = void> U get (U, U) = delete;
 
-   template <typename Void = void> int32_t get (int32_t low, int32_t high) {
-      return static_cast <int32_t> (wyrand32 () * (static_cast <double> (high) - static_cast <double> (low) + 1.0) / div_ + static_cast <double> (low));
+   template <typename Void = void> constexpr int32_t get (int32_t low, int32_t high) {
+      return static_cast <int32_t> (next <int32_t> () * (static_cast <double> (high) - static_cast <double> (low) + 1.0) / limit_ + static_cast <double> (low));
    }
 
-   template <typename Void = void> float get (float low, float high) {
-      return static_cast <float> (wyrand32 () * (static_cast <double> (high) - static_cast <double> (low)) / (div_ - 1) + static_cast <double> (low));
+   template <typename Void = void> constexpr float get (float low, float high) {
+      return static_cast <float> (next <float> () * (static_cast <double> (high) - static_cast <double> (low)) / limit_ - 1 + static_cast <double> (low));
    }
 
 public:
-   bool chance (int32_t limit) {
+   constexpr bool chance (int32_t limit) {
       return get <int32_t> (0, 100) < limit;
    }
 };
 
 // expose global random generator
-CR_EXPOSE_GLOBAL_SINGLETON (Random, rg);
+CR_EXPOSE_GLOBAL_SINGLETON (Xoshiro128, rg);
 
 CR_NAMESPACE_END

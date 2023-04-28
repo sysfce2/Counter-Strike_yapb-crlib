@@ -115,7 +115,7 @@ public:
    }
 
    template <typename F> Lambda (F function) {
-      if (cr::fix (sizeof (function) > LamdaSmallBufferLength)) {
+      if constexpr (sizeof (F) > LamdaSmallBufferLength) {
          ssoObject_ = false;
          new (small_) UniquePtr <LambdaFunctorWrapper> (makeUnique <LambdaFunctor <F>> (cr::move (function)));
       }

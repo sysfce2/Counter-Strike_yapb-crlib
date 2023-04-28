@@ -51,15 +51,11 @@ template <typename T>  constexpr T clamp (const T &x, const T &a, const T &b) {
    return min (max (x, a), b);
 }
 
-template <typename T> const T &fix (const T &type) {
-   return type;
-}
-
-template <typename T, typename U> struct IsSameType {
+template <typename T, typename U> struct is_same {
    static constexpr bool value = false;
 };
 
-template <typename T> struct IsSameType <T, T> {
+template <typename T> struct is_same <T, T> {
    static constexpr bool value = true;
 };
 

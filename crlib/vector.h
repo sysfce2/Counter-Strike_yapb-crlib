@@ -144,20 +144,24 @@ public:
       return cr::sqrtf (lengthSq ());
    }
 
-   T length2d () const {
-      return cr::sqrtf (cr::sqrf (x) + cr::sqrf (y));
-   }
-
    T lengthSq () const {
       return cr::sqrf (x) + cr::sqrf (y) + cr::sqrf (z);
    }
 
+   T length2d () const {
+      return cr::sqrtf (lengthSq2d ());
+   }
+
+   T lengthSq2d () const {
+      return cr::sqrf (x) + cr::sqrf (y);
+   }
+
    T distance (const Vec3D &rhs) const {
-      return (*this - rhs).length ();
+      return apx::sqrtf ((*this - rhs).lengthSq ());
    }
 
    T distance2d (const Vec3D &rhs) const {
-      return (*this - rhs).length2d ();
+      return apx::sqrtf ((*this - rhs).lengthSq2d ());
    }
 
    T distanceSq (const Vec3D &rhs) const {
@@ -169,10 +173,10 @@ public:
    }
 
    Vec3D normalize () const {
-#if defined (CR_HAS_SSE) && !defined (CR_ARCH_ARM)
+#if defined (CR_HAS_SSE)
       return SimdVec3Wrap { x, y, z }.normalize ();
 #else
-      auto len = length () + cr::kFloatCmpEpsilon;
+      auto len = length () + cr::kFloatEpsilon;
 
       if (cr::fzero (len)) {
          return { 0.0f, 0.0f, 1.0f };
@@ -183,10 +187,10 @@ public:
    }
 
    Vec3D normalize2d () const {
-#if defined (CR_HAS_SSE) && !defined (CR_ARCH_ARM)
+#if defined (CR_HAS_SSE)
       return SimdVec3Wrap { x, y }.normalize ();
 #else
-      auto len = length2d () + cr::kFloatCmpEpsilon;
+      auto len = length2d () + cr::kFloatEpsilon;
 
       if (cr::fzero (len)) {
          return { 0.0f, 1.0f, 0.0f };
@@ -194,6 +198,16 @@ public:
       len = 1.0f / len;
       return { x * len, y * len, 0.0f };
 #endif
+   }
+
+   Vec3D normalize_apx () const {
+      const float length = cr::rsqrtf (lengthSq () + kFloatEpsilon);
+      return { x * length, y * length, z * length };
+   }
+
+   Vec3D normalize2d_apx () const {
+      const float length = cr::rsqrtf (lengthSq2d () + kFloatEpsilon);
+      return { x * length, y * length, 0.0f };
    }
 
    bool empty () const {
@@ -234,7 +248,7 @@ public:
    }
 
    void angleVectors (Vec3D *forward, Vec3D *right, Vec3D *upward) const {
-#if defined (CR_HAS_SSE) && !defined (CR_ARCH_ARM)
+#if defined (CR_HAS_SSE) && !defined (CR_ARCH_ARM32)
       static SimdVec3Wrap s, c;
       SimdVec3Wrap { x, y, z }.angleVectors (s, c);
 #else

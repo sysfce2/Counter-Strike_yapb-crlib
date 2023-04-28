@@ -31,7 +31,7 @@ private:
 
 public:
    explicit Array () {
-      if (fix (S > 0)) {
+      if constexpr (S > 0) {
          reserve (S);
       }
    }
@@ -91,7 +91,7 @@ public:
       }
       auto capacity = capacity_ ? capacity_ : 12;
 
-      if (cr::fix (R == ReservePolicy::Multiple)) {
+      if constexpr (R == ReservePolicy::Multiple) {
          while (length_ + amount > capacity) {
             capacity *= 2;
          }

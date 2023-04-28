@@ -14,10 +14,10 @@
 
 CR_NAMESPACE_BEGIN
 
-constexpr float kFloatEpsilon = 0.01f;
+constexpr float kFloatOnEpsilon = 0.01f;
 constexpr float kFloatEqualEpsilon = 0.001f;
-constexpr float kFloatCmpEpsilon = 1.192092896e-07f;
-constexpr float kMathPi = 3.141592653589793f;
+constexpr float kFloatEpsilon = 1.192092896e-07f;
+constexpr float kMathPi = 3.141592653583f;
 constexpr float kDegreeToRadians = kMathPi / 180.0f;
 constexpr float kRadiansToDegree = 180.0f / kMathPi;
 
@@ -85,6 +85,14 @@ inline float sqrtf (const float value) {
 #endif
 }
 
+inline float rsqrtf (const float value) {
+#if defined (CR_HAS_SSE)
+   return _mm_cvtss_f32 (_mm_rsqrt_ss (_mm_load_ss (&value)));
+#else
+   return 1.0f / ::sqrtf (value);
+#endif
+}
+
 inline float tanf (const float value) {
 #if defined (CR_HAS_SSE)
    return _mm_cvtss_f32 (ssemath::tan_ps (_mm_load_ss (&value)));
@@ -126,7 +134,7 @@ static inline void sincosf (const float &x, float &s, float &c) {
    c = _mm_cvtss_f32 (_c);
 #else
    c = cr::cosf (x);
-   s = cr::sqrtf (static_cast <float> (1) - square (c));
+   s = cr::sqrtf (static_cast <float> (1) - cr::sqrf (c));
 
    if (static_cast <int> (x / cr::kMathPi) & 1) {
       s = -s;
@@ -135,7 +143,7 @@ static inline void sincosf (const float &x, float &s, float &c) {
 }
 
 static inline bool fzero (const float e) {
-   return cr::abs (e) < kFloatEpsilon;
+   return cr::abs (e) < kFloatOnEpsilon;
 }
 
 static inline bool fequal (const float a, const float b) {
@@ -169,9 +177,9 @@ static inline float anglesDifference (const float a, const float b) {
 // approximation functions
 namespace apx {
    inline float sqrtf (const float value) {
-   #if defined (CR_ARCH_ARM)
+#if defined (CR_ARCH_ARM)
       return cr::sqrtf (value);
-   #else
+#else
       union {
          float f;
          uint32_t u;
@@ -179,8 +187,23 @@ namespace apx {
 
       val.u = (val.u >> 1U) + 0x1fbb4000;
       return val.f;
-   #endif
+#endif
+   }
+
+   inline float rsqrtf (const float value) {
+#if defined (CR_ARCH_ARM)
+      return cr::rsqrtf (value);
+#else
+      union {
+         float f;
+         uint32_t u;
+      } val = { value };
+      val.u = 0x5f1ffff9 - (val.u >> 1U);
+      val.f *= 0.703952253f * (2.38924456f - value * cr::sqrf (val.f));
+      return val.f;
+#endif
    }
 }
+
 
 CR_NAMESPACE_END
