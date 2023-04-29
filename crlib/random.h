@@ -75,7 +75,7 @@ public:
    }
 
    template <typename Void = void> constexpr float get (float low, float high) {
-      return static_cast <float> (next <float> () * (static_cast <double> (high) - static_cast <double> (low)) / limit_ - 1 + static_cast <double> (low));
+      return static_cast <float> (next <float> () * (static_cast <double> (high) - static_cast <double> (low)) / (limit_ - 1) + static_cast <double> (low));
    }
 
 public:

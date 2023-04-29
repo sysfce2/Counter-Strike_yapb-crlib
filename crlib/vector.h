@@ -19,71 +19,75 @@ public:
    T z {};
 
 public:
-   Vec3D (const T &scaler = 0.0f) : x (scaler), y (scaler), z (scaler)
-   { }
+   constexpr Vec3D (const T &scaler = 0.0f) : x (scaler), y (scaler), z (scaler) {}
 
-   Vec3D (const T &x, const T &y, const T &z) : x (x), y (y), z (z)
-   { }
+   constexpr Vec3D (const T &x, const T &y, const T &z) : x (x), y (y), z (z) {}
 
-   Vec3D (T *rhs) : x (rhs[0]), y (rhs[1]), z (rhs[2])
-   { }
+   constexpr Vec3D (T *rhs) : x (rhs[0]), y (rhs[1]), z (rhs[2]) {}
 
 #if defined (CR_HAS_SSE)
-   Vec3D (const SimdVec3Wrap &rhs) : x (rhs.x), y (rhs.y), z (rhs.z)
-   { }
+   constexpr Vec3D (const SimdVec3Wrap &rhs) : x (rhs.x), y (rhs.y), z (rhs.z) {}
 #endif
 
-   Vec3D (const Vec3D &) = default;
+   constexpr Vec3D (const Vec3D &) = default;
 
-   Vec3D (decltype (nullptr)) {
+   constexpr Vec3D (decltype (nullptr)) {
       clear ();
    }
 
 public:
-   operator T * () {
+   constexpr operator T *() {
       return &x;
    }
 
-   operator const T * () const {
+   constexpr operator const T *() const {
       return &x;
    }
 
-   Vec3D operator + (const Vec3D &rhs) const {
-      return { x + rhs.x, y + rhs.y, z + rhs.z };
+   constexpr decltype (auto) operator + (const Vec3D &rhs) const {
+      return Vec3D { x + rhs.x, y + rhs.y, z + rhs.z };
    }
 
-   Vec3D operator - (const Vec3D &rhs) const {
-      return { x - rhs.x, y - rhs.y, z - rhs.z };
+   constexpr decltype (auto) operator - (const Vec3D &rhs) const {
+      return Vec3D { x - rhs.x, y - rhs.y, z - rhs.z };
    }
 
-   Vec3D operator - () const {
-      return { -x, -y, -z };
+   constexpr decltype (auto) operator - () const {
+      return Vec3D { -x, -y, -z };
    }
 
-   friend Vec3D operator * (const T &scale, const Vec3D &rhs) {
-      return { rhs.x * scale, rhs.y * scale, rhs.z * scale };
+   friend constexpr decltype (auto) operator * (const T &scale, const Vec3D &rhs) {
+      return Vec3D { rhs.x * scale, rhs.y * scale, rhs.z * scale };
    }
 
-   Vec3D operator * (const T &scale) const {
-      return { scale * x, scale * y, scale * z };
+   constexpr decltype (auto) operator * (const T &scale) const {
+      return Vec3D { scale * x, scale * y, scale * z };
    }
 
-   Vec3D operator / (const T &rhs) const {
+   constexpr decltype (auto) operator / (const T &rhs) const {
       const auto inv = 1 / (rhs + kFloatEqualEpsilon);
-      return { inv * x, inv * y, inv * z };
+      return Vec3D { inv * x, inv * y, inv * z };
    }
 
    // cross product
-   Vec3D operator ^ (const Vec3D &rhs) const {
-      return { y * rhs.z - z * rhs.y, z * rhs.x - x * rhs.z, x * rhs.y - y * rhs.x };
+   constexpr decltype (auto) operator ^ (const Vec3D &rhs) const {
+#if defined (CR_HAS_SSE)
+      return Vec3D { SimdVec3Wrap { x, y, z }.cross ({ rhs.x, rhs.y, rhs.z }) };
+#else
+      return Vec3D { y * rhs.z - z * rhs.y, z * rhs.x - x * rhs.z, x * rhs.y - y * rhs.x };
+#endif
    }
 
    // dot product
-   T operator | (const Vec3D &rhs) const {
+   constexpr T operator | (const Vec3D &rhs) const {
+#if defined (CR_HAS_SSE)
+      return SimdVec3Wrap { x, y, z }.dot ({ rhs.x, rhs.y, rhs.z });
+#else
       return x * rhs.x + y * rhs.y + z * rhs.z;
+#endif
    }
 
-   const Vec3D &operator += (const Vec3D &rhs) {
+   constexpr decltype (auto) operator += (const Vec3D &rhs) {
       x += rhs.x;
       y += rhs.y;
       z += rhs.z;
@@ -91,7 +95,7 @@ public:
       return *this;
    }
 
-   const Vec3D &operator -= (const Vec3D &rhs) {
+   constexpr decltype (auto) operator -= (const Vec3D &rhs) {
       x -= rhs.x;
       y -= rhs.y;
       z -= rhs.z;
@@ -99,7 +103,7 @@ public:
       return *this;
    }
 
-   const Vec3D &operator *= (const T &rhs) {
+   constexpr decltype (auto) operator *= (const T &rhs) {
       x *= rhs;
       y *= rhs;
       z *= rhs;
@@ -107,7 +111,7 @@ public:
       return *this;
    }
 
-   const Vec3D &operator /= (const T &rhs) {
+   constexpr decltype (auto) operator /= (const T &rhs) {
       const auto inv = 1 / (rhs + kFloatEqualEpsilon);
 
       x *= inv;
@@ -117,23 +121,23 @@ public:
       return *this;
    }
 
-   bool operator == (const Vec3D &rhs) const {
+   constexpr bool operator == (const Vec3D &rhs) const {
       return cr::fequal (x, rhs.x) && cr::fequal (y, rhs.y) && cr::fequal (z, rhs.z);
    }
 
-   bool operator != (const Vec3D &rhs) const {
+   constexpr bool operator != (const Vec3D &rhs) const {
       return !operator == (rhs);
    }
 
-   void operator = (decltype (nullptr)) {
+   constexpr void operator = (decltype (nullptr)) {
       clear ();
    }
 
-   const float &operator [] (const int i) const {
+   constexpr const float &operator [] (const int i) const {
       return &(x)[i];
    }
 
-   float &operator [] (const int i) {
+   constexpr float &operator [] (const int i) {
       return &(x)[i];
    }
 
@@ -141,7 +145,11 @@ public:
 
 public:
    T length () const {
+#if defined (CR_HAS_SSE)
+      return SimdVec3Wrap { x, y, z }.hypot ();
+#else
       return cr::sqrtf (lengthSq ());
+#endif
    }
 
    T lengthSq () const {
@@ -149,7 +157,11 @@ public:
    }
 
    T length2d () const {
+#if defined (CR_HAS_SSE)
+      return SimdVec3Wrap { x, y, 0.0f }.hypot ();
+#else
       return cr::sqrtf (lengthSq2d ());
+#endif
    }
 
    T lengthSq2d () const {
@@ -168,8 +180,8 @@ public:
       return (*this - rhs).lengthSq ();
    }
 
-   Vec3D get2d () const {
-      return { x, y, 0.0f };
+   constexpr decltype (auto) get2d () const {
+      return Vec3D { x, y, 0.0f };
    }
 
    Vec3D normalize () const {
@@ -210,15 +222,15 @@ public:
       return { x * length, y * length, 0.0f };
    }
 
-   bool empty () const {
+   constexpr bool empty () const {
       return cr::fzero (x) && cr::fzero (y) && cr::fzero (z);
    }
 
-   void clear () {
+   constexpr void clear () {
       x = y = z = 0.0f;
    }
 
-   Vec3D clampAngles () {
+   decltype (auto) clampAngles () {
       x = cr::wrapAngle (x);
       y = cr::wrapAngle (y);
       z = 0.0f;
