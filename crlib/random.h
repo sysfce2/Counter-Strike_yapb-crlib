@@ -67,7 +67,6 @@ public:
    }
 
 public:
-public:
    template <typename U, typename Void = void> U get (U, U) = delete;
 
    template <typename Void = void> constexpr int32_t get (int32_t low, int32_t high) {
