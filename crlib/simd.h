@@ -29,7 +29,7 @@ CR_ALIGN16 const auto simd_EPS = _mm_set1_ps (kFloatEpsilon);
 // simple wrapper for vector
 class CR_ALIGN16 SimdVec3Wrap final {
 private:
-   __m128 _mm_sdot4_safe_ps (__m128 v0, __m128 v1) const {
+   template <bool ADD_EPS = false> static __m128 _mm_dot4_ps (__m128 v0, __m128 v1) {
       v0 = _mm_mul_ps (v0, v1);
 
       v1 = _mm_shuffle_ps (v0, v0, _MM_SHUFFLE (2, 3, 0, 1));
@@ -37,17 +37,9 @@ private:
       v1 = _mm_shuffle_ps (v0, v0, _MM_SHUFFLE (0, 1, 2, 3));
       v0 = _mm_add_ps (v0, v1);
 
-      return _mm_add_ps (v0, simd_EPS); // avoid NaN's
-   }
-
-   __m128 _mm_dot4_ps (__m128 v0, __m128 v1) const {
-      v0 = _mm_mul_ps (v0, v1);
-
-      v1 = _mm_shuffle_ps (v0, v0, _MM_SHUFFLE (2, 3, 0, 1));
-      v0 = _mm_add_ps (v0, v1);
-      v1 = _mm_shuffle_ps (v0, v0, _MM_SHUFFLE (0, 1, 2, 3));
-      v0 = _mm_add_ps (v0, v1);
-
+      if constexpr (ADD_EPS) {
+         v0 = _mm_add_ps (v0, simd_EPS); // avoid NaN's
+      }
       return v0;
    }
 
@@ -84,7 +76,7 @@ public:
 
 public:
    SimdVec3Wrap normalize () const {
-      return { _mm_div_ps (m, _mm_sqrt_ps (_mm_sdot4_safe_ps (m, m))) };
+      return { _mm_div_ps (m, _mm_sqrt_ps (_mm_dot4_ps <true> (m, m))) };
    }
 
    float hypot () const {

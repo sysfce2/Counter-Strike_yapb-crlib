@@ -119,6 +119,9 @@ CR_NAMESPACE_BEGIN
 CR_NAMESPACE_END
 
 #if defined(CR_WINDOWS)
+#  define PATH_SEP "\\"
+#  define DLL_SUFFIX "dll"
+
 #  define WIN32_LEAN_AND_MEAN
 #  define NOGDICAPMASKS
 #  define NOVIRTUALKEYCODES
@@ -162,6 +165,12 @@ CR_NAMESPACE_END
 #  include <windows.h>
 #  include <direct.h>
 #else
+#  define PATH_SEP "/"
+#  if defined (CR_OSX)
+#     define DLL_SUFFIX "dylib"
+#  else
+#     define DLL_SUFFIX "so"
+#endif
 #  include <unistd.h>
 #  include <strings.h>
 #  include <sys/stat.h>

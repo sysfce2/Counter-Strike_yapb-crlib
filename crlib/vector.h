@@ -71,20 +71,12 @@ public:
 
    // cross product
    constexpr decltype (auto) operator ^ (const Vec3D &rhs) const {
-#if defined (CR_HAS_SSE)
-      return Vec3D { SimdVec3Wrap { x, y, z }.cross ({ rhs.x, rhs.y, rhs.z }) };
-#else
       return Vec3D { y * rhs.z - z * rhs.y, z * rhs.x - x * rhs.z, x * rhs.y - y * rhs.x };
-#endif
    }
 
    // dot product
    constexpr T operator | (const Vec3D &rhs) const {
-#if defined (CR_HAS_SSE)
-      return SimdVec3Wrap { x, y, z }.dot ({ rhs.x, rhs.y, rhs.z });
-#else
       return x * rhs.x + y * rhs.y + z * rhs.z;
-#endif
    }
 
    constexpr decltype (auto) operator += (const Vec3D &rhs) {
@@ -145,11 +137,7 @@ public:
 
 public:
    T length () const {
-#if defined (CR_HAS_SSE)
-      return SimdVec3Wrap { x, y, z }.hypot ();
-#else
       return cr::sqrtf (lengthSq ());
-#endif
    }
 
    T lengthSq () const {
@@ -157,11 +145,7 @@ public:
    }
 
    T length2d () const {
-#if defined (CR_HAS_SSE)
-      return SimdVec3Wrap { x, y, 0.0f }.hypot ();
-#else
       return cr::sqrtf (lengthSq2d ());
-#endif
    }
 
    T lengthSq2d () const {
