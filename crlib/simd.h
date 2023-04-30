@@ -60,11 +60,11 @@ public:
 #   pragma warning(pop) 
 #endif
 
-   constexpr SimdVec3Wrap (const float &x, const float &y, const float &z) {
+   SimdVec3Wrap (const float &x, const float &y, const float &z) {
       m = _mm_set_ps (0.0f, z, y, x);
    }
 
-   constexpr SimdVec3Wrap (const float &x, const float &y) {
+   SimdVec3Wrap (const float &x, const float &y) {
       m = _mm_set_ps (0.0f, 0.0f, y, x);
    }
 
