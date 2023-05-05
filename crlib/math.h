@@ -162,10 +162,12 @@ template <int Degree> float _wrapAngleFn (float x) {
    return x - 2.0f * static_cast <float> (Degree) * cr::floorf (x / (2.0f * static_cast <float> (Degree)) + 0.5f);
 }
 
+// adds or subtracts 360.0f enough times need to given angle in order to set it into the range[0.0, 360.0f).
 static inline float wrapAngle360 (float a) {
    return _wrapAngleFn <360> (a);
 }
 
+// adds or subtracts 360.0f enough times need to given angle in order to set it into the range [-180.0, 180.0f).
 static inline float wrapAngle (const float a) {
    return _wrapAngleFn <180> (a);
 }

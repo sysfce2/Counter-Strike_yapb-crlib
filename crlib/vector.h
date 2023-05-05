@@ -222,6 +222,7 @@ public:
       return *this;
    }
 
+   // converts a spatial location determined by the vector passed into an absolute X angle (pitch) from the origin of the world.
    T pitch () const {
       if (cr::fzero (z)) {
          return 0.0f;
@@ -229,6 +230,7 @@ public:
       return cr::deg2rad (cr::atan2f (z, length2d ()));
    }
 
+   // converts a spatial location determined by the vector passed into an absolute Y angle (yaw) from the origin of the world.
    T yaw () const {
       if (cr::fzero (x) && cr::fzero (y)) {
          return 0.0f;
@@ -236,13 +238,20 @@ public:
       return cr::rad2deg (cr::atan2f (y, x));
    }
 
+   // converts a spatial location determined by the vector passed in into constant absolute angles from the origin of the world.
    Vec3D angles () const {
       if (cr::fzero (x) && cr::fzero (y)) {
          return { z > 0.0f ? 90.0f : 270.0f, 0.0, 0.0f };
       }
+
+      // else it's another sort of vector compute individually the pitch and yaw corresponding to this vector.
       return { cr::rad2deg (cr::atan2f (z, length2d ())), cr::rad2deg (cr::atan2f (y, x)), 0.0f };
    }
 
+   //	builds a 3D referential from a view angle, that is to say, the relative "forward", "right" and "upward" direction 
+   // that a player would have if he were facing this view angle. World angles are stored in Vector structs too, the 
+   // "x" component corresponding to the X angle (horizontal angle), and the "y" component corresponding to the Y angle 
+   // (vertical angle).
    void angleVectors (Vec3D *forward, Vec3D *right, Vec3D *upward) const {
 #if defined (CR_HAS_SSE) && !defined (CR_ARCH_ARM32)
       static SimdVec3Wrap s, c;

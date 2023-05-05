@@ -26,6 +26,7 @@
 #include <crlib/ulz.h>
 #include <crlib/color.h>
 #include <crlib/detour.h>
+#include <crlib/thread.h>
 
 CR_NAMESPACE_BEGIN
 

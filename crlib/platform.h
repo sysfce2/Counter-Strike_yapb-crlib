@@ -95,7 +95,12 @@ CR_NAMESPACE_BEGIN
 
 // msvc provides us placement new by default
 #if defined (CR_CXX_MSVC)
-#  define __PLACEMENT_NEW_INLINE 1
+#  define __PLACEMENT_NEW_INLINE
+#endif
+
+// ship windows xp release builds only with msvc
+#if defined (CR_CXX_MSVC) && !defined(CR_DEBUG)
+#  define CR_HAS_WINXP_SUPPORT
 #endif
 
 // set the minimal glibc as we can
@@ -114,6 +119,11 @@ CR_NAMESPACE_BEGIN
    __asm__ (".symver dladdr, dladdr@GLIBC_" GLIBC_VERSION_MIN);
    __asm__ (".symver dlclose, dlclose@GLIBC_" GLIBC_VERSION_MIN);
    __asm__ (".symver dlopen, dlopen@GLIBC_" GLIBC_VERSION_MIN);
+
+   __asm__ (".symver pthread_mutex_trylock, pthread_mutex_trylock@GLIBC_" GLIBC_VERSION_MIN);
+   __asm__ (".symver pthread_join, pthread_join@GLIBC_" GLIBC_VERSION_MIN);
+   __asm__ (".symver pthread_detach, pthread_detach@GLIBC_" GLIBC_VERSION_MIN);
+   __asm__ (".symver pthread_create, pthread_create@GLIBC_" GLIBC_VERSION_MIN);
 #endif
 
 CR_NAMESPACE_END
@@ -351,6 +361,17 @@ struct Platform : public Singleton <Platform> {
       }
 #endif
       return result;
+   }
+
+   int32_t hardwareConcurrency () {
+#if defined (CR_WINDOWS)
+      SYSTEM_INFO sysinfo;
+      GetSystemInfo (&sysinfo);
+
+      return sysinfo.dwNumberOfProcessors;
+#else
+      return sysconf (_SC_NPROCESSORS_ONLN);
+#endif
    }
 };
 

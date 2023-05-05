@@ -154,14 +154,14 @@ public:
    }
 
    T popFront () {
-      auto object (front ());
+      auto object (cr::move (front ()));
       discardFront ();
 
       return object;
    }
 
    T popLast () {
-      auto object (last ());
+      auto object (cr::move (last ()));
       discardLast ();
 
       return object;

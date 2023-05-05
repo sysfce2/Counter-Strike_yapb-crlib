@@ -14,64 +14,9 @@
 #  include <pthread.h>
 #endif
 
+#include <crlib/thread.h>
+
 CR_NAMESPACE_BEGIN
-
-// simple wrapper for critical sections
-class CriticalSection final : public DenyCopying {
-private:
-#if defined (CR_WINDOWS)
-   CRITICAL_SECTION cs_;
-#else
-   pthread_mutex_t mutex_;
-#endif
-
-public:
-   CriticalSection () {
-#if defined (CR_WINDOWS)
-      InitializeCriticalSection (&cs_);
-#else
-      pthread_mutex_init (&mutex_, nullptr);
-#endif
-   }
-   ~CriticalSection () {
-#if defined (CR_WINDOWS)
-      DeleteCriticalSection (&cs_);
-#else
-      pthread_mutex_destroy (&mutex_);
-#endif
-   }
-
-   void lock () {
-#if defined (CR_WINDOWS)
-      EnterCriticalSection (&cs_);
-#else
-      pthread_mutex_lock (&mutex_); 
-#endif
-   }
-
-   void unlock () {
-#if defined (CR_WINDOWS)
-      LeaveCriticalSection (&cs_);
-#else
-      pthread_mutex_unlock (&mutex_);
-#endif
-   }
-};
-
-// simple autolock wrapper
-class AutoLock final : public DenyCopying {
-private:
-   CriticalSection *cs_;
-
-public:
-   AutoLock (CriticalSection *cs) : cs_ (cs) {
-      cs_->lock ();
-   }
-
-   ~AutoLock () {
-      cs_->unlock ();
-   }
-};
 
 // simple detour class for x86/x64
 template <typename T> class Detour final : public DenyCopying {
@@ -93,7 +38,7 @@ private:
 #endif
 
 private:
-   CriticalSection cs_;
+   Mutex cs_;
 
    void *original_ = nullptr;
    void *detour_ = nullptr;
@@ -118,7 +63,7 @@ private:
    bool overwriteMemory (const Array <uint8_t> &to, const bool overwritten) noexcept {
       overwritten_ = overwritten;
 
-      AutoLock lock (&cs_);
+      MutexScopedLock lock (cs_);
 #if defined (CR_WINDOWS)
       unsigned long oldProtect {};
 
