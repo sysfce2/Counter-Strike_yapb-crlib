@@ -59,7 +59,7 @@ namespace detail {
       Deleted
    };
 
-   template <typename K, typename V> struct HashEntry final : DenyCopying {
+   template <typename K, typename V> struct HashEntry final : NonCopyable {
       K key {};
       V val {};
       HashEntryStatus status { HashEntryStatus::Empty };
@@ -106,7 +106,7 @@ public:
    HashMap (HashMap &&rhs) noexcept : contents_ (cr::move (rhs.contents_)), length_ (rhs.length_), hash_ (cr::move (hash_)) {}
    ~HashMap () = default;
 
-   HashMap (const std::initializer_list <Twin <K, V>> &list) {
+   HashMap (std::initializer_list <Twin <K, V>> list) {
       contents_.resize (list.size ());
 
       for (const auto &elem : list) {
@@ -331,6 +331,7 @@ public:
    void clear () {
       contents_.clear ();
       contents_.resize (kInitialSize);
+      contents_.shrink ();
 
       length_ = 0;
    }

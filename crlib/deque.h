@@ -12,7 +12,7 @@
 
 CR_NAMESPACE_BEGIN
 
-template <typename T> class Deque : private DenyCopying {
+template <typename T> class Deque : private NonCopyable {
 private:
    size_t capacity_ {};
    T *contents_ {};
@@ -54,19 +54,24 @@ private:
    }
 
    void extendCapacity () {
-      auto capacity = capacity_ ? capacity_ * 2 : 8;
-      auto contents = Memory::get <T> (sizeof (T) * capacity);
+      auto capacity = capacity_ > 0 ? capacity_ * 2 : 8;
+      auto contents = Memory::get <T> (capacity);
 
       if (index_.first < index_.second) {
-         Memory::transfer (contents, contents_ + index_.first, index_.second - index_.first);
-
+         for (size_t i = 0; i < index_.second - index_.first; ++i) {
+            Memory::construct (&contents[i], cr::move (contents_[i + index_.first]));
+         }
          index_.second = index_.second - index_.first;
          index_.first = 0;
       }
       else {
-         Memory::transfer (contents, contents_ + index_.first, capacity_ - index_.first);
-         Memory::transfer (contents + (capacity_ - index_.first), contents_, index_.second);
-
+         for (size_t i = 0; i < capacity_ - index_.first; ++i) {
+            Memory::construct (&contents[i], cr::move (contents_[i + index_.first]));
+         }
+            
+         for (size_t i = 0; i < index_.second; ++i) {
+            Memory::construct (&contents[capacity_ - index_.first + i], cr::move (contents_[i]));
+         }
          index_.second = index_.second + (capacity_ - index_.first);
          index_.first = 0;
       }
@@ -77,7 +82,7 @@ private:
    }
 
    void destroy () {
-      auto destruct = [&] (size_t start, size_t end) {
+      auto destruct = [this] (size_t start, size_t end) {
          for (size_t i = start; i < end; ++i) {
             Memory::destruct (&contents_[i]);
          }

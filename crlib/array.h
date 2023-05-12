@@ -23,7 +23,7 @@ CR_DECLARE_SCOPED_ENUM (ReservePolicy,
 CR_NAMESPACE_BEGIN
 
 // simple array class like std::vector
-template <typename T, ReservePolicy R = ReservePolicy::Multiple, size_t S = 0> class Array : public DenyCopying {
+template <typename T, ReservePolicy R = ReservePolicy::Multiple, size_t S = 0> class Array : public NonCopyable {
 private:
    T *contents_ {};
    size_t capacity_ {};
@@ -56,7 +56,7 @@ public:
       rhs.reset ();
    }
 
-   Array (const std::initializer_list <T> &list) {
+   Array (std::initializer_list <T> list) {
       for (const auto &elem : list) {
          push (elem);
       }
@@ -312,7 +312,6 @@ public:
       if (length_ == capacity_ || !length_) {
          return false;
       }
-
       auto data = Memory::get <T> (length_);
 
       Memory::transfer (data, contents_, length_);

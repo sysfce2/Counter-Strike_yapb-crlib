@@ -19,23 +19,23 @@ public:
    B second;
 
 public:
-   template <typename T, typename U> Twin (T &&a, U &&b) : first (cr::forward <T> (a)), second (cr::forward <U> (b)) {}
-   template <typename T, typename U> Twin (const Twin <T, U> &rhs) : first (rhs.first), second (rhs.second) {}
-   template <typename T, typename U> Twin (Twin <T, U> &&rhs) noexcept : first (cr::move (rhs.first)), second (cr::move (rhs.second)) {}
+   template <typename T, typename U> constexpr Twin (T &&a, U &&b) : first (cr::forward <T> (a)), second (cr::forward <U> (b)) {}
+   template <typename T, typename U> constexpr Twin (const Twin <T, U> &rhs) : first (rhs.first), second (rhs.second) {}
+   template <typename T, typename U> constexpr Twin (Twin <T, U> &&rhs) noexcept : first (cr::move (rhs.first)), second (cr::move (rhs.second)) {}
 
 public:
-   explicit Twin () = default;
+   explicit constexpr Twin () = default;
    ~Twin () = default;
 
 public:
-   template <typename T, typename U> Twin &operator = (const Twin <T, U> &rhs) {
+   template <typename T, typename U> constexpr Twin &operator = (const Twin <T, U> &rhs) {
       first = rhs.first;
       second = rhs.second;
 
       return *this;
    }
 
-   template <typename T, typename U> Twin &operator = (Twin <T, U> &&rhs) {
+   template <typename T, typename U> constexpr Twin &operator = (Twin <T, U> &&rhs) {
       first = cr::move (rhs.first);
       second = cr::move (rhs.second);
 
@@ -43,27 +43,27 @@ public:
    }
 
 public:
-   bool operator < (const Twin <A, B> &rhs) const {
+   constexpr bool operator < (const Twin <A, B> &rhs) const {
       return first < rhs.first || (first == rhs.first && second < rhs.second);
    }
 
-   bool operator > (const Twin <A, B> &rhs) const {
+   constexpr bool operator > (const Twin <A, B> &rhs) const {
       return first > rhs.first || (first == rhs.first && second > rhs.second);
    }
 
-   bool operator <= (const Twin<A, B> &rhs) const {
+   constexpr bool operator <= (const Twin<A, B> &rhs) const {
       return first < rhs.first || (first == rhs.first && second <= rhs.second);
    }
 
-   bool operator >= (const Twin <A, B> &rhs) const {
+   constexpr bool operator >= (const Twin <A, B> &rhs) const {
       return first > rhs.first || (first == rhs.first && second >= rhs.second);
    }
 
-   bool operator == (const Twin <A, B> &rhs) const {
+   constexpr bool operator == (const Twin <A, B> &rhs) const {
       return first == rhs.first && second == rhs.second;
    }
 
-   bool operator != (const Twin <A, B> &rhs) const {
+   constexpr bool operator != (const Twin <A, B> &rhs) const {
       return first != rhs.first || second != rhs.second;
    }
 };

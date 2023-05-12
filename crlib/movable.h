@@ -7,8 +7,6 @@
 
 #pragma once
 
-#include <crlib/basic.h>
-
 CR_NAMESPACE_BEGIN
 
 namespace detail {
@@ -35,13 +33,13 @@ template <typename T> constexpr T &&forward (typename detail::ClearRef <T>::Type
    return static_cast <T &&> (type);
 }
 
-template <typename T> inline void swap (T &left, T &right) noexcept {
+template <typename T> constexpr void swap (T &left, T &right) noexcept {
    auto temp = cr::move (left);
    left = cr::move (right);
    right = cr::move (temp);
 }
 
-template <typename T, size_t S> inline void swap (T (&left)[S], T (&right)[S]) noexcept {
+template <typename T, size_t S> constexpr void swap (T (&left)[S], T (&right)[S]) noexcept {
    if (&left == &right) {
       return;
    }

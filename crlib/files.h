@@ -15,7 +15,7 @@
 CR_NAMESPACE_BEGIN
 
 // simple stdio file wrapper
-class File final : private DenyCopying {
+class File final : private NonCopyable {
 private:
    FILE *handle_ = nullptr;
    size_t length_ {};
@@ -136,22 +136,14 @@ public:
    }
 
 public:
-   static inline bool exists (StringRef file) {
-      File fp;
+   static inline void makePath (const char  *path) {
+      auto dir = const_cast <char *> (path) + sizeof (PATH_SEP);
 
-      if (fp.open (file, "rb")) {
-         fp.close ();
-         return true;
-      }
-      return false;
-   }
-
-   static inline void createPath (const char *path) {
-      for (auto str = const_cast <char *> (path) + 1; *str; ++str) {
-         if (*str == '/') {
-            *str = 0;
+      for (auto str = dir; *str != kNullChar; ++str) {
+         if (*str ==  *PATH_SEP) {
+            *str = kNullChar;
             plat.createDirectory (path);
-            *str = '/';
+            *str = *PATH_SEP;
          }
       }
       plat.createDirectory (path);
@@ -162,12 +154,8 @@ private:
       if (*this) {
          close ();
       }
+      handle_ = plat.openStdioFile (filename.chars (), mode.chars ());
 
-#if defined (CR_CXX_MSVC)
-      fopen_s (&handle_, filename.chars (), mode.chars ());
-#else
-      handle_ = fopen (filename.chars (), mode.chars ());
-#endif
       return handle_ != nullptr;
    }
 };
@@ -239,7 +227,7 @@ public:
    }
 };
 
-class MemFile final : public DenyCopying {
+class MemFile final : public NonCopyable {
 private:
    enum : char {
       Eof = static_cast <char> (-1)

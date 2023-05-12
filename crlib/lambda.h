@@ -8,121 +8,139 @@
 #pragma once
 
 #include <crlib/memory.h>
-#include <crlib/uniqueptr.h>
 
 CR_NAMESPACE_BEGIN
 
 template <typename> class Lambda;
-template <typename R, typename ...Args> class Lambda <R (Args...)> {
+template <typename R, typename ...Args> class Lambda <R (Args...)> final {
 private:
-   enum : uint32_t {
-      LamdaSmallBufferLength = sizeof (void *) * 16
-   };
+   static constexpr uint32_t kSmallBufferSize = sizeof (void *) * 3;
 
 private:
-   class LambdaFunctorWrapper {
+   class LambdaWrapper : public NonCopyable {
    public:
-      LambdaFunctorWrapper () = default;
-      virtual ~LambdaFunctorWrapper () = default;
+      explicit LambdaWrapper () = default;
+      virtual ~LambdaWrapper () = default;
 
    public:
-      virtual void move (uint8_t *to) = 0;
-      virtual void small (uint8_t *to) const = 0;
-
-      virtual R invoke (Args &&...) = 0;
-      virtual UniquePtr <LambdaFunctorWrapper> clone () const = 0;
+      virtual R invoke (Args &&... args) const = 0;
+      virtual LambdaWrapper *clone (void *obj) const = 0;
+      virtual LambdaWrapper *move (void *obj) = 0;
    };
 
-   template <typename T> class LambdaFunctor : public LambdaFunctorWrapper {
+   template <typename T> class LambdaFunctor final : public LambdaWrapper {
    private:
-      T callable_;
+      T callee_;
 
    public:
-      LambdaFunctor (const T &callable) : LambdaFunctorWrapper (), callable_ (callable)
-      { }
+      constexpr LambdaFunctor (const LambdaFunctor &rhs) : callee_ { rhs.callee_ } {}
+      constexpr LambdaFunctor (LambdaFunctor &&rhs) : callee_ { cr::move (rhs.callee_) } {}
+      constexpr LambdaFunctor (const T &callee) : callee_ { callee } {}
+      constexpr LambdaFunctor (T &&callee) : callee_ { cr::move (callee) } {}
 
-      LambdaFunctor (T &&callable) : LambdaFunctorWrapper (), callable_ (cr::move (callable))
-      { }
-
-      ~LambdaFunctor () override = default;
+      virtual ~LambdaFunctor () = default;
 
    public:
-      void move (uint8_t *to) override {
-         new (to) LambdaFunctor <T> (cr::move (callable_));
+      virtual R invoke (Args &&... args) const override {
+         return callee_ (cr::forward <Args> (args)...);
       }
 
-      void small (uint8_t *to) const override {
-         new (to) LambdaFunctor <T> (callable_);
+      virtual LambdaWrapper *clone (void *obj) const override {
+         if (!obj) {
+            return Memory::getAndConstruct <LambdaFunctor> (*this);;
+         }
+         return Memory::construct (reinterpret_cast <LambdaFunctor *> (obj), *this);
       }
 
-      R invoke (Args &&... args) override {
-         return callable_ (cr::forward <Args> (args)...);
-      }
-
-      UniquePtr <LambdaFunctorWrapper> clone () const override {
-         return makeUnique <LambdaFunctor <T>> (callable_);
+      virtual LambdaWrapper *move (void *obj) override {
+         return Memory::construct (reinterpret_cast <LambdaFunctor *> (obj), cr::move (*this));
       }
    };
+
+private:
+   LambdaWrapper *lambda_ {};
 
    union {
-      UniquePtr <LambdaFunctorWrapper> functor_;
-      uint8_t small_[LamdaSmallBufferLength] {};
-   };
-
-   bool ssoObject_ = false;
+      double alignment_;
+      uint8_t alias_[kSmallBufferSize];
+   } storage_ {};
 
 private:
-   void destroy () {
-      if (ssoObject_) {
-         reinterpret_cast <LambdaFunctorWrapper *> (small_)->~LambdaFunctorWrapper ();
-      }
-      else {
-         functor_.reset ();
-      }
+   constexpr decltype (auto) small () {
+      return &storage_;
    }
 
-   void swap (Lambda &rhs) noexcept {
-      cr::swap (rhs, *this);
+   constexpr bool isSmall () const {
+      return &storage_ == reinterpret_cast <void *> (lambda_);
    }
 
 public:
-   explicit Lambda () noexcept : Lambda (nullptr)
-   { }
+   constexpr void destroy () noexcept {
+      if (!lambda_) {
+         return;
+      }
 
-   Lambda (decltype (nullptr)) noexcept : functor_ (nullptr), ssoObject_ (false)
-   { }
-
-   Lambda (const Lambda &rhs) {
-      if (rhs.ssoObject_) {
-         reinterpret_cast <const LambdaFunctorWrapper *> (rhs.small_)->small (small_);
+      if (isSmall ()) {
+         Memory::destruct (lambda_);
       }
       else {
-         new (small_) UniquePtr <LambdaFunctorWrapper> (rhs.functor_->clone ());
+         Memory::release (lambda_);
       }
-      ssoObject_ = rhs.ssoObject_;
    }
 
-   Lambda (Lambda &&rhs) noexcept {
-      if (rhs.ssoObject_) {
-         reinterpret_cast <LambdaFunctorWrapper *> (rhs.small_)->move (small_);
-         new (rhs.small_) UniquePtr <LambdaFunctorWrapper> (nullptr);
+   constexpr void apply (const Lambda &rhs) noexcept {
+      if (!rhs) {
+         lambda_ = nullptr;
+      }
+      else if (rhs.isSmall ()) {
+         lambda_ = rhs.lambda_->clone (small ());
       }
       else {
-         new (small_) UniquePtr <LambdaFunctorWrapper> (cr::move (rhs.functor_));
+         lambda_ = rhs.lambda_->clone (nullptr);
       }
-      ssoObject_ = rhs.ssoObject_;
-      rhs.ssoObject_ = false;
    }
 
-   template <typename F> Lambda (F function) {
-      if constexpr (sizeof (function) > LamdaSmallBufferLength) {
-         ssoObject_ = false;
-         new (small_) UniquePtr <LambdaFunctorWrapper> (makeUnique <LambdaFunctor <F>> (cr::move (function)));
+   constexpr void move (Lambda &&rhs) noexcept {
+      if (!rhs) {
+         lambda_ = nullptr;
+      }
+      else if (rhs.isSmall ()) {
+         lambda_ = rhs.lambda_->move (small ());
+         rhs.destroy ();
+         rhs.lambda_ = nullptr;
       }
       else {
-         ssoObject_ = true;
-         new (small_) LambdaFunctor <F> (cr::move (function));
+         lambda_ = rhs.lambda_;
+         rhs.lambda_ = nullptr;
       }
+   }
+
+   template <typename U> constexpr void apply (U &&fn) {
+      using Type = LambdaFunctor <typename cr::decay <U>::type>;
+
+      if constexpr (sizeof (Type) > sizeof (storage_)) {
+         lambda_ = Memory::getAndConstruct <Type> (cr::forward <U> (fn));
+      }
+      else {
+         lambda_ = Memory::construct (reinterpret_cast <Type *> (small ()), cr::forward <U> (fn));
+      }
+   }
+
+public:
+   constexpr Lambda () : lambda_ { nullptr } {}
+   constexpr Lambda (decltype (nullptr)) : lambda_ { nullptr } {}
+
+public:
+   constexpr Lambda (const Lambda &rhs) {
+      apply (rhs);
+   }
+
+   constexpr Lambda (Lambda &&rhs) noexcept {
+      move (cr::forward <Lambda> (rhs));
+   }
+
+   template <typename U> constexpr Lambda (U &&obj) {
+      apply (cr::forward <U> (obj));
    }
 
    ~Lambda () {
@@ -130,39 +148,38 @@ public:
    }
 
 public:
-   Lambda &operator = (const Lambda &rhs) {
-      destroy ();
-
-      Lambda tmp (rhs);
-      swap (tmp);
-
-      return *this;
+   explicit constexpr operator bool () const {
+      return !!lambda_;
    }
 
-   Lambda &operator = (Lambda &&rhs) noexcept {
-      destroy ();
-
-      if (rhs.ssoObject_) {
-         reinterpret_cast <LambdaFunctorWrapper *> (rhs.small_)->move (small_);
-         new (rhs.small_) UniquePtr <LambdaFunctorWrapper> (nullptr);
-      }
-      else {
-         new (small_) UniquePtr <LambdaFunctorWrapper> (cr::move (rhs.functor_));
-      }
-
-      ssoObject_ = rhs.ssoObject_;
-      rhs.ssoObject_ = false;
-
-      return *this;
-   }
-
-   explicit operator bool () const noexcept {
-      return ssoObject_ || !!functor_;
+   constexpr decltype (auto) operator () (Args... args) const {
+      assert (lambda_);
+      return lambda_->invoke (cr::forward <Args> (args)...);
    }
 
 public:
-   R operator () (Args ...args) {
-      return ssoObject_ ? reinterpret_cast <LambdaFunctorWrapper *> (small_)->invoke (cr::forward <Args> (args)...) : functor_->invoke (cr::forward <Args> (args)...);
+   constexpr Lambda &operator = (decltype (nullptr)) {
+      destroy ();
+      lambda_ = nullptr;
+      return *this;
+   }
+
+   constexpr Lambda &operator = (const Lambda &rhs) {
+      destroy ();
+      apply (rhs);
+      return *this;
+   }
+
+   constexpr Lambda &operator = (Lambda &&rhs) noexcept {
+      destroy ();
+      move (cr::move (rhs));
+      return *this;
+   }
+
+   template <typename U> constexpr Lambda &operator = (U &&rhs) {
+      destroy ();
+      apply (rhs);
+      return *this;
    }
 };
 

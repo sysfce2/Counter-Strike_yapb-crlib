@@ -164,6 +164,10 @@ public:
       return (*this - rhs).lengthSq ();
    }
 
+   T distanceSq2d (const Vec3D &rhs) const {
+      return (*this - rhs).lengthSq2d ();
+   }
+
    constexpr decltype (auto) get2d () const {
       return Vec3D { x, y, 0.0f };
    }

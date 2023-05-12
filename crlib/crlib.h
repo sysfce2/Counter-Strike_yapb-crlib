@@ -27,6 +27,7 @@
 #include <crlib/color.h>
 #include <crlib/detour.h>
 #include <crlib/thread.h>
+#include <crlib/timers.h>
 
 CR_NAMESPACE_BEGIN
 

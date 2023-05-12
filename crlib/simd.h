@@ -49,7 +49,7 @@ public:
 #   pragma warning(disable: 4201)
 #endif
    union {
-      __m128 m { };
+      __m128 m { _mm_setzero_ps () };
 
       struct {
          float x, y, z, w;

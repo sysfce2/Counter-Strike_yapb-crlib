@@ -21,7 +21,7 @@
 CR_NAMESPACE_BEGIN
 
 // handling dynamic library loading
-class SharedLibrary final : public DenyCopying {
+class SharedLibrary final : public NonCopyable {
 public:
 #if defined (CR_WINDOWS)
    using Handle = HMODULE;

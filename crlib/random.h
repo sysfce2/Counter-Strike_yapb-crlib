@@ -8,6 +8,7 @@
 #pragma once
 
 #include <crlib/basic.h>
+#include <crlib/traits.h>
 
 CR_NAMESPACE_BEGIN
 
@@ -53,11 +54,11 @@ private:
       return result;
    }
 
-   template <typename U> uint32_t next () {
-      if constexpr (is_same <U, int32_t>::value) {
+   template <typename U> constexpr uint32_t next () {
+      if constexpr (cr::is_same <U, int32_t>::value) {
          return scramble (states_, rotl32 (states_[0] + states_[3], 7) + states_[0]);
       }
-      else if constexpr (is_same <U, float>::value) {
+      else if constexpr (cr::is_same <U, float>::value) {
          return scramble (states2_, states2_[0] + states2_[3]);
       }
    }
@@ -69,18 +70,18 @@ public:
    }
 
 public:
-   template <typename U, typename Void = void> U get (U, U) = delete;
+   template <typename U, typename Void = void> constexpr U get (U, U) = delete;
 
-   template <typename Void = void> int32_t get (int32_t low, int32_t high) {
+   template <typename Void = void> constexpr int32_t get (int32_t low, int32_t high) {
       return static_cast <int32_t> (next <int32_t> () * (static_cast <double> (high) - static_cast <double> (low) + 1.0) / limit_ + static_cast <double> (low));
    }
 
-   template <typename Void = void> float get (float low, float high) {
+   template <typename Void = void> constexpr float get (float low, float high) {
       return static_cast <float> (next <float> () * (static_cast <double> (high) - static_cast <double> (low)) / (limit_ - 1) + static_cast <double> (low));
    }
 
 public:
-   bool chance (int32_t limit) {
+   constexpr bool chance (int32_t limit) {
       return get <int32_t> (0, 100) < limit;
    }
 };

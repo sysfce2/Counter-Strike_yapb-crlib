@@ -19,7 +19,7 @@
 CR_NAMESPACE_BEGIN
 
 // simple detour class for x86/x64
-template <typename T> class Detour final : public DenyCopying {
+template <typename T> class Detour final : public NonCopyable {
 private:
    enum : uint32_t {
       PtrSize = sizeof (void *),

@@ -126,11 +126,11 @@ CR_NAMESPACE_BEGIN
    __asm__ (".symver pthread_create, pthread_create@GLIBC_" GLIBC_VERSION_MIN);
 #endif
 
-CR_NAMESPACE_END
+   CR_NAMESPACE_END
 
 #if defined(CR_WINDOWS)
-#  define PATH_SEP "\\"
-#  define DLL_SUFFIX "dll"
+constexpr auto PATH_SEP = "\\";
+constexpr auto DLL_SUFFIX = ".dll";
 
 #  define WIN32_LEAN_AND_MEAN
 #  define NOGDICAPMASKS
@@ -174,16 +174,16 @@ CR_NAMESPACE_END
 #  define NOIME
 #  include <windows.h>
 #  include <direct.h>
+#  include <io.h>
 #else
-#  define PATH_SEP "/"
+constexpr auto PATH_SEP = "/";
 #  if defined (CR_OSX)
-#     define DLL_SUFFIX "dylib"
+      constexpr auto DLL_SUFFIX = ".dylib";
 #  else
-#     define DLL_SUFFIX "so"
+      constexpr auto DLL_SUFFIX = ".so";
 #endif
 #  include <unistd.h>
 #  include <strings.h>
-#  include <sys/stat.h>
 #  include <sys/time.h>
 #endif
 
@@ -192,6 +192,9 @@ CR_NAMESPACE_END
 #include <locale.h>
 #include <string.h>
 #include <stdarg.h>
+
+#include <sys/types.h>
+#include <sys/stat.h>
 
 #if defined (CR_ANDROID)
 #  include <android/log.h>
@@ -261,13 +264,13 @@ struct Platform : public Singleton <Platform> {
    }
 
    bool createDirectory (const char *dir) {
-      int result = 0;
+      int result = 1;
 #if defined(CR_WINDOWS)
       result = _mkdir (dir);
 #else
       result = mkdir (dir, 0777);
 #endif
-      return !!result;
+      return result == 0;
    }
 
    bool removeFile (const char *dir) {
@@ -372,6 +375,25 @@ struct Platform : public Singleton <Platform> {
 #else
       return sysconf (_SC_NPROCESSORS_ONLN);
 #endif
+   }
+
+   bool fileExists (const char *path) {
+#if defined (CR_WINDOWS)
+      return _access (path, 0) == 0;
+#else
+      return access (path, F_OK) == 0;
+#endif
+   }
+
+   FILE *openStdioFile (const char *path, const char *mode) {
+      FILE *handle = nullptr;
+
+#if defined (CR_CXX_MSVC)
+      fopen_s (&handle, path, mode);
+#else
+      handle = fopen (path, mode);
+#endif
+      return handle;
    }
 };
 

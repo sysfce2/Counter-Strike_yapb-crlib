@@ -19,7 +19,7 @@
 CR_NAMESPACE_BEGIN
 
 // simple scoped lock wrapper
-template <typename T> class ScopedLock final : public DenyCopying {
+template <typename T> class ScopedLock final : public NonCopyable {
 private:
    T &lockable_;
 
@@ -33,7 +33,7 @@ public:
    }
 };
 
-template <typename T> class ScopedUnlock final : public DenyCopying {
+template <typename T> class ScopedUnlock final : public NonCopyable {
 private:
    T &lockable_;
 
@@ -46,7 +46,7 @@ public:
 };
 
 // simple wrapper for critical sections
-class Mutex final : public DenyCopying {
+class Mutex final : public NonCopyable {
 private:
 #if defined (CR_WINDOWS)
 #if defined (CR_HAS_WINXP_SUPPORT)
@@ -124,7 +124,7 @@ public:
 };
 
 // conditional variable (signal)
-class Signal final : public DenyCopying {
+class Signal final : public NonCopyable {
 private:
    Mutex cs_;
 
@@ -268,7 +268,7 @@ using MutexScopedLock = ScopedLock <Mutex>;
 using SignalScopedLock = ScopedLock <Signal>;
 
 // basic thread class
-class Thread final : public DenyCopying {
+class Thread final : public NonCopyable {
 public:
    using Func = Lambda <void ()>;
 
@@ -364,7 +364,7 @@ public:
 };
 
 // extra simple thread pool
-class ThreadPool final : public DenyCopying {
+class ThreadPool final : public NonCopyable {
 private:
    using Func = Thread::Func;
 
@@ -432,24 +432,21 @@ public:
 
       for (std::size_t i = 0; i < workers; ++i) {
          threads_.emplace ([this] () {
-            SignalScopedLock lock (signal_);
+            for (;;) {
+               Func job;
+               {
+                  SignalScopedLock lock (signal_);
 
-            while (running_) {
-               while (running_ && jobs_.empty ()) {
-                  signal_.wait ();
+                  while (running_ && jobs_.empty ()) {
+                     signal_.wait ();
+                  }
+
+                  if (!running_ && jobs_.empty ()) {
+                     return;
+                  }
+                  job = cr::move (jobs_.popFront ());
                }
-
-               if (!running_) {
-                  break;
-               }
-
-               while (!jobs_.empty ()) {
-                  auto workload = cr::move (jobs_.popFront ());
-
-                  signal_.unlock ();
-                  workload ();
-                  signal_.lock ();
-               }
+               job ();
             }
 #if !defined (THREAD_SIGNAL_HAS_BROADCAST)
             {

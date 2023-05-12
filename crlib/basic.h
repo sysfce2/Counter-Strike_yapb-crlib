@@ -51,34 +51,37 @@ template <typename T>  constexpr T clamp (const T &x, const T &a, const T &b) {
    return min (max (x, a), b);
 }
 
-template <typename T, typename U> struct is_same {
-   static constexpr bool value = false;
-};
-
-template <typename T> struct is_same <T, T> {
-   static constexpr bool value = true;
-};
-
 // simple non-copying base class
-class DenyCopying {
+class NonCopyable {
 protected:
-   explicit DenyCopying () = default;
-   ~DenyCopying () = default;
+   explicit NonCopyable () = default;
+   ~NonCopyable () = default;
 
 public:
-   DenyCopying (const DenyCopying &) = delete;
-   DenyCopying &operator = (const DenyCopying &) = delete;
+   NonCopyable (const NonCopyable &) = delete;
+   NonCopyable &operator = (const NonCopyable &) = delete;
+};
+
+// simple non-movable base class
+class NonMovable {
+protected:
+   explicit NonMovable () = default;
+   ~NonMovable () = default;
+
+public:
+   NonMovable (NonMovable &&) = delete;
+   NonMovable &operator = (NonMovable &&) = delete;
 };
 
 // singleton for objects
-template <typename T> class Singleton : public DenyCopying {
+template <typename T> class Singleton : public NonCopyable, NonMovable {
 protected:
-   Singleton () = default;
+   explicit Singleton () = default;
    ~Singleton () = default;
 
 public:
-   static  T &instance () {
-      static T __instance;
+   static T &instance () {
+      static T __instance {};
       return __instance;
    }
 };
@@ -87,7 +90,7 @@ public:
 #define CR_DECLARE_SCOPED_ENUM_TYPE(enumName, enumType, ...) \
    CR_NAMESPACE_BEGIN                                        \
    namespace enums {                                         \
-      struct _##enumName : protected DenyCopying {           \
+      struct _##enumName : public NonCopyable, NonMovable {  \
          enum Type : enumType {                              \
             __VA_ARGS__                                      \
          };                                                  \
@@ -97,12 +100,12 @@ public:
    using enumName = ::cr::enums::_##enumName::Type;          \
 
 // same as above, but with int32_t type
-#define CR_DECLARE_SCOPED_ENUM(enumName, ...)                  \
+#define CR_DECLARE_SCOPED_ENUM(enumName, ...)                   \
    CR_DECLARE_SCOPED_ENUM_TYPE(enumName, int32_t, __VA_ARGS__)   \
 
 // exposes global variable from class singleton
-#define CR_EXPOSE_GLOBAL_SINGLETON(className, variable)  \
-   static auto &variable { className::instance () }      \
+#define CR_EXPOSE_GLOBAL_SINGLETON(className, globalVar)  \
+   static inline auto &globalVar { className::instance () }      \
 
 CR_NAMESPACE_END
 

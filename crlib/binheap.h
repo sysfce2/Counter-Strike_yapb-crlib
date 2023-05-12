@@ -12,7 +12,7 @@
 CR_NAMESPACE_BEGIN
 
 // simple priority queue
-template <typename T> class BinaryHeap final : public DenyCopying {
+template <typename T> class BinaryHeap final : public NonCopyable {
 private:
    Array <T> contents_;
 

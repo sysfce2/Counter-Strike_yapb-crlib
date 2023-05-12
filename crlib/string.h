@@ -24,7 +24,7 @@ static const char kNullChar = '\0';
 // overloaded version of snprintf to take String and StringRef as char arrays
 class SNPrintfWrap : public Singleton <SNPrintfWrap> {
 public:
-   SNPrintfWrap () = default;
+   explicit SNPrintfWrap () = default;
    ~SNPrintfWrap () = default;
 
 private:
@@ -863,6 +863,11 @@ public:
       fmtwrap.exec (buffer, StaticBufferSize, fmt, args...);
 
       return buffer;
+   }
+
+   template <typename ...Args> String joinPath (Args &&...args) noexcept {
+      Array <String> data ({ cr::forward <Args> (args)... });
+      return String::join (data, PATH_SEP);
    }
 
    template <typename U> U *format (const U *fmt) noexcept {

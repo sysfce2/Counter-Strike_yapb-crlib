@@ -156,7 +156,7 @@ namespace detail {
    };
 }
 
-class Socket final : public DenyCopying {
+class Socket final : public NonCopyable {
 private:
    int32_t socket_;
    uint32_t timeout_;
@@ -341,7 +341,7 @@ public:
          plat.abort ("Sockets not initialized.");
       }
 
-      if (File::exists (localPath)) {
+      if (plat.fileExists (localPath.chars ())) {
          statusCode_ = HttpClientResult::LocalFileExists;
          return false;
       }
@@ -411,7 +411,7 @@ public:
          plat.abort ("Sockets not initialized.");
       }
 
-      if (!File::exists (localPath)) {
+      if (!plat.fileExists (localPath.chars ())) {
          statusCode_ = HttpClientResult::NoLocalFile;
          return false;
       }
