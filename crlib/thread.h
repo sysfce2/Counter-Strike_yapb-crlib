@@ -283,10 +283,11 @@ private:
 
 private:
 #if defined (CR_WINDOWS)
-   static unsigned __stdcall threadWorker (void *pthis) {
+   static DWORD __stdcall threadWorker (void *pthis) {
 #else
    static void *threadWorker (void *pthis) {
 #endif
+      assert (pthis);
       (*reinterpret_cast <Thread *> (pthis)->m_invokable) ();
 
 #if defined (CR_WINDOWS)
@@ -301,7 +302,7 @@ public:
       m_invokable = makeUnique <Func> (cr::move (callback));
 
 #if defined(CR_WINDOWS)
-      thread_ =  reinterpret_cast <HANDLE> (_beginthreadex (nullptr, 0, threadWorker, this, 0, nullptr));
+      thread_ =  CreateThread (nullptr, 0, threadWorker, this, 0, nullptr);
 #else
       initialized_ = (pthread_create (&thread_, nullptr, threadWorker, this) == 0);
 #endif
@@ -429,10 +430,11 @@ public:
          jobs_.clear ();
          running_ = true;
       }
-
-      for (std::size_t i = 0; i < workers; ++i) {
+      
+      for (size_t i = 0; i < workers; ++i) {
          threads_.emplace ([this] () {
             for (;;) {
+               
                Func job;
                {
                   SignalScopedLock lock (signal_);
