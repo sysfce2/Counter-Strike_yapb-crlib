@@ -442,18 +442,15 @@ public:
                   }
 
                   if (!running_ && jobs_.empty ()) {
+#if !defined (THREAD_SIGNAL_HAS_BROADCAST)
+                     signal_.notify ();
+#endif
                      return;
                   }
                   job = cr::move (jobs_.popFront ());
                }
                job ();
             }
-#if !defined (THREAD_SIGNAL_HAS_BROADCAST)
-            {
-               SignalScopedLock notify_lock (signal_);
-               signal_.notify ();
-            }
-#endif
          });
       }
    }
