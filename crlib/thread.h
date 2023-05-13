@@ -18,6 +18,53 @@
 
 CR_NAMESPACE_BEGIN
 
+#if !defined (CR_WINDOWS)
+// pthread workaround since glibc 2.34 doesn't provide linkage with libpthread
+// and we're need to target binary compiled with latest compiler on ancient distro
+class PthreadWrapper final : public Singleton <PthreadWrapper> {
+private:
+   using MutexTryLock = decltype (&pthread_mutex_trylock);
+   using Join = decltype (&pthread_join);
+   using Detach = decltype (&pthread_detach);
+   using Create = decltype (&pthread_create);
+
+private:
+   SharedLibrary libpthread_;
+
+public:
+   MutexTryLock mutex_trylock = nullptr;
+   Join join = nullptr;
+   Detach detach = nullptr;
+   Create create = nullptr;
+
+private:
+   template <typename T> T resolve (const char *symbol) {
+      auto result = reinterpret_cast <T> (dlsym (RTLD_DEFAULT, symbol));
+
+      if (!result) {
+         if (!libpthread_) {
+            libpthread_.load ("libpthread.so"); // older than glibc 2.34, try load libpthread as workaround
+         }
+         result = libpthread_.resolve <T> (symbol); // ... and lookup there
+      }
+      return result;
+   }
+
+public:
+   explicit PthreadWrapper () {
+      mutex_trylock = resolve <MutexTryLock> ("pthread_mutex_trylock");
+      join = resolve <Join> ("pthread_join");
+      detach = resolve <Detach> ("pthread_detach");
+      create = resolve <Create> ("pthread_create");
+   }
+   ~PthreadWrapper () = default;
+};
+
+// expose thread wrapper
+CR_EXPOSE_GLOBAL_SINGLETON (PthreadWrapper, pthread);
+
+#endif
+
 // simple scoped lock wrapper
 template <typename T> class ScopedLock final : public NonCopyable {
 private:
@@ -110,7 +157,7 @@ public:
       return !!TryAcquireSRWLockExclusive (&cs_);
 #endif
 #else
-      return pthread_mutex_trylock (&mutex_) == 0;
+      return pthread.mutex_trylock (&mutex_) == 0;
 #endif
    }
 
@@ -267,6 +314,7 @@ public:
 using MutexScopedLock = ScopedLock <Mutex>;
 using SignalScopedLock = ScopedLock <Signal>;
 
+
 // basic thread class
 class Thread final : public NonCopyable {
 public:
@@ -304,7 +352,7 @@ public:
 #if defined(CR_WINDOWS)
       thread_ =  CreateThread (nullptr, 0, threadWorker, this, 0, nullptr);
 #else
-      initialized_ = (pthread_create (&thread_, nullptr, threadWorker, this) == 0);
+      initialized_ = (pthread.create (&thread_, nullptr, threadWorker, this) == 0);
 #endif
 
       if (!ok ()) {
@@ -333,7 +381,7 @@ public:
       CloseHandle (thread_);
       thread_ = nullptr;
 #else
-      pthread_detach (thread_);
+      pthread.detach (thread_);
 #endif
    }
 
@@ -354,7 +402,7 @@ public:
       WaitForSingleObjectEx (thread_, INFINITE, FALSE);
       thread_ = nullptr;
 #else
-      pthread_join (thread_, nullptr);
+      pthread.join (thread_, nullptr);
       initialized_ = false;
 #endif
    }

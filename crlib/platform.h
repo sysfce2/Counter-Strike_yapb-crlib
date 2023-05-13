@@ -119,14 +119,9 @@ CR_NAMESPACE_BEGIN
    __asm__ (".symver dladdr, dladdr@GLIBC_" GLIBC_VERSION_MIN);
    __asm__ (".symver dlclose, dlclose@GLIBC_" GLIBC_VERSION_MIN);
    __asm__ (".symver dlopen, dlopen@GLIBC_" GLIBC_VERSION_MIN);
-
-   __asm__ (".symver pthread_mutex_trylock, pthread_mutex_trylock@GLIBC_" GLIBC_VERSION_MIN);
-   __asm__ (".symver pthread_join, pthread_join@GLIBC_" GLIBC_VERSION_MIN);
-   __asm__ (".symver pthread_detach, pthread_detach@GLIBC_" GLIBC_VERSION_MIN);
-   __asm__ (".symver pthread_create, pthread_create@GLIBC_" GLIBC_VERSION_MIN);
 #endif
 
-   CR_NAMESPACE_END
+CR_NAMESPACE_END
 
 #if defined(CR_WINDOWS)
 constexpr auto PATH_SEP = "\\";
