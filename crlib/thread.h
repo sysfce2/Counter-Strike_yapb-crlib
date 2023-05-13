@@ -157,7 +157,11 @@ public:
       return !!TryAcquireSRWLockExclusive (&cs_);
 #endif
 #else
+#if defined (CR_OSX)
+      return pthread_mutex_trylock (&mutex_) == 0;
+#else
       return pthread.mutex_trylock (&mutex_) == 0;
+#endif
 #endif
    }
 
@@ -352,7 +356,11 @@ public:
 #if defined(CR_WINDOWS)
       thread_ =  CreateThread (nullptr, 0, threadWorker, this, 0, nullptr);
 #else
+#if defined(CR_OSX)
+      initialized_ = (pthread_create (&thread_, nullptr, threadWorker, this) == 0);
+#else
       initialized_ = (pthread.create (&thread_, nullptr, threadWorker, this) == 0);
+#endif
 #endif
 
       if (!ok ()) {
@@ -381,7 +389,11 @@ public:
       CloseHandle (thread_);
       thread_ = nullptr;
 #else
+#if defined (CR_OSX)
+      pthread_detach (thread_);
+#else
       pthread.detach (thread_);
+#endif
 #endif
    }
 
@@ -402,7 +414,11 @@ public:
       WaitForSingleObjectEx (thread_, INFINITE, FALSE);
       thread_ = nullptr;
 #else
+#if defined (CR_OSX)
+      pthread_join (thread_, nullptr);
+#else
       pthread.join (thread_, nullptr);
+#endif
       initialized_ = false;
 #endif
    }
