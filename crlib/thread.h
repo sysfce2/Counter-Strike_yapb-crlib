@@ -18,7 +18,7 @@
 
 CR_NAMESPACE_BEGIN
 
-#if !defined (CR_WINDOWS)
+#if !defined (CR_WINDOWS) && !defined (CR_OSX)
 // pthread workaround since glibc 2.34 doesn't provide linkage with libpthread
 // and we're need to target binary compiled with latest compiler on ancient distro
 class PthreadWrapper final : public Singleton <PthreadWrapper> {
