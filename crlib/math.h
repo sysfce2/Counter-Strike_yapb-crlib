@@ -1,6 +1,6 @@
 //
-// YaPB - Counter-Strike Bot based on PODBot by Markus Klinge.
-// Copyright © 2004-2022 YaPB Project <yapb@jeefo.net>.
+// crlib, simple class library for private needs.
+// Copyright © RWSH Solutions LLC <lab@rwsh.ru>.
 //
 // SPDX-License-Identifier: MIT
 //
