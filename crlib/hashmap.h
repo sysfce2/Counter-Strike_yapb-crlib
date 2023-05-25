@@ -95,8 +95,8 @@ private:
 private:
    static constexpr size_t kInitialSize = 3;
    static constexpr float kLoadFactor = static_cast <float> (kInitialSize) / 6.0f;
-   static constexpr int32_t kGrowFractor = static_cast <int32_t> (kLoadFactor * 6.0f);
-   static constexpr int32_t kInvalidDeleteIndex = -1;
+   static constexpr size_t kGrowFractor = static_cast <size_t> (kLoadFactor * 6.0f);
+   static constexpr size_t kInvalidDeleteIndex = static_cast <size_t> (-1);
 
 public:
    HashMap () {
@@ -134,7 +134,7 @@ private:
       return hash_ (key) % contents_.length ();
    }
 
-   void setIndexOccupied (const int32_t index, const K &key, V &&val) {
+   void setIndexOccupied (const size_t index, const K &key, V &&val) {
       contents_[index].key = key;
       contents_[index].val = cr::move (val);
       contents_[index].status = Status::Occupied;
@@ -232,7 +232,7 @@ public:
          if (contents_[index].key == key) {
             return false;
          }
-         int32_t deleteIndex = kInvalidDeleteIndex;
+         auto deleteIndex = kInvalidDeleteIndex;
 
          for (size_t i = 1; i < contents_.length (); i++) {
             const size_t probeIndex = (index + i) % contents_.length ();

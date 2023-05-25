@@ -41,7 +41,7 @@ public:
 #endif
       if (!memory) {
          char errmsg[256] {};
-         snprintf (errmsg, cr::bufsize (errmsg), "Failed to allocate %d megabytes of memory. Closing down.", size / 1024 / 1024);
+         snprintf (errmsg, cr::bufsize (errmsg), "Failed to allocate %zd megabytes of memory. Closing down.", size / 1024 / 1024);
 
          plat.abort (errmsg);
       }
