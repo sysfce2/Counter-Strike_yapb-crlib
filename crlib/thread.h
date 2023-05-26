@@ -337,7 +337,7 @@ private:
 #if defined (CR_WINDOWS)
    static DWORD __stdcall worker (void *pthis) {
 #else
-   static void *threadWorker (void *pthis) {
+   static void *worker (void *pthis) {
 #endif
       assert (pthis);
       (*reinterpret_cast <Thread *> (pthis)->m_invokable) ();
