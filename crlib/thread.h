@@ -335,7 +335,7 @@ private:
 
 private:
 #if defined (CR_WINDOWS)
-   static DWORD __stdcall threadWorker (void *pthis) {
+   static DWORD __stdcall worker (void *pthis) {
 #else
    static void *threadWorker (void *pthis) {
 #endif
@@ -354,12 +354,12 @@ public:
       m_invokable = makeUnique <Func> (cr::move (callback));
 
 #if defined(CR_WINDOWS)
-      thread_ =  CreateThread (nullptr, 0, threadWorker, this, 0, nullptr);
+      thread_ =  CreateThread (nullptr, 0, worker, this, 0, nullptr);
 #else
 #if defined(CR_OSX)
-      initialized_ = (pthread_create (&thread_, nullptr, threadWorker, this) == 0);
+      initialized_ = (pthread_create (&thread_, nullptr, worker, this) == 0);
 #else
-      initialized_ = (pthread.create (&thread_, nullptr, threadWorker, this) == 0);
+      initialized_ = (pthread.create (&thread_, nullptr, worker, this) == 0);
 #endif
 #endif
 
@@ -412,7 +412,6 @@ public:
       }
 #if defined (CR_WINDOWS)
       WaitForSingleObjectEx (thread_, INFINITE, FALSE);
-      thread_ = nullptr;
 #else
 #if defined (CR_OSX)
       pthread_join (thread_, nullptr);
