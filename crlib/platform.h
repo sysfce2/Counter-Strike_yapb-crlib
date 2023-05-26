@@ -107,7 +107,7 @@ CR_NAMESPACE_BEGIN
 #if defined (CR_ARCH_ARM)
 #  define GLIBC_VERSION_MIN "2.17"
 #elif defined (CR_ARCH_X64) && !defined (CR_ARCH_ARM)
-#  define GLIBC_VERSION_MIN "2.12"
+#  define GLIBC_VERSION_MIN "2.2.5"
 #else
 #  define GLIBC_VERSION_MIN "2.0"
 #endif
