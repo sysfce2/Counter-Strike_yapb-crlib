@@ -18,7 +18,10 @@
 
 CR_NAMESPACE_BEGIN
 
-#if !defined (CR_WINDOWS) && !defined (CR_OSX)
+// @todo: subject to remove, this will not work on <=debian8 centos<=8 in case binary loaded with RTLD_DEEPBIND
+// #define GLIBC_PTHREAD_WORKAROUND
+
+#if defined (GLIBC_PTHREAD_WORKAROUND)
 // pthread workaround since glibc 2.34 doesn't provide linkage with libpthread
 // and we're need to target binary compiled with latest compiler on ancient distro
 class PthreadWrapper final : public Singleton <PthreadWrapper> {
@@ -157,7 +160,7 @@ public:
       return !!TryAcquireSRWLockExclusive (&cs_);
 #endif
 #else
-#if defined (CR_OSX)
+#if !defined (GLIBC_PTHREAD_WORKAROUND)
       return pthread_mutex_trylock (&mutex_) == 0;
 #else
       return pthread.mutex_trylock (&mutex_) == 0;
@@ -356,7 +359,7 @@ public:
 #if defined(CR_WINDOWS)
       thread_ =  CreateThread (nullptr, 0, worker, this, 0, nullptr);
 #else
-#if defined(CR_OSX)
+#if !defined(GLIBC_PTHREAD_WORKAROUND)
       initialized_ = (pthread_create (&thread_, nullptr, worker, this) == 0);
 #else
       initialized_ = (pthread.create (&thread_, nullptr, worker, this) == 0);
@@ -389,7 +392,7 @@ public:
       CloseHandle (thread_);
       thread_ = nullptr;
 #else
-#if defined (CR_OSX)
+#if !defined (GLIBC_PTHREAD_WORKAROUND)
       pthread_detach (thread_);
 #else
       pthread.detach (thread_);
@@ -413,7 +416,7 @@ public:
 #if defined (CR_WINDOWS)
       WaitForSingleObjectEx (thread_, INFINITE, FALSE);
 #else
-#if defined (CR_OSX)
+#if !defined (GLIBC_PTHREAD_WORKAROUND)
       pthread_join (thread_, nullptr);
 #else
       pthread.join (thread_, nullptr);
