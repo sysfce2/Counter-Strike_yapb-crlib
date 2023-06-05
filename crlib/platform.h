@@ -127,6 +127,12 @@ CR_NAMESPACE_END
 constexpr auto PATH_SEP = "\\";
 constexpr auto DLL_SUFFIX = ".dll";
 
+// raise windows api version if doesn't build for xp
+#if !defined(CR_HAS_WINXP_SUPPORT) && !defined (CR_CXX_MSVC)
+#  define _WIN32_WINNT 0x0600
+#  define WINVER 0x0600 
+#endif
+
 #  define WIN32_LEAN_AND_MEAN
 #  define NOGDICAPMASKS
 #  define NOVIRTUALKEYCODES
