@@ -114,7 +114,6 @@ CR_NAMESPACE_BEGIN
 
 // avoid linking to high GLIBC versions
 #if defined (CR_LINUX)
-   __asm__ (".symver powf, powf@GLIBC_" GLIBC_VERSION_MIN);
    __asm__ (".symver dlsym, dlsym@GLIBC_" GLIBC_VERSION_MIN);
    __asm__ (".symver dladdr, dladdr@GLIBC_" GLIBC_VERSION_MIN);
    __asm__ (".symver dlclose, dlclose@GLIBC_" GLIBC_VERSION_MIN);
@@ -173,6 +172,7 @@ constexpr auto DLL_SUFFIX = ".dll";
 #  define NOMCX
 #  define NOWINRES
 #  define NOIME
+
 #  include <windows.h>
 #  include <direct.h>
 #  include <io.h>

@@ -19,7 +19,9 @@
 CR_NAMESPACE_BEGIN
 
 // @todo: subject to remove, this will not work on <=debian8 centos<=8 in case binary loaded with RTLD_DEEPBIND
-// #define GLIBC_PTHREAD_WORKAROUND
+#if defined (CR_LINUX) && defined(__GLIBC__ ) && __GLIBC__ >= 2 && __GLIBC_MINOR__ >= 34
+#  define GLIBC_PTHREAD_WORKAROUND
+#endif
 
 #if defined (GLIBC_PTHREAD_WORKAROUND)
 // pthread workaround since glibc 2.34 doesn't provide linkage with libpthread

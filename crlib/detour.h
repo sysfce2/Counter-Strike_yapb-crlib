@@ -186,8 +186,8 @@ public:
    }
 
    template <typename... Args > decltype (auto) operator () (Args &&...args) {
-      DetourSwitch sw (this);
-      return reinterpret_cast <T *> (original_) (args...);
+      DetourSwitch sw { this };
+      return reinterpret_cast <T *> (original_) (cr::forward <Args> (args)...);
    }
 };
 

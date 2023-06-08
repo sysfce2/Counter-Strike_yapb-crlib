@@ -103,7 +103,7 @@ public:
       contents_.resize (kInitialSize);
    }
 
-   HashMap (HashMap &&rhs) noexcept : contents_ (cr::move (rhs.contents_)), length_ (rhs.length_), hash_ (cr::move (hash_)) {}
+   HashMap (HashMap &&rhs) noexcept : contents_ (cr::move (rhs.contents_)), length_ (rhs.length_), hash_ (cr::move (rhs.hash_)) {}
    ~HashMap () = default;
 
    HashMap (std::initializer_list <Twin <K, V>> list) {
