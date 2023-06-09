@@ -7,7 +7,7 @@
 
 #pragma once
 
-#if defined(CR_LINUX) && !defined (CR_ARCH_ARM)
+#if (defined(CR_LINUX) || defined (CR_OSX)) && !defined (CR_ARCH_ARM)
 #include <cpuid.h>
 #elif defined (CR_WINDOWS)
 #include <intrin.h>
