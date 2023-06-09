@@ -105,17 +105,71 @@ public:
       );
    }
 
+#if defined (CR_ARCH_ARM)
    void angleVectors (SimdVec3Wrap &sines, SimdVec3Wrap &cosines) {
       static constexpr CR_ALIGN16 float d2r[] = {
          kDegreeToRadians, kDegreeToRadians,
          kDegreeToRadians, kDegreeToRadians
       };
-#if defined (CR_ARCH_ARM64)
       neon_sincos_ps (_mm_mul_ps (m, _mm_load_ps (d2r)), sines.m, cosines.m);
-#else
-      ssemath::sincos_ps (_mm_mul_ps (m, _mm_load_ps (d2r)), sines.m, cosines.m);
-#endif
    }
+#else
+   // this function directly taken from rehlds project https://github.com/dreamstalker/rehlds
+   void angleVectors (float *forward, float *right, float *upward) {
+      static constexpr CR_ALIGN16 float d2r[] = {
+         kDegreeToRadians, kDegreeToRadians,
+         kDegreeToRadians, kDegreeToRadians
+      };
+
+      static constexpr CR_ALIGN16 uint32_t negmask[4] = {
+         0x80000000, 0x80000000, 0x80000000, 0x80000000
+      };
+
+      static constexpr CR_ALIGN16 uint32_t negmask_1001[4] = {
+         0x80000000, 0, 0, 0x80000000
+      };
+
+      __m128 s, c;
+      ssemath::sincos_ps (_mm_mul_ps (m, _mm_load_ps (d2r)), s, c);
+
+      auto m1 = _mm_shuffle_ps (c, s, 0x90); // [cp][cp][sy][sr]
+      auto m2 = _mm_shuffle_ps (c, c, 0x09); // [cy][cr][cp][cp]
+      auto cp_mults = _mm_mul_ps (m1, m2); // [cp * cy][cp * cr][cp * sy][cp * sr];
+
+      m1 = _mm_shuffle_ps (c, s, 0x15); // [cy][cy][sy][sp]
+      m2 = _mm_shuffle_ps (s, c, 0xa0); // [sp][sp][cr][cr]
+      m1 = _mm_shuffle_ps (m1, m1, 0xc8); // [cy][sy][cy][sp]
+
+      auto m3 = _mm_shuffle_ps (s, s, 0x4a); // [sr][sr][sp][sy];
+      m3 = _mm_mul_ps (m3, _mm_mul_ps (m1, m2)); // [sp*cy*sr][sp*sy*sr][cr*cy*sp][cr*sp*sy]
+
+      m2 = _mm_shuffle_ps (s, c, 0x65); // [sy][sy][cr][cy]
+      m1 = _mm_shuffle_ps (c, s, 0xa6); // [cr][cy][sr][sr]
+      m2 = _mm_shuffle_ps (m2, m2, 0xd8); // [sy][cr][sy][cy]
+      m1 = _mm_xor_ps (m1, _mm_load_ps (const_cast <float *> (reinterpret_cast <const float *> (&negmask_1001)))); // [-cr][cy][sr][-sr]
+      m1 = _mm_mul_ps (m1, m2); // [-cr*sy][cy*cr][sr*sy][-sr*cy]
+
+      m3 = _mm_add_ps (m3, m1);
+
+      if (forward) {
+         _mm_storel_pi (reinterpret_cast <__m64 *> (forward), _mm_shuffle_ps (cp_mults, cp_mults, 0x08));
+         forward[2] = -_mm_cvtss_f32 (s);
+      }
+
+      if (right) {
+         auto r = _mm_shuffle_ps (m3, cp_mults, 0xF4); // [m3(0)][m3(1)][cp(3)][cp(3)]
+         r = _mm_xor_ps (r, _mm_load_ps (const_cast <float *> (reinterpret_cast <const float *> (&negmask))));
+
+         _mm_storel_pi (reinterpret_cast <__m64 *> (right), r);
+         _mm_store_ss (right + 2, _mm_shuffle_ps (r, r, 0x02));
+      }
+
+      if (upward) {
+         _mm_storel_pi (reinterpret_cast <__m64 *> (upward), _mm_shuffle_ps (m3, m3, 0x0e));
+         upward[2] = _mm_cvtss_f32 (_mm_shuffle_ps (cp_mults, cp_mults, 0x01));
+      }
+   }
+#endif
 };
 
 #endif
@@ -274,6 +328,7 @@ private:
 
 public:
    void init () {
+      // this is not effective when builds are done with native optimizations
 #if defined (CR_HAS_SSE) && !defined (CR_NATIVE_BUILD)
       if (cpuflags.sse42 || plat.arm) {
          this->strlen = reinterpret_cast <StrLen *> (sse42_strlen);

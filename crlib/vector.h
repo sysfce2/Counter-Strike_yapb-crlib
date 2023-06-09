@@ -258,9 +258,13 @@ public:
    // "x" component corresponding to the X angle (horizontal angle), and the "y" component corresponding to the Y angle 
    // (vertical angle).
    void angleVectors (Vec3D *forward, Vec3D *right, Vec3D *upward) const {
-#if defined (CR_HAS_SSE) && !defined (CR_ARCH_ARM32)
+#if defined (CR_HAS_SSE)
+#if defined (CR_ARCH_ARM)
       static SimdVec3Wrap s, c;
       SimdVec3Wrap { x, y, z }.angleVectors (s, c);
+#else
+      SimdVec3Wrap { x, y, z }.angleVectors (*forward, *right, *upward);
+#endif
 #else
       static Vec3D s, c, r;
       r = { cr::deg2rad (x), cr::deg2rad (y), cr::deg2rad (z) };
@@ -270,6 +274,7 @@ public:
       cr::sincosf (r.z, s.z, c.z);
 #endif
 
+#if !defined (CR_HAS_SSE) || defined (CR_ARCH_ARM)
       if (forward) {
          *forward = { c.x * c.y, c.x * s.y, -s.x };
       }
@@ -281,6 +286,7 @@ public:
       if (upward) {
          *upward = { c.z * s.x * c.y + s.z * s.y, c.z * s.x * s.y - s.z * c.y, c.z * c.x };
       }
+#endif
    }
 
    const Vec3D &forward () {
