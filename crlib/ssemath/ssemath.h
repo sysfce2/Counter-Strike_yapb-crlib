@@ -114,7 +114,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #ifndef SSE_INLINE
 
-#if defined( __GNUC__ )
+#if defined( __GNUC__ ) || defined (__clang__)
 
 // GCC
 #define SSE_INLINE  static inline __attribute__( ( always_inline ) )
@@ -138,18 +138,18 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // MSVC
 
 #define DECLARE_SSEMATH_PS( Name, Val ) \
-    static const __declspec( align( 16 ) ) float SSEMATH_PS_##Name[ 4 ]     = { Val, Val, Val, Val };
+    static const __declspec( align( 16 ) ) constexpr float SSEMATH_PS_##Name[ 4 ]     = { Val, Val, Val, Val };
 #define DECLARE_SSEMATH_PI32( Name, Val ) \
-    static const __declspec( align( 16 ) ) unsigned long   SSEMATH_PI32_##Name[ 4 ]   = { (unsigned long) Val, (unsigned long) Val, (unsigned long) Val, (unsigned long) Val };
+    static const __declspec( align( 16 ) ) constexpr unsigned long   SSEMATH_PI32_##Name[ 4 ]   = { (unsigned long) Val, (unsigned long) Val, (unsigned long) Val, (unsigned long) Val };
 
 #else
 
 // GCC, Intel or any other (hopefully)
 
 #define DECLARE_SSEMATH_PS( Name, Val ) \
-    static const float SSEMATH_PS_##Name[ 4 ]     __attribute__( ( aligned( 16 ) ) ) = { Val, Val, Val, Val };
+    constexpr float SSEMATH_PS_##Name[ 4 ]     __attribute__( ( aligned( 16 ) ) ) = { Val, Val, Val, Val };
 #define DECLARE_SSEMATH_PI32( Name, Val ) \
-    static const unsigned long   SSEMATH_PI32_##Name[ 4 ]   __attribute__( ( aligned( 16 ) ) ) = { (unsigned long) Val, (unsigned long) Val, (unsigned long) Val, (unsigned long) Val };
+    constexpr unsigned long   SSEMATH_PI32_##Name[ 4 ]   __attribute__( ( aligned( 16 ) ) ) = { (unsigned long) Val, (unsigned long) Val, (unsigned long) Val, (unsigned long) Val };
 
 #endif
 

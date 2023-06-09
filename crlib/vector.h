@@ -7,7 +7,8 @@
 
 #pragma once
 
-#include <crlib/math.h>
+#include <crlib/mathlib.h>
+#include <crlib/traits.h>
 
 CR_NAMESPACE_BEGIN
 
@@ -31,7 +32,7 @@ public:
 
    constexpr Vec3D (const Vec3D &) = default;
 
-   constexpr Vec3D (decltype (nullptr)) {
+   constexpr Vec3D (nullptr_t) {
       clear ();
    }
 
@@ -121,7 +122,7 @@ public:
       return !operator == (rhs);
    }
 
-   constexpr void operator = (decltype (nullptr)) {
+   constexpr void operator = (nullptr_t) {
       clear ();
    }
 

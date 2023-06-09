@@ -19,7 +19,7 @@
 CR_NAMESPACE_BEGIN
 
 // @todo: subject to remove, this will not work on <=debian8 centos<=8 in case binary loaded with RTLD_DEEPBIND
-#if defined (CR_LINUX) && defined(__GLIBC__ ) && __GLIBC__ >= 2 && __GLIBC_MINOR__ >= 34
+#if defined (CR_LINUX) && !defined (CR_NATIVE_BUILD) && defined(__GLIBC__ ) && __GLIBC__ >= 2 && __GLIBC_MINOR__ >= 34
 #  define GLIBC_PTHREAD_WORKAROUND
 #endif
 

@@ -75,7 +75,7 @@ CR_NAMESPACE_BEGIN
 #if !defined(CR_DISABLE_SSE)
 #  define CR_HAS_SSE
 #  if !defined (CR_ARCH_ARM)
-#     define CR_INTRIN_INCLUDE <emmintrin.h>
+#     define CR_INTRIN_INCLUDE <smmintrin.h>
 #  else
 #     define CR_INTRIN_INCLUDE <crlib/ssemath/sse2neon.h>
 #  endif
@@ -96,6 +96,14 @@ CR_NAMESPACE_BEGIN
 // msvc provides us placement new by default
 #if defined (CR_CXX_MSVC)
 #  define __PLACEMENT_NEW_INLINE
+#endif
+
+#if (defined (CR_CXX_MSVC) && !defined (CR_CXX_CLANG)) || defined (CR_ARCH_ARM)
+#  define CR_SSE_TARGET(dest)
+#  define CR_SSE_TARGET_AIL(dest)
+#else
+#  define CR_SSE_TARGET(dest) __attribute__((target(dest)))
+#  define CR_SSE_TARGET_AIL(dest) __attribute__((__always_inline__, target(dest)))
 #endif
 
 // ship windows xp release builds only with msvc

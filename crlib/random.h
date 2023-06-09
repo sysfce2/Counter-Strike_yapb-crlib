@@ -17,7 +17,7 @@ class Xoshiro128 final : public Singleton <Xoshiro128> {
 private:
    uint32_t states_[4] {};
    uint32_t states2_[4] {};
-   uint64_t limit_ { static_cast <uint64_t> (1) << 32ull };
+   static constexpr uint64_t limit_ { static_cast <uint64_t> (1) << 32ull };
 
 private:
    constexpr uint32_t rotl32 (const uint32_t x, int32_t k) {

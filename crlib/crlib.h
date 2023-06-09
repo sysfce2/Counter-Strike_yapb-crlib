@@ -20,7 +20,8 @@
 #include <crlib/library.h>
 #include <crlib/hashmap.h>
 #include <crlib/logger.h>
-#include <crlib/math.h>
+#include <crlib/cpuflags.h>
+#include <crlib/mathlib.h>
 #include <crlib/vector.h>
 #include <crlib/random.h>
 #include <crlib/ulz.h>

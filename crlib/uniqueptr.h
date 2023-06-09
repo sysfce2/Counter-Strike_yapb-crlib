@@ -73,7 +73,7 @@ public:
       return *this;
    }
 
-   constexpr UniquePtr &operator = (decltype (nullptr)) {
+   constexpr UniquePtr &operator = (nullptr_t) {
       destroy ();
       return *this;
    }
@@ -149,7 +149,7 @@ public:
       return *this;
    }
 
-   constexpr UniquePtr &operator = (decltype (nullptr)) {
+   constexpr UniquePtr &operator = (nullptr_t) {
       destroy ();
       return *this;
    }

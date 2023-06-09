@@ -78,10 +78,10 @@ public:
    constexpr StringRef (const char *chars, size_t length) : chars_ (chars), length_ (length)
    { }
 
-   constexpr StringRef (decltype (nullptr)) : chars_ (""), length_ (0)
+   constexpr StringRef (nullptr_t) : chars_ (""), length_ (0)
    { }
 
-   constexpr StringRef (decltype (nullptr), size_t) : chars_ (""), length_ (0)
+   constexpr StringRef (nullptr_t, size_t) : chars_ (""), length_ (0)
    { }
 
 public:
@@ -1150,5 +1150,6 @@ public:
 
 // expose global utf8 tools 
 CR_EXPOSE_GLOBAL_SINGLETON (Utf8Tools, utf8tools);
+
 
 CR_NAMESPACE_END

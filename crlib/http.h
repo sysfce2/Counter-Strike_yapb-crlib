@@ -149,7 +149,7 @@ namespace detail {
          WSADATA wsa;
 
          if (WSAStartup (MAKEWORD (2, 2), &wsa) != 0) {
-            logger.error ("Unable to inialize sockets.");
+            logger.error ("Unable to initialize sockets.");
          }
 #endif
       }

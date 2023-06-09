@@ -128,7 +128,7 @@ public:
 
 public:
    constexpr Lambda () : lambda_ { nullptr } {}
-   constexpr Lambda (decltype (nullptr)) : lambda_ { nullptr } {}
+   constexpr Lambda (nullptr_t) : lambda_ { nullptr } {}
 
 public:
    constexpr Lambda (const Lambda &rhs) {
@@ -158,7 +158,7 @@ public:
    }
 
 public:
-   constexpr Lambda &operator = (decltype (nullptr)) {
+   constexpr Lambda &operator = (nullptr_t) {
       destroy ();
       lambda_ = nullptr;
       return *this;

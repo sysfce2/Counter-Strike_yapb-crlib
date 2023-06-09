@@ -43,9 +43,6 @@ template <typename T>  constexpr T max (const T &a, const T &b) {
    return a > b ? a : b;
 }
 
-template <typename T> constexpr T sqrf (const T &value) {
-   return value * value;
-}
 
 template <typename T>  constexpr T clamp (const T &x, const T &a, const T &b) {
    return min (max (x, a), b);
@@ -80,7 +77,7 @@ protected:
    ~Singleton () = default;
 
 public:
-   static T &instance () {
+   static inline T &instance () {
       static T __instance {};
       return __instance;
    }
