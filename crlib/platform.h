@@ -121,7 +121,7 @@ CR_NAMESPACE_BEGIN
 #endif
 
 // avoid linking to high GLIBC versions
-#if defined (CR_LINUX)
+#if defined (CR_LINUX) && !defined (CR_ANDROID)
    __asm__ (".symver dlsym, dlsym@GLIBC_" GLIBC_VERSION_MIN);
    __asm__ (".symver dladdr, dladdr@GLIBC_" GLIBC_VERSION_MIN);
    __asm__ (".symver dlclose, dlclose@GLIBC_" GLIBC_VERSION_MIN);
@@ -137,7 +137,7 @@ constexpr auto DLL_SUFFIX = ".dll";
 // raise windows api version if doesn't build for xp
 #if !defined(CR_HAS_WINXP_SUPPORT) && !defined (CR_CXX_MSVC)
 #  define _WIN32_WINNT 0x0600
-#  define WINVER 0x0600 
+#  define WINVER 0x0600
 #endif
 
 #  define WIN32_LEAN_AND_MEAN
@@ -212,6 +212,10 @@ constexpr auto PATH_SEP = "/";
 #include <time.h>
 
 CR_NAMESPACE_BEGIN
+// undef bzero under android
+#if defined (CR_ANDROID)
+#  undef bzero
+#endif
 
 // helper struct for platform detection
 struct Platform : public Singleton <Platform> {

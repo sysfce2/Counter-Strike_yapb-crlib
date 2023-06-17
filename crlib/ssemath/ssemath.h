@@ -119,7 +119,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // GCC
 #define SSE_INLINE  static inline __attribute__( ( always_inline ) )
 
-#elif defined( MSC_VER ) || defined( __ICL )
+#elif defined( _MSC_VER ) || defined( __ICL )
 
 // MSVC or ICC
 #define SSE_INLINE  static __forceinline
