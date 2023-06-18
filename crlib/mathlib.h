@@ -27,7 +27,7 @@ CR_NAMESPACE_END
 
 CR_NAMESPACE_BEGIN
 
-#if defined (CR_HAS_SSE)
+#if defined (CR_HAS_SIMD)
 template <> inline float abs (const float &x) {
    return _mm_cvtss_f32 (ssemath::fabs_ps (_mm_load_ss (&x)));
 }
@@ -50,7 +50,7 @@ template <typename T> constexpr T sqrf (const T &value) {
 }
 
 inline float sinf (const float value) {
-#if defined (CR_HAS_SSE)
+#if defined (CR_HAS_SIMD)
    return _mm_cvtss_f32 (ssemath::sin_ps (_mm_load_ss (&value)));
 #else
    return ::sinf (value);
@@ -58,7 +58,7 @@ inline float sinf (const float value) {
 }
 
 inline float cosf (const float value) {
-#if defined (CR_HAS_SSE)
+#if defined (CR_HAS_SIMD)
    return _mm_cvtss_f32 (ssemath::cos_ps (_mm_load_ss (&value)));
 #else
    return ::cosf (value);
@@ -66,7 +66,7 @@ inline float cosf (const float value) {
 }
 
 inline float atan2f (const float y, const float x) {
-#if defined (CR_HAS_SSE)
+#if defined (CR_HAS_SIMD)
    return _mm_cvtss_f32 (ssemath::atan2_ps (_mm_load_ss (&y), _mm_load_ss (&x)));
 #else
    return ::atan2f (y, x);
@@ -74,7 +74,7 @@ inline float atan2f (const float y, const float x) {
 }
 
 inline float powf (const float x, const float y) {
-#if defined (CR_HAS_SSE)
+#if defined (CR_HAS_SIMD)
    return _mm_cvtss_f32 (ssemath::pow_ps (_mm_load_ss (&x), _mm_load_ss (&y)));
 #else
    return ::powf (x, y);
@@ -82,7 +82,7 @@ inline float powf (const float x, const float y) {
 }
 
 inline float sqrtf (const float value) {
-#if defined (CR_HAS_SSE)
+#if defined (CR_HAS_SIMD)
    return _mm_cvtss_f32 (_mm_sqrt_ss (_mm_load_ss (&value)));
 #else
    return ::sqrtf (value);
@@ -90,7 +90,7 @@ inline float sqrtf (const float value) {
 }
 
 inline float rsqrtf (const float value) {
-#if defined (CR_HAS_SSE)
+#if defined (CR_HAS_SIMD)
    return _mm_cvtss_f32 (_mm_rsqrt_ss (_mm_load_ss (&value)));
 #else
    return 1.0f / ::sqrtf (value);
@@ -98,7 +98,7 @@ inline float rsqrtf (const float value) {
 }
 
 inline float tanf (const float value) {
-#if defined (CR_HAS_SSE)
+#if defined (CR_HAS_SIMD)
    return _mm_cvtss_f32 (ssemath::tan_ps (_mm_load_ss (&value)));
 #else
    return ::tanf (value);
@@ -106,7 +106,7 @@ inline float tanf (const float value) {
 }
 
 inline float ceilf (const float value) {
-#if defined (CR_HAS_SSE)
+#if defined (CR_HAS_SIMD)
    return _mm_cvtss_f32 (ssemath::ceil_ps (_mm_load_ss (&value)));
 #else
    return ::ceilf (value);
@@ -114,7 +114,7 @@ inline float ceilf (const float value) {
 }
 
 inline float log10 (const float value) {
-#if defined (CR_HAS_SSE)
+#if defined (CR_HAS_SIMD)
    return _mm_cvtss_f32 (ssemath::log10_ps (_mm_load_ss (&value)));
 #else
    return ::log10f (value);
@@ -122,7 +122,7 @@ inline float log10 (const float value) {
 }
 
 inline float floorf (const float value) {
-#if defined (CR_HAS_SSE)
+#if defined (CR_HAS_SIMD)
    return _mm_cvtss_f32 (cr::ssemath::floor_ps (_mm_load_ss (&value)));
 #else
    return ::floorf (value);
@@ -130,7 +130,7 @@ inline float floorf (const float value) {
 }
 
 static inline void sincosf (const float &x, float &s, float &c) {
-#if defined (CR_HAS_SSE)
+#if defined (CR_HAS_SIMD)
    __m128 _s, _c;
    ssemath::sincos_ps (_mm_load_ss (&x), _s, _c);
 

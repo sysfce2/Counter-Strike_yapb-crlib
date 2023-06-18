@@ -9,7 +9,7 @@
 
 #include <crlib/basic.h>
 
-#if defined (CR_HAS_SSE)
+#if defined (CR_HAS_SIMD)
 #  include CR_INTRIN_INCLUDE
 #  if defined (CR_ARCH_ARM)
 #     include <crlib/ssemath/sincos_arm.h>
@@ -18,35 +18,32 @@
 
 CR_NAMESPACE_BEGIN
 
-#if defined (CR_HAS_SSE)
+#if defined (CR_HAS_SIMD)
 
 namespace ssemath {
 #  include <crlib/ssemath/ssemath.h>
 }
 
-CR_ALIGN16 const auto simd_EPS = _mm_set1_ps (kFloatEpsilon);
+CR_SIMD_ALIGNED const auto simd_EPS = _mm_set1_ps (kFloatEpsilon);
 
 // simple wrapper for vector
-class CR_ALIGN16 SimdVec3Wrap final {
+class CR_SIMD_ALIGNED SimdVec3Wrap final {
 private:
-   template <bool AVOID_NAN = false> static inline CR_SSE_TARGET_AIL ("sse4.1") __m128 _mm_dot4_ps (__m128 v0, __m128 v1) {
+   template <bool AVOID_NAN = false> static inline CR_SIMD_TARGET_AIL ("sse4.1") __m128 _mm_dot4_ps (__m128 v0, __m128 v1) {
       if (cpuflags.sse41) {
          if constexpr (AVOID_NAN) {
             return _mm_dp_ps (v0, v1, 0x7f);
          }
          return _mm_dp_ps (v0, v1, 0x71);
       }
-      v0 = _mm_mul_ps (v0, v1);
 
-      v1 = _mm_shuffle_ps (v0, v0, _MM_SHUFFLE (2, 3, 0, 1));
-      v0 = _mm_add_ps (v0, v1);
-      v1 = _mm_shuffle_ps (v0, v0, _MM_SHUFFLE (0, 1, 2, 3));
-      v0 = _mm_add_ps (v0, v1);
+      auto mul0 = _mm_mul_ps (v0, v1);
+      auto had0 = _mm_add_ps (_mm_movehl_ps (mul0, mul0), _mm_hadd_ps (mul0, mul0));
 
       if constexpr (AVOID_NAN) {
-         v0 = _mm_add_ps (v0, simd_EPS); // avoid NaN's
+         had0 = _mm_add_ps (had0, simd_EPS); // avoid NaN's
       }
-      return v0;
+      return had0;
    }
 
 public:
@@ -81,7 +78,7 @@ public:
    ~SimdVec3Wrap () = default;
 
 public:
-   CR_SSE_TARGET ("sse4.1")
+   CR_SIMD_TARGET ("sse4.1")
    SimdVec3Wrap normalize () const {
 #if defined(CR_ARCH_ARM)
       return { _mm_div_ps (m, _mm_sqrt_ps (_mm_dp_ps (m, m, 0x7f))) };
@@ -107,7 +104,7 @@ public:
 
 #if defined (CR_ARCH_ARM)
    void angleVectors (SimdVec3Wrap &sines, SimdVec3Wrap &cosines) {
-      static constexpr CR_ALIGN16 float d2r[] = {
+      static constexpr CR_SIMD_ALIGNED float d2r[] = {
          kDegreeToRadians, kDegreeToRadians,
          kDegreeToRadians, kDegreeToRadians
       };
@@ -116,16 +113,16 @@ public:
 #else
    // this function directly taken from rehlds project https://github.com/dreamstalker/rehlds
    void angleVectors (float *forward, float *right, float *upward) {
-      static constexpr CR_ALIGN16 float d2r[] = {
+      static constexpr CR_SIMD_ALIGNED float d2r[] = {
          kDegreeToRadians, kDegreeToRadians,
          kDegreeToRadians, kDegreeToRadians
       };
 
-      static constexpr CR_ALIGN16 uint32_t negmask[4] = {
+      static constexpr CR_SIMD_ALIGNED uint32_t negmask[4] = {
          0x80000000, 0x80000000, 0x80000000, 0x80000000
       };
 
-      static constexpr CR_ALIGN16 uint32_t negmask_1001[4] = {
+      static constexpr CR_SIMD_ALIGNED uint32_t negmask_1001[4] = {
          0x80000000, 0, 0, 0x80000000
       };
 
@@ -194,8 +191,8 @@ public:
    StrNCmp *strncmp { ::strncmp };
 
 private:
-#if defined (CR_HAS_SSE)
-   static inline size_t CR_SSE_TARGET_AIL ("sse4.2") sse42_strlen (const char *s) {
+#if defined (CR_HAS_SIMD)
+   static inline size_t CR_SIMD_TARGET_AIL ("sse4.2") simd_sse42_strlen (const char *s) {
       size_t result = 0;
 
       auto mem = reinterpret_cast<__m128i *> (const_cast <char *> (s));
@@ -213,7 +210,7 @@ private:
       }
    }
 
-   static inline int CR_SSE_TARGET_AIL ("sse4.2") sse42_memcmp (const void *s1, const void *s2, size_t n) {
+   static inline int CR_SIMD_TARGET_AIL ("sse4.2") simd_sse42_memcmp (const void *s1, const void *s2, size_t n) {
       if (n == 0 || s1 == s2) {
          return 0;
       }
@@ -253,7 +250,7 @@ private:
       return 0;
    }
 
-   static inline int CR_SSE_TARGET_AIL ("sse4.2") sse42_strcmp (const char *s1, const char *s2) {
+   static inline int CR_SIMD_TARGET_AIL ("sse4.2") simd_sse42_strcmp (const char *s1, const char *s2) {
       if (s1 == s2) {
          return 0;
       }
@@ -289,7 +286,7 @@ private:
       return 0;
    }
 
-   static inline int CR_SSE_TARGET_AIL ("sse4.2") sse42_strncmp (const char *s1, const char *s2, size_t n) {
+   static inline int CR_SIMD_TARGET_AIL ("sse4.2") simd_sse42_strncmp (const char *s1, const char *s2, size_t n) {
       if (n == 0 || s1 == s2) {
          return 0;
       }
@@ -329,12 +326,12 @@ private:
 public:
    void init () {
       // this is not effective when builds are done with native optimizations
-#if defined (CR_HAS_SSE) && !defined (CR_NATIVE_BUILD)
+#if defined (CR_HAS_SIMD) && !defined (CR_NATIVE_BUILD)
       if (cpuflags.sse42 || plat.arm) {
-         this->strlen = reinterpret_cast <StrLen *> (sse42_strlen);
-         this->strcmp = reinterpret_cast <StrCmp *> (sse42_strcmp);
-         this->memcmp = reinterpret_cast <MemCmp *> (sse42_memcmp);
-         this->strncmp = reinterpret_cast <StrNCmp *> (sse42_strncmp);
+         this->strlen = reinterpret_cast <StrLen *> (simd_sse42_strlen);
+         this->strcmp = reinterpret_cast <StrCmp *> (simd_sse42_strcmp);
+         this->memcmp = reinterpret_cast <MemCmp *> (simd_sse42_memcmp);
+         this->strncmp = reinterpret_cast <StrNCmp *> (simd_sse42_strncmp);
       }
 #endif
    }

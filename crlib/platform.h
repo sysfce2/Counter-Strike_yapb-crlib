@@ -72,8 +72,8 @@ CR_NAMESPACE_BEGIN
 #endif
 
 
-#if !defined(CR_DISABLE_SSE)
-#  define CR_HAS_SSE
+#if !defined(CR_DISABLE_SIMD)
+#  define CR_HAS_SIMD
 #  if !defined (CR_ARCH_ARM)
 #     define CR_INTRIN_INCLUDE <smmintrin.h>
 #  else
@@ -81,11 +81,11 @@ CR_NAMESPACE_BEGIN
 #  endif
 #endif
 
-#if defined(CR_HAS_SSE)
+#if defined(CR_HAS_SIMD)
 #  if defined (CR_CXX_MSVC)
-#     define CR_ALIGN16 __declspec (align (16))
+#     define CR_SIMD_ALIGNED __declspec (align (16))
 #  else
-#     define CR_ALIGN16 __attribute__((aligned(16)))
+#     define CR_SIMD_ALIGNED __attribute__((aligned(16)))
 #  endif
 #endif
 
@@ -99,11 +99,11 @@ CR_NAMESPACE_BEGIN
 #endif
 
 #if (defined (CR_CXX_MSVC) && !defined (CR_CXX_CLANG)) || defined (CR_ARCH_ARM)
-#  define CR_SSE_TARGET(dest)
-#  define CR_SSE_TARGET_AIL(dest)
+#  define CR_SIMD_TARGET(dest)
+#  define CR_SIMD_TARGET_AIL(dest)
 #else
-#  define CR_SSE_TARGET(dest) __attribute__((target(dest)))
-#  define CR_SSE_TARGET_AIL(dest) __attribute__((__always_inline__, target(dest)))
+#  define CR_SIMD_TARGET(dest) __attribute__((target(dest)))
+#  define CR_SIMD_TARGET_AIL(dest) __attribute__((__always_inline__, target(dest)))
 #endif
 
 // ship windows xp release builds only with msvc

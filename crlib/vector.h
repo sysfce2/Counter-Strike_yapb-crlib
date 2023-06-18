@@ -26,7 +26,7 @@ public:
 
    constexpr Vec3D (T *rhs) : x (rhs[0]), y (rhs[1]), z (rhs[2]) {}
 
-#if defined (CR_HAS_SSE)
+#if defined (CR_HAS_SIMD)
    constexpr Vec3D (const SimdVec3Wrap &rhs) : x (rhs.x), y (rhs.y), z (rhs.z) {}
 #endif
 
@@ -174,7 +174,7 @@ public:
    }
 
    Vec3D normalize () const {
-#if defined (CR_HAS_SSE)
+#if defined (CR_HAS_SIMD)
       return SimdVec3Wrap { x, y, z }.normalize ();
 #else
       auto len = length () + cr::kFloatEpsilon;
@@ -188,7 +188,7 @@ public:
    }
 
    Vec3D normalize2d () const {
-#if defined (CR_HAS_SSE)
+#if defined (CR_HAS_SIMD)
       return SimdVec3Wrap { x, y }.normalize ();
 #else
       auto len = length2d () + cr::kFloatEpsilon;
@@ -258,7 +258,7 @@ public:
    // "x" component corresponding to the X angle (horizontal angle), and the "y" component corresponding to the Y angle 
    // (vertical angle).
    void angleVectors (Vec3D *forward, Vec3D *right, Vec3D *upward) const {
-#if defined (CR_HAS_SSE)
+#if defined (CR_HAS_SIMD)
 #if defined (CR_ARCH_ARM)
       static SimdVec3Wrap s, c;
       SimdVec3Wrap { x, y, z }.angleVectors (s, c);
@@ -274,7 +274,7 @@ public:
       cr::sincosf (r.z, s.z, c.z);
 #endif
 
-#if !defined (CR_HAS_SSE) || defined (CR_ARCH_ARM)
+#if !defined (CR_HAS_SIMD) || defined (CR_ARCH_ARM)
       if (forward) {
          *forward = { c.x * c.y, c.x * s.y, -s.x };
       }
