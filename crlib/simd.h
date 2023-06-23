@@ -394,7 +394,7 @@ CR_EXPOSE_GLOBAL_SINGLETON (SimdString, simdstring);
 
 // declares libc function that replaced by crlib version
 #define DECLARE_CRLIB_LIBC_FN(fn) \
-   template <typename ...Args> static inline auto fn (Args &&...args) { \
+   template <typename ...Args> constexpr auto fn (Args &&...args) { \
       return SimdString::instance ().fn##_ (cr::forward <Args> (args)...); \
    } \
 
