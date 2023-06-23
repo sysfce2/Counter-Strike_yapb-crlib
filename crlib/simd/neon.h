@@ -21,23 +21,21 @@
 
 #pragma once
 
-#include <arm_neon.h>
+constexpr auto c_sincof_p0 = -1.9515295891E-4f;;
+constexpr auto c_sincof_p1 = 8.3321608736E-3f;
+constexpr auto c_sincof_p2 = -1.6666654611E-1f;
 
-#define c_sincof_p0 -1.9515295891E-4f
-#define c_sincof_p1 8.3321608736E-3f
-#define c_sincof_p2 -1.6666654611E-1f
+constexpr auto c_minus_cephes_DP1 = -0.78515625f;
+constexpr auto c_minus_cephes_DP2 = -2.4187564849853515625e-4f;
+constexpr auto c_minus_cephes_DP3 = -3.77489497744594108e-8f;
 
-#define c_minus_cephes_DP1 -0.78515625f
-#define c_minus_cephes_DP2 -2.4187564849853515625e-4f
-#define c_minus_cephes_DP3 -3.77489497744594108e-8f
+constexpr auto c_coscof_p0 = 2.443315711809948E-005f;
+constexpr auto c_coscof_p1 = -1.388731625493765E-003f;
+constexpr auto c_coscof_p2 = 4.166664568298827E-002f;
 
-#define c_coscof_p0 2.443315711809948E-005f
-#define c_coscof_p1 -1.388731625493765E-003f
-#define c_coscof_p2 4.166664568298827E-002f
+constexpr auto c_cephes_FOPI = 1.27323954473516f;
 
-#define c_cephes_FOPI 1.27323954473516f  // 4 / M_PI
-
-static inline void neon_sincos_ps (float32x4_t x, float32x4_t &ysin, float32x4_t &ycos) {  // any x
+static inline void sincos_ps (float32x4_t x, float32x4_t &ysin, float32x4_t &ycos) {  // any x
    float32x4_t xmm1, xmm2, xmm3, y;
 
    uint32x4_t emm2;
@@ -103,4 +101,25 @@ static inline void neon_sincos_ps (float32x4_t x, float32x4_t &ysin, float32x4_t
 
    ysin = vbslq_f32 (sign_mask_sin, vnegq_f32 (ys), ys);
    ycos = vbslq_f32 (sign_mask_cos, yc, vnegq_f32 (yc));
+}
+
+static inline float32x4_t div_ps (float32x4_t a, float32x4_t b) {
+#if __aarch64__
+   return vdivq_f32 (a, b);
+#else
+   float32x4_t reciprocal = vrecpeq_f32 (b);
+   reciprocal = vmulq_f32 (vrecpsq_f32 (b, reciprocal), reciprocal);
+   // reciprocal = vmulq_f32(vrecpsq_f32(b, reciprocal), reciprocal);
+   return vmulq_f32 (a, reciprocal);
+#endif
+}
+
+static inline float32x4_t sqrt_ps (float32x4_t a) {
+#if __aarch64__
+   return vsqrtq_f32 (a);
+#else
+   float32x4_t _reciprocal = vrsqrteq_f32 (a);
+   _reciprocal = vmulq_f32 (vrsqrtsq_f32 (vmulq_f32 (a, _reciprocal), _reciprocal), _reciprocal);
+   return vmulq_f32 (a, _reciprocal);
+#endif
 }

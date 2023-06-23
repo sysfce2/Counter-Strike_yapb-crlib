@@ -15,9 +15,19 @@ CR_NAMESPACE_BEGIN
 // 3dmath vector
 template <typename T> class Vec3D {
 public:
-   T x {};
-   T y {};
-   T z {};
+#if defined (CR_CXX_MSVC)
+#   pragma warning(push)
+#   pragma warning(disable: 4201)
+#endif
+   union {
+      struct {
+         T x, y, z;
+      };
+      T data[3] {};
+   };
+#if defined (CR_CXX_MSVC)
+#   pragma warning(pop) 
+#endif
 
 public:
    constexpr Vec3D (const T &scaler = 0.0f) : x (scaler), y (scaler), z (scaler) {}
@@ -37,12 +47,12 @@ public:
    }
 
 public:
-   constexpr operator T *() {
-      return &x;
+   constexpr operator T * () {
+      return data;
    }
 
-   constexpr operator const T *() const {
-      return &x;
+   constexpr operator const T * () const {
+      return data;
    }
 
    constexpr decltype (auto) operator + (const Vec3D &rhs) const {
@@ -127,18 +137,22 @@ public:
    }
 
    constexpr const float &operator [] (const int i) const {
-      return &(x)[i];
+      return data[i];
    }
 
    constexpr float &operator [] (const int i) {
-      return &(x)[i];
+      return data[i];
    }
 
    Vec3D &operator = (const Vec3D &) = default;
 
 public:
    T length () const {
+#if defined (CR_HAS_SIMD)
+      return SimdVec3Wrap { data }.hypot ();
+#else
       return cr::sqrtf (lengthSq ());
+#endif
    }
 
    T lengthSq () const {
@@ -146,7 +160,11 @@ public:
    }
 
    T length2d () const {
+#if defined (CR_HAS_SIMD_SSE)
+      return SimdVec3Wrap { x, y }.hypot2d ();
+#else
       return cr::sqrtf (lengthSq2d ());
+#endif
    }
 
    T lengthSq2d () const {
@@ -175,7 +193,7 @@ public:
 
    Vec3D normalize () const {
 #if defined (CR_HAS_SIMD)
-      return SimdVec3Wrap { x, y, z }.normalize ();
+      return SimdVec3Wrap { data }.normalize ();
 #else
       auto len = length () + cr::kFloatEpsilon;
 
@@ -258,14 +276,13 @@ public:
    // "x" component corresponding to the X angle (horizontal angle), and the "y" component corresponding to the Y angle 
    // (vertical angle).
    void angleVectors (Vec3D *forward, Vec3D *right, Vec3D *upward) const {
-#if defined (CR_HAS_SIMD)
-#if defined (CR_ARCH_ARM)
+#if defined (CR_HAS_SIMD_SSE)
+      SimdVec3Wrap { data }.angleVectors <Vec3D> (forward, right, upward);
+#elif defined (CR_HAS_SIMD_NEON)
       static SimdVec3Wrap s, c;
-      SimdVec3Wrap { x, y, z }.angleVectors (s, c);
+      SimdVec3Wrap { data }.angleVectors (s, c);
 #else
-      SimdVec3Wrap { x, y, z }.angleVectors (*forward, *right, *upward);
-#endif
-#else
+
       static Vec3D s, c, r;
       r = { cr::deg2rad (x), cr::deg2rad (y), cr::deg2rad (z) };
 
@@ -274,7 +291,7 @@ public:
       cr::sincosf (r.z, s.z, c.z);
 #endif
 
-#if !defined (CR_HAS_SIMD) || defined (CR_ARCH_ARM)
+#if !defined (CR_HAS_SIMD_SSE)
       if (forward) {
          *forward = { c.x * c.y, c.x * s.y, -s.x };
       }

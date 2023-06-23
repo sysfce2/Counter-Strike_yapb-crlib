@@ -27,20 +27,20 @@ CR_NAMESPACE_END
 
 CR_NAMESPACE_BEGIN
 
-#if defined (CR_HAS_SIMD)
-template <> inline float abs (const float &x) {
-   return _mm_cvtss_f32 (ssemath::fabs_ps (_mm_load_ss (&x)));
+#if defined (CR_HAS_SIMD_SSE)
+template <> CR_FORCE_INLINE float abs (const float &x) {
+   return _mm_cvtss_f32 (simd::fabs_ps (_mm_load_ss (&x)));
 }
 
-template <> inline float min (const float &a, const float &b) {
+template <> CR_FORCE_INLINE float min (const float &a, const float &b) {
    return _mm_cvtss_f32 (_mm_min_ss (_mm_load_ss (&a), _mm_load_ss (&b)));
 }
 
-template <> inline float max (const float &a, const float &b) {
+template <> CR_FORCE_INLINE float max (const float &a, const float &b) {
    return _mm_cvtss_f32 (_mm_max_ss (_mm_load_ss (&a), _mm_load_ss (&b)));
 }
 
-template <> inline float clamp (const float &x, const float &a, const float &b) {
+template <> CR_FORCE_INLINE float clamp (const float &x, const float &a, const float &b) {
    return _mm_cvtss_f32 (_mm_min_ss (_mm_max_ss (_mm_load_ss (&x), _mm_load_ss (&a)), _mm_load_ss (&b)));
 }
 #endif
@@ -49,108 +49,177 @@ template <typename T> constexpr T sqrf (const T &value) {
    return value * value;
 }
 
-inline float sinf (const float value) {
-#if defined (CR_HAS_SIMD)
-   return _mm_cvtss_f32 (ssemath::sin_ps (_mm_load_ss (&value)));
+CR_FORCE_INLINE float sinf (const float value) {
+#if defined (CR_HAS_SIMD_SSE)
+   return _mm_cvtss_f32 (simd::sin_ps (_mm_load_ss (&value)));
 #else
    return ::sinf (value);
 #endif
 }
 
-inline float cosf (const float value) {
-#if defined (CR_HAS_SIMD)
-   return _mm_cvtss_f32 (ssemath::cos_ps (_mm_load_ss (&value)));
+CR_FORCE_INLINE float cosf (const float value) {
+#if defined (CR_HAS_SIMD_SSE)
+   return _mm_cvtss_f32 (simd::cos_ps (_mm_load_ss (&value)));
 #else
    return ::cosf (value);
 #endif
 }
 
-inline float atan2f (const float y, const float x) {
-#if defined (CR_HAS_SIMD)
-   return _mm_cvtss_f32 (ssemath::atan2_ps (_mm_load_ss (&y), _mm_load_ss (&x)));
+CR_FORCE_INLINE float atan2f (const float y, const float x) {
+#if defined (CR_HAS_SIMD_SSE)
+   return _mm_cvtss_f32 (simd::atan2_ps (_mm_load_ss (&y), _mm_load_ss (&x)));
 #else
    return ::atan2f (y, x);
 #endif
 }
 
-inline float powf (const float x, const float y) {
-#if defined (CR_HAS_SIMD)
-   return _mm_cvtss_f32 (ssemath::pow_ps (_mm_load_ss (&x), _mm_load_ss (&y)));
+CR_FORCE_INLINE float powf (const float x, const float y) {
+#if defined (CR_HAS_SIMD_SSE)
+   return _mm_cvtss_f32 (simd::pow_ps (_mm_load_ss (&x), _mm_load_ss (&y)));
 #else
    return ::powf (x, y);
 #endif
 }
 
-inline float sqrtf (const float value) {
-#if defined (CR_HAS_SIMD)
+CR_FORCE_INLINE float sqrtf (const float value) {
+#if defined (CR_HAS_SIMD_SSE)
    return _mm_cvtss_f32 (_mm_sqrt_ss (_mm_load_ss (&value)));
 #else
    return ::sqrtf (value);
 #endif
 }
 
-inline float rsqrtf (const float value) {
-#if defined (CR_HAS_SIMD)
+CR_FORCE_INLINE float rsqrtf (const float value) {
+#if defined (CR_HAS_SIMD_SSE)
    return _mm_cvtss_f32 (_mm_rsqrt_ss (_mm_load_ss (&value)));
 #else
    return 1.0f / ::sqrtf (value);
 #endif
 }
 
-inline float tanf (const float value) {
-#if defined (CR_HAS_SIMD)
-   return _mm_cvtss_f32 (ssemath::tan_ps (_mm_load_ss (&value)));
+CR_FORCE_INLINE float tanf (const float value) {
+#if defined (CR_HAS_SIMD_SSE)
+   return _mm_cvtss_f32 (simd::tan_ps (_mm_load_ss (&value)));
 #else
    return ::tanf (value);
 #endif
 }
 
-inline float ceilf (const float value) {
-#if defined (CR_HAS_SIMD)
-   return _mm_cvtss_f32 (ssemath::ceil_ps (_mm_load_ss (&value)));
-#else
-   return ::ceilf (value);
-#endif
-}
-
-inline float log10 (const float value) {
-#if defined (CR_HAS_SIMD)
-   return _mm_cvtss_f32 (ssemath::log10_ps (_mm_load_ss (&value)));
+CR_FORCE_INLINE float log10 (const float value) {
+#if defined (CR_HAS_SIMD_SSE)
+   return _mm_cvtss_f32 (simd::log10_ps (_mm_load_ss (&value)));
 #else
    return ::log10f (value);
 #endif
 }
 
-inline float floorf (const float value) {
-#if defined (CR_HAS_SIMD)
-   return _mm_cvtss_f32 (cr::ssemath::floor_ps (_mm_load_ss (&value)));
+CR_SIMD_TARGET_AIL ("sse4.1")
+float ceilf (const float value) {
+#if defined (CR_HAS_SIMD_SSE)
+   if (cpuflags.sse41) {
+      return _mm_cvtss_f32 (_mm_ceil_ps (_mm_load_ss (&value)));
+   }
+   return _mm_cvtss_f32 (simd::ceil_ps (_mm_load_ss (&value)));
+#else
+   return ::ceilf (value);
+#endif
+}
+
+CR_SIMD_TARGET_AIL ("sse4.1")
+float floorf (const float value) {
+#if defined (CR_HAS_SIMD_SSE)
+   if (cpuflags.sse41) {
+      return _mm_cvtss_f32 (_mm_floor_ps (_mm_load_ss (&value)));
+   }
+   return _mm_cvtss_f32 (simd::floor_ps (_mm_load_ss (&value)));
 #else
    return ::floorf (value);
 #endif
 }
 
-static inline void sincosf (const float &x, float &s, float &c) {
-#if defined (CR_HAS_SIMD)
-   __m128 _s, _c;
-   ssemath::sincos_ps (_mm_load_ss (&x), _s, _c);
-
-   s = _mm_cvtss_f32 (_s);
-   c = _mm_cvtss_f32 (_c);
+// approximation functions
+namespace apx {
+CR_FORCE_INLINE float sqrtf (const float value) {
+#if defined (CR_HAS_SIMD_SSE)
+   return cr::sqrtf (value);
 #else
-   c = cr::cosf (x);
-   s = cr::sqrtf (static_cast <float> (1) - cr::sqrf (c));
-
-   if (static_cast <int> (x / cr::kMathPi) & 1) {
-      s = -s;
-   }
+   union {
+      float f;
+      uint32_t u;
+   } val { value };
+   val.u = (val.u >> 1U) + 0x1fbb4000;
+   return val.f;
 #endif
 }
 
-static inline bool fzero (const float e) {
+CR_FORCE_INLINE float rsqrtf (const float value) {
+#if defined (CR_HAS_SIMD_SSE)
+   return cr::rsqrtf (value);
+#else
+   union {
+      float f;
+      uint32_t u;
+   } val = { value };
+   val.u = 0x5f1ffff9 - (val.u >> 1U);
+   val.f *= 0.703952253f * (2.38924456f - value * cr::sqrf (val.f));
+   return val.f;
+#endif
+}
+
+// not used, but just to not lost :)
+#if defined (CR_HAS_SIMD_SSE)
+
+CR_FORCE_INLINE float rsqrtf_sse (const float value) {
+   __m128 num0 = _mm_load_ss (&value);
+   __m128 mul0 = _mm_mul_ss (num0, _mm_set_ss (0.5f));
+   __m128 tmp0 = num0;
+   __m128i tmp1 = _mm_castps_si128 (tmp0);
+
+   tmp1 = _mm_sub_epi32 (_mm_set1_epi32 (0x5f3759df), _mm_srli_epi32 (tmp1, 1));
+   tmp0 = _mm_castsi128_ps (tmp1);
+   tmp0 = _mm_mul_ss (tmp0, _mm_sub_ss (_mm_set_ss (1.5f), _mm_mul_ss (mul0, _mm_mul_ss (tmp0, tmp0))));
+
+   return _mm_cvtss_f32 (tmp0);
+}
+
+CR_FORCE_INLINE float sqrtf_sse (const float value) {
+   __m128 num0 = _mm_load_ss (&value);
+   __m128 tmp0 = num0;
+   __m128i tmp1 = _mm_castps_si128 (tmp0);
+
+   tmp1 = _mm_add_epi32 (_mm_set1_epi32 (0x1fbb4000), _mm_srli_epi32 (tmp1, 1));
+   tmp0 = _mm_castsi128_ps (tmp1);
+
+   return _mm_cvtss_f32 (tmp0);
+}
+
+#endif
+}
+
+CR_FORCE_INLINE void sincosf (const float &x, float &s, float &c) {
+#if defined (CR_HAS_SIMD_SSE)
+   __m128 _s, _c;
+   simd::sincos_ps (_mm_load_ss (&x), _s, _c);
+
+   s = _mm_cvtss_f32 (_s);
+   c = _mm_cvtss_f32 (_c);
+#elif defined (CR_HAS_SIMD_NEON)
+   float32x4_t _s, _c;
+   simd::sincos_ps (vsetq_lane_f32 (x, vdupq_n_f32 (0), 0), _s, _c);
+
+   s = vgetq_lane_f32 (_s, 0);
+   c = vgetq_lane_f32 (_c, 0);
+#else
+   c = cr::cosf (x);
+   s = cr::sinf (x);
+#endif
+}
+
+CR_FORCE_INLINE bool fzero (const float e) {
    return cr::abs (e) < kFloatOnEpsilon;
 }
 
-static inline bool fequal (const float a, const float b) {
+CR_FORCE_INLINE bool fequal (const float a, const float b) {
    return cr::abs (a - b) < kFloatEqualEpsilon;
 }
 
@@ -162,54 +231,43 @@ constexpr float deg2rad (const float d) {
    return d * kDegreeToRadians;
 }
 
-template <int Degree> float _wrapAngleFn (float x) {
-   return x - 2.0f * static_cast <float> (Degree) * cr::floorf (x / (2.0f * static_cast <float> (Degree)) + 0.5f);
+template <int D> CR_SIMD_TARGET ("sse4.1") float _wrapAngleFn (float x) {
+#if defined (CR_HAS_SIMD_SSE)
+   __m128 v0 = _mm_load_ss (&x);
+   __m128 v1 = _mm_set_ss (static_cast <float> (D));
+
+   __m128 mul0 = _mm_mul_ss (_mm_set_ss (2.0f), v1);
+   __m128 div0 = _mm_div_ss (v0, mul0);
+   __m128 add0 = _mm_add_ss (div0, _mm_set_ss (0.5f));
+   __m128 flr0;
+
+   if (cpuflags.sse41) {
+      flr0 = _mm_floor_ss (_mm_setzero_ps (), add0);
+   }
+   else {
+      flr0 = simd::floor_ps (add0);
+   }
+   __m128 mul1 = _mm_mul_ss (mul0, flr0);
+   __m128 sub0 = _mm_sub_ss (v0, mul1);
+
+   return _mm_cvtss_f32 (sub0);
+#else
+   return x - 2.0f * static_cast <float> (D) * cr::floorf (x / (2.0f * static_cast <float> (D)) + 0.5f);
+#endif
 }
 
 // adds or subtracts 360.0f enough times need to given angle in order to set it into the range[0.0, 360.0f).
-static inline float wrapAngle360 (float a) {
+CR_FORCE_INLINE float wrapAngle360 (float a) {
    return _wrapAngleFn <360> (a);
 }
 
 // adds or subtracts 360.0f enough times need to given angle in order to set it into the range [-180.0, 180.0f).
-static inline float wrapAngle (const float a) {
+CR_FORCE_INLINE float wrapAngle (const float a) {
    return _wrapAngleFn <180> (a);
 }
 
-static inline float anglesDifference (const float a, const float b) {
+CR_FORCE_INLINE float anglesDifference (const float a, const float b) {
    return wrapAngle (a - b);
 }
-
-// approximation functions
-namespace apx {
-   inline float sqrtf (const float value) {
-#if defined (CR_ARCH_ARM)
-      return cr::sqrtf (value);
-#else
-      union {
-         float f;
-         uint32_t u;
-      } val { value };
-
-      val.u = (val.u >> 1U) + 0x1fbb4000;
-      return val.f;
-#endif
-   }
-
-   inline float rsqrtf (const float value) {
-#if defined (CR_ARCH_ARM)
-      return cr::rsqrtf (value);
-#else
-      union {
-         float f;
-         uint32_t u;
-      } val = { value };
-      val.u = 0x5f1ffff9 - (val.u >> 1U);
-      val.f *= 0.703952253f * (2.38924456f - value * cr::sqrf (val.f));
-      return val.f;
-#endif
-   }
-}
-
 
 CR_NAMESPACE_END

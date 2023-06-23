@@ -18,13 +18,6 @@ CR_NAMESPACE_BEGIN
 #  define CR_WINDOWS
 #endif
 
-#if defined(__ANDROID__)
-#  define CR_ANDROID
-#     if defined(LOAD_HARDFP)
-#        define CR_ANDROID_HARD_FP
-#     endif
-#endif
-
 #if !defined (CR_DEBUG) && (defined(DEBUG) || defined(_DEBUG))
 #  define CR_DEBUG
 #endif
@@ -71,14 +64,22 @@ CR_NAMESPACE_BEGIN
 #   define CR_ARCH_ARM
 #endif
 
-
 #if !defined(CR_DISABLE_SIMD)
-#  define CR_HAS_SIMD
 #  if !defined (CR_ARCH_ARM)
-#     define CR_INTRIN_INCLUDE <smmintrin.h>
+#     define CR_HAS_SIMD_SSE
 #  else
-#     define CR_INTRIN_INCLUDE <crlib/ssemath/sse2neon.h>
+#     undef CR_HAS_SIMD_NEON
 #  endif
+#endif
+
+#if defined (CR_CXX_MSVC)
+#  define CR_FORCE_INLINE __forceinline
+#else
+#  define CR_FORCE_INLINE __attribute__((__always_inline__)) inline
+#endif
+
+#if defined (CR_HAS_SIMD_SSE) || defined (CR_HAS_SIMD_NEON)
+#  define CR_HAS_SIMD
 #endif
 
 #if defined(CR_HAS_SIMD)
@@ -99,11 +100,11 @@ CR_NAMESPACE_BEGIN
 #endif
 
 #if (defined (CR_CXX_MSVC) && !defined (CR_CXX_CLANG)) || defined (CR_ARCH_ARM)
-#  define CR_SIMD_TARGET(dest)
-#  define CR_SIMD_TARGET_AIL(dest)
+#  define CR_SIMD_TARGET(dest) CR_FORCE_INLINE
+#  define CR_SIMD_TARGET_AIL(dest) CR_FORCE_INLINE
 #else
 #  define CR_SIMD_TARGET(dest) __attribute__((target(dest)))
-#  define CR_SIMD_TARGET_AIL(dest) __attribute__((__always_inline__, target(dest)))
+#  define CR_SIMD_TARGET_AIL(dest) __attribute__((__always_inline__, target(dest))) inline
 #endif
 
 // ship windows xp release builds only with msvc
@@ -223,7 +224,6 @@ struct Platform : public Singleton <Platform> {
    bool nix = false;
    bool osx = false;
    bool android = false;
-   bool hfp = false;
    bool x64 = false;
    bool arm = false;
 
@@ -236,10 +236,6 @@ struct Platform : public Singleton <Platform> {
 
 #if defined(CR_ANDROID)
       android = true;
-
-#  if defined (CR_ANDROID_HARD_FP)
-      hfp = true;
-#  endif
 #endif
 
 #if defined(CR_LINUX)

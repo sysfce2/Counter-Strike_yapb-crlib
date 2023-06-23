@@ -99,16 +99,15 @@ public:
       return length_ == rhs.length_ && memcmp (chars_, rhs.chars_, length_) == 0;
    }
 
-   constexpr bool operator == (const char *rhs) const {
-      auto length = StringRef::len (rhs);
-      return length_ == length && memcmp (chars_, rhs, length) == 0;
+   bool operator == (const char *rhs) const {
+      return strcmp (chars_, rhs) == 0;
    }
 
    constexpr bool operator != (const StringRef &rhs) const {
       return !(*this == rhs);
    }
 
-   constexpr bool operator != (const char *rhs) const {
+   bool operator != (const char *rhs) const {
       return !(*this == rhs);
    }
 

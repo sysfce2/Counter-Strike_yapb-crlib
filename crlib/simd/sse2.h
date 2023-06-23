@@ -103,55 +103,24 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#define SSEMATH_MAJOR  0
-#define SSEMATH_MINOR  9
-#define SSEMATH_PATCH  0
-#define SSEMATH_EXTRA  ""
-
-#ifndef SSEMATH_BUILD
-#define SSEMATH_BUILD  0
-#endif
-
-#ifndef SSE_INLINE
-
 #if defined( __GNUC__ ) || defined (__clang__)
-
-// GCC
-#define SSE_INLINE  static inline __attribute__( ( always_inline ) )
-
+#  define SSE_INLINE  static inline __attribute__((always_inline))
+#  define SSE_ALIGN __attribute__((aligned(16)))
 #elif defined( _MSC_VER ) || defined( __ICL )
-
-// MSVC or ICC
-#define SSE_INLINE  static __forceinline
-
+#  define SSE_INLINE  static __forceinline
+#  define SSE_ALIGN __declspec (align(16))
 #else
-
-// Fallback
-#define SSE_INLINE  static inline
-
+#  define SSE_INLINE  static inline
+#  define SSE_ALIGN
 #endif
 
-#endif
 
-#if defined( _MSC_VER )
+#define DECLARE_SSEMATH_PS(Name, Val) \
+    static const SSE_ALIGN constexpr float SSEMATH_PS_##Name[4] = { static_cast <float> (Val), static_cast <float> (Val), static_cast <float> (Val), static_cast <float> (Val) };
 
-// MSVC
+#define DECLARE_SSEMATH_PI32(Name, Val) \
+    static const SSE_ALIGN constexpr int32_t SSEMATH_PI32_##Name[4] = { static_cast <int32_t> (Val), static_cast <int32_t> (Val), static_cast <int32_t> (Val), static_cast <int32_t> (Val) };
 
-#define DECLARE_SSEMATH_PS( Name, Val ) \
-    static const __declspec( align( 16 ) ) constexpr float SSEMATH_PS_##Name[ 4 ]     = { Val, Val, Val, Val };
-#define DECLARE_SSEMATH_PI32( Name, Val ) \
-    static const __declspec( align( 16 ) ) constexpr unsigned long   SSEMATH_PI32_##Name[ 4 ]   = { (unsigned long) Val, (unsigned long) Val, (unsigned long) Val, (unsigned long) Val };
-
-#else
-
-// GCC, Intel or any other (hopefully)
-
-#define DECLARE_SSEMATH_PS( Name, Val ) \
-    constexpr float SSEMATH_PS_##Name[ 4 ]     __attribute__( ( aligned( 16 ) ) ) = { Val, Val, Val, Val };
-#define DECLARE_SSEMATH_PI32( Name, Val ) \
-    constexpr unsigned long   SSEMATH_PI32_##Name[ 4 ]   __attribute__( ( aligned( 16 ) ) ) = { (unsigned long) Val, (unsigned long) Val, (unsigned long) Val, (unsigned long) Val };
-
-#endif
 
 /** @file
 
@@ -193,20 +162,20 @@ DECLARE_SSEMATH_PI32( Name, Val ) - Creates a constant named SSEMATH_PI32_Name w
 */
 
 // Float constants
-DECLARE_SSEMATH_PS (E, (float) M_E);
-DECLARE_SSEMATH_PS (LOG2E, (float) M_LOG2E);
-DECLARE_SSEMATH_PS (LOG10E, (float) M_LOG10E);
-DECLARE_SSEMATH_PS (LN2, (float) M_LN2);
-DECLARE_SSEMATH_PS (LN10, (float) M_LN10);
-DECLARE_SSEMATH_PS (PI, (float) M_PI);
-DECLARE_SSEMATH_PS (PI_2, (float) M_PI_2);
-DECLARE_SSEMATH_PS (PI_4, (float) M_PI_4);
-DECLARE_SSEMATH_PS (1_PI, (float) M_1_PI);
-DECLARE_SSEMATH_PS (2_PI, (float) M_2_PI);
+DECLARE_SSEMATH_PS (E, M_E);
+DECLARE_SSEMATH_PS (LOG2E, M_LOG2E);
+DECLARE_SSEMATH_PS (LOG10E, M_LOG10E);
+DECLARE_SSEMATH_PS (LN2, M_LN2);
+DECLARE_SSEMATH_PS (LN10, M_LN10);
+DECLARE_SSEMATH_PS (PI, M_PI);
+DECLARE_SSEMATH_PS (PI_2, M_PI_2);
+DECLARE_SSEMATH_PS (PI_4, M_PI_4);
+DECLARE_SSEMATH_PS (1_PI, M_1_PI);
+DECLARE_SSEMATH_PS (2_PI, M_2_PI);
 DECLARE_SSEMATH_PS (4_PI, 1.27323954473516f);
-DECLARE_SSEMATH_PS (2_SQRTPI, (float) M_2_SQRTPI);
-DECLARE_SSEMATH_PS (SQRT2, (float) M_SQRT2);
-DECLARE_SSEMATH_PS (SQRT1_2, (float) M_SQRT1_2);
+DECLARE_SSEMATH_PS (2_SQRTPI, M_2_SQRTPI);
+DECLARE_SSEMATH_PS (SQRT2, M_SQRT2);
+DECLARE_SSEMATH_PS (SQRT1_2, M_SQRT1_2);
 DECLARE_SSEMATH_PS (CBRT2, 1.25992104989487316477f);
 DECLARE_SSEMATH_PS (CBRT4, 1.58740105196819947475f);
 DECLARE_SSEMATH_PS (1_CBRT2, 0.79370052598409973738f);
@@ -311,16 +280,16 @@ split mantissa and exponent
 \return Returns the mantissa (and stores the exponent in \p rExp)
 */
 SSE_INLINE __m128 frexp_ps (
-   __m128 const  val,  //!< Value
+   __m128 val,  //!< Value
    __m128i &rExp //!< Returns the exponent
 ) {
    // get exponent
-   __m128 const  z = _mm_and_ps (val, *(__m128 *)SSEMATH_PI32_INVMASK_SIGN);
-   __m128i const  tmpi = _mm_srli_epi32 (_mm_castps_si128 (z), 23);
+   __m128 z = _mm_and_ps (val, *(__m128 *)SSEMATH_PI32_INVMASK_SIGN);
+   __m128i tmpi = _mm_srli_epi32 (_mm_castps_si128 (z), 23);
    rExp = _mm_sub_epi32 (tmpi, _mm_set1_epi32 (0x7e));
 
    // only keep mantissa
-   __m128 const  x = _mm_and_ps (val, *(__m128 *)SSEMATH_PI32_INVMASK_MANT);
+   __m128 x = _mm_and_ps (val, *(__m128 *)SSEMATH_PI32_INVMASK_MANT);
    return _mm_or_ps (x, _mm_set1_ps (0.5f));
 }
 
@@ -330,11 +299,11 @@ join mantissa and exponent
 \return Returns \f${base}\,2^{exp}\f$
 */
 SSE_INLINE __m128 ldexp_ps (
-   __m128 const   base,    //!< Base
-   __m128i const  exp      //!< Exponent
+   __m128 base,    //!< Base
+   __m128i exp      //!< Exponent
 ) {
    // y = y * 2 ^ exp
-   __m128i  x = _mm_add_epi32 (exp, _mm_set1_epi32 (0x7f));
+  __m128i x = _mm_add_epi32 (exp, _mm_set1_epi32 (0x7f));
    x = _mm_slli_epi32 (x, 23);
    return _mm_mul_ps (base, _mm_castsi128_ps (x));
 }
@@ -345,19 +314,24 @@ ceiling function
 \return Returns \f$\lceil{val}\rceil\f$
 */
 SSE_INLINE __m128 ceil_ps (
-   __m128 const  val   //!< Value
+   __m128 val   //!< Value
 ) {
+#if __SSE4_1__
+   return _mm_ceil_ps (val);
+#else
+
    // truncate value and add offset depending on sign
-   __m128i  trunc = _mm_cvttps_epi32 (val);
-   __m128  mask = _mm_castsi128_ps (_mm_cmpeq_epi32 (trunc, _mm_set1_epi32 (0x80000000u)));
+  __m128i trunc = _mm_cvttps_epi32 (val);
+   __m128 mask = _mm_castsi128_ps (_mm_cmpeq_epi32 (trunc, _mm_set1_epi32 (0x80000000u)));
    mask = _mm_or_ps (mask, _mm_cmpeq_ps (_mm_cvtepi32_ps (trunc), val));
-   __m128i const  sign_off = _mm_xor_si128 (_mm_set1_epi32 (1), _mm_srli_epi32 (_mm_castps_si128 (val), 31));
+   __m128i sign_off = _mm_xor_si128 (_mm_set1_epi32 (1), _mm_srli_epi32 (_mm_castps_si128 (val), 31));
    trunc = _mm_add_epi32 (trunc, sign_off);
 
    // convert back to float and mask out invalid values
-   __m128  x = _mm_cvtepi32_ps (trunc);
+   __m128 x = _mm_cvtepi32_ps (trunc);
    x = _mm_andnot_ps (mask, x);
    return _mm_add_ps (x, _mm_and_ps (mask, val));
+#endif // __SSE4_1__
 }
 
 /**
@@ -366,19 +340,24 @@ floor function
 \return Returns \f$\lfloor{val}\rfloor\f$
 */
 SSE_INLINE __m128 floor_ps (
-   __m128 const  val   //!< Value
+   __m128 val   //!< Value
 ) {
+#if __SSE4_1__
+   return _mm_floor_ps (val);
+#else
+
    // truncate value and add offset depending on sign
-   __m128i  trunc = _mm_cvttps_epi32 (val);
-   __m128  mask = _mm_castsi128_ps (_mm_cmpeq_epi32 (trunc, _mm_set1_epi32 (0x80000000u)));
+  __m128i trunc = _mm_cvttps_epi32 (val);
+   __m128 mask = _mm_castsi128_ps (_mm_cmpeq_epi32 (trunc, _mm_set1_epi32 (0x80000000u)));
    mask = _mm_or_ps (mask, _mm_cmpeq_ps (_mm_cvtepi32_ps (trunc), val));
-   __m128i const  sign_off = _mm_srli_epi32 (_mm_castps_si128 (val), 31);
+   __m128i sign_off = _mm_srli_epi32 (_mm_castps_si128 (val), 31);
    trunc = _mm_sub_epi32 (trunc, sign_off);
 
    // convert back to float and mask out invalid values
-   __m128  x = _mm_cvtepi32_ps (trunc);
+   __m128 x = _mm_cvtepi32_ps (trunc);
    x = _mm_andnot_ps (mask, x);
    return _mm_add_ps (x, _mm_and_ps (mask, val));
+#endif // __SSE4_1__
 }
 
 /**
@@ -387,14 +366,14 @@ truncation
 \return Returns \f$int({val})\f$
 */
 SSE_INLINE __m128 trunc_ps (
-   __m128 const  val   //!< Value
+   __m128 val   //!< Value
 ) {
    // truncate value
-   __m128i  trunc = _mm_cvttps_epi32 (val);
-   __m128  mask = _mm_castsi128_ps (_mm_cmpeq_epi32 (trunc, _mm_set1_epi32 (0x80000000u)));
+  __m128i trunc = _mm_cvttps_epi32 (val);
+   __m128 mask = _mm_castsi128_ps (_mm_cmpeq_epi32 (trunc, _mm_set1_epi32 (0x80000000u)));
 
    // convert back to float and mask out invalid values
-   __m128  x = _mm_cvtepi32_ps (trunc);
+   __m128 x = _mm_cvtepi32_ps (trunc);
    x = _mm_andnot_ps (mask, x);
    return _mm_add_ps (x, _mm_and_ps (mask, val));
 }
@@ -405,7 +384,7 @@ absolute value
 \return Returns \f$\left|{val}\right|\f$
 */
 SSE_INLINE __m128 fabs_ps (
-   __m128 const  val   //!< Value
+   __m128 val   //!< Value
 ) {
    return _mm_and_ps (val, *(__m128 *)SSEMATH_PI32_INVMASK_SIGN);
 }
@@ -416,11 +395,11 @@ copy sign
 \return Returns \p x with the sign of \p y
 */
 SSE_INLINE __m128 copysign_ps (
-   __m128 const  x,    //!< Value
-   __m128 const  y     //!< Sign source
+   __m128 x,    //!< Value
+   __m128 y     //!< Sign source
 ) {
-   __m128  x_abs = _mm_and_ps (x, *(__m128 *)SSEMATH_PI32_INVMASK_SIGN);
-   __m128  y_sign = _mm_and_ps (y, *(__m128 *)SSEMATH_PI32_MASK_SIGN);
+   __m128 x_abs = _mm_and_ps (x, *(__m128 *)SSEMATH_PI32_INVMASK_SIGN);
+   __m128 y_sign = _mm_and_ps (y, *(__m128 *)SSEMATH_PI32_MASK_SIGN);
    return _mm_or_ps (x_abs, y_sign);
 }
 
@@ -430,40 +409,40 @@ floating-point remainder
 \return Returns \f${num}-{den}\,int(\frac{num}{den})\f$. If \f${den}\,=\,0\f$ NaN is returned.
 */
 SSE_INLINE __m128 fmod_ps (
-   __m128 const  num,  //!< Numerator
-   __m128 const  den   //!< Denominator
+   __m128 num,  //!< Numerator
+   __m128 den   //!< Denominator
 ) {
    // save invalid mask
-   __m128 const  invalid_mask = _mm_cmpeq_ps (den, _mm_setzero_ps ());
+   __m128 invalid_mask = _mm_cmpeq_ps (den, _mm_setzero_ps ());
 
    // abs( x ) and abs( y )
-   __m128  x = _mm_and_ps (num, *(__m128 *)SSEMATH_PI32_INVMASK_SIGN);
-   __m128 const  y = _mm_and_ps (den, *(__m128 *)SSEMATH_PI32_INVMASK_SIGN);
+   __m128 x = _mm_and_ps (num, *(__m128 *)SSEMATH_PI32_INVMASK_SIGN);
+   __m128 y = _mm_and_ps (den, *(__m128 *)SSEMATH_PI32_INVMASK_SIGN);
 
    // mask for x >= y (ignore y == 0)
-   __m128  mask_xgey = _mm_andnot_ps (invalid_mask, _mm_cmple_ps (y, x));
+   __m128 mask_xgey = _mm_andnot_ps (invalid_mask, _mm_cmple_ps (y, x));
 
    // x mod y == ( x - n * y ) mod y
-   __m128i  x_exp;
-   __m128 const  x_base = frexp_ps (x, x_exp);
-   __m128i  y_exp;
-   __m128 const  y_base = frexp_ps (y, y_exp);
+  __m128i x_exp;
+   __m128 x_base = frexp_ps (x, x_exp);
+  __m128i y_exp;
+   __m128 y_base = frexp_ps (y, y_exp);
 
    // build y * 2 ^ n
-   __m128 const  offs_mask = _mm_cmplt_ps (x_base, y_base);
-   __m128i const  offs_exp = _mm_and_si128 (_mm_set1_epi32 (1), _mm_castps_si128 (offs_mask));
+   __m128 offs_mask = _mm_cmplt_ps (x_base, y_base);
+   __m128i offs_exp = _mm_and_si128 (_mm_set1_epi32 (1), _mm_castps_si128 (offs_mask));
    x_exp = _mm_sub_epi32 (x_exp, offs_exp);
 
    // only change x where x >= y
-   __m128 const  n = _mm_and_ps (mask_xgey, ldexp_ps (y_base, x_exp));
+   __m128 n = _mm_and_ps (mask_xgey, ldexp_ps (y_base, x_exp));
    x = _mm_sub_ps (x, n);
 
    // restore sign
-   __m128 const  sign_bit = _mm_and_ps (num, *(__m128 *)SSEMATH_PI32_MASK_SIGN);
+   __m128 sign_bit = _mm_and_ps (num, *(__m128 *)SSEMATH_PI32_MASK_SIGN);
    x = _mm_xor_ps (x, sign_bit);
 
    // fmod: z = x - den * int( x / den )
-   __m128  z = trunc_ps (_mm_div_ps (x, den));
+   __m128 z = trunc_ps (_mm_div_ps (x, den));
    z = _mm_mul_ps (z, den);
    z = _mm_sub_ps (x, z);
 
@@ -477,7 +456,7 @@ integral and fractional part
 \return Returns \f$\{{val}\}\f$.
 */
 SSE_INLINE __m128 modf_ps (
-   __m128 const  val,      //!< Value
+   __m128 val,      //!< Value
    __m128 &rInt     //!< Returns \f$int({val})\f$
 ) {
    rInt = trunc_ps (val);
@@ -490,17 +469,17 @@ rounding
 \return Returns \p val rounded to nearest integral value
 */
 SSE_INLINE __m128 round_ps (
-   __m128 const  val   //!< Value
+   __m128 val   //!< Value
 ) {
-   __m128  i = _mm_setzero_ps ();
-   __m128  frac = modf_ps (val, i);
+   __m128 i = _mm_setzero_ps ();
+   __m128 frac = modf_ps (val, i);
 
    // add rounding to fractional part to avoid precision loss
    frac = _mm_add_ps (frac, _mm_set1_ps (0.5f));
 
    // floor( frac )
-   __m128i  trunc = _mm_cvttps_epi32 (frac);
-   __m128i const  sign_off = _mm_srli_epi32 (_mm_castps_si128 (frac), 31);
+  __m128i trunc = _mm_cvttps_epi32 (frac);
+   __m128i sign_off = _mm_srli_epi32 (_mm_castps_si128 (frac), 31);
    trunc = _mm_sub_epi32 (trunc, sign_off);
    frac = _mm_cvtepi32_ps (trunc);
    return _mm_add_ps (frac, i);
@@ -512,8 +491,8 @@ positive difference
 \return Returns the positive difference between \p x and \p y
 */
 SSE_INLINE __m128 fdim_ps (
-   __m128 const  x,    //!< X value
-   __m128 const  y     //!< Y value
+   __m128 x,    //!< X value
+   __m128 y     //!< Y value
 ) {
    return _mm_max_ps (_mm_sub_ps (x, y), _mm_setzero_ps ());
 }
@@ -524,11 +503,11 @@ euclidean distance function
 \return Returns \f$\sqrt{x^2+y^2}\f$
 */
 SSE_INLINE __m128 hypot_ps (
-   __m128 const  x,    //!< X value
-   __m128 const  y     //!< Y value
+   __m128 x,    //!< X value
+   __m128 y     //!< Y value
 ) {
-   __m128 const  xx = _mm_mul_ps (x, x);
-   __m128 const  yy = _mm_mul_ps (y, y);
+   __m128 xx = _mm_mul_ps (x, x);
+   __m128 yy = _mm_mul_ps (y, y);
    return _mm_sqrt_ps (_mm_add_ps (xx, yy));
 }
 
@@ -540,16 +519,16 @@ precision.
 \return Returns \f$\sin({ang})\f$
 */
 SSE_INLINE __m128 sin_ps (
-   __m128 const  ang   //!< Angle in radian
+   __m128 ang   //!< Angle in radian
 ) {
    // abs( x )
-   __m128  x = _mm_and_ps (ang, *(__m128 *)SSEMATH_PI32_INVMASK_SIGN);
+   __m128 x = _mm_and_ps (ang, *(__m128 *)SSEMATH_PI32_INVMASK_SIGN);
 
    // tmp = x / ( PI / 4 )
-   __m128  tmp = _mm_mul_ps (x, *(__m128 *)SSEMATH_PS_4_PI);
+   __m128 tmp = _mm_mul_ps (x, *(__m128 *)SSEMATH_PS_4_PI);
 
    // from cephes: j = ( j + 1 ) & ( ~1 )
-   __m128i  tmpi = _mm_cvttps_epi32 (tmp);
+  __m128i tmpi = _mm_cvttps_epi32 (tmp);
    tmpi = _mm_add_epi32 (tmpi, _mm_set1_epi32 (1));
    tmpi = _mm_and_si128 (tmpi, _mm_set1_epi32 (~1));
    tmp = _mm_cvtepi32_ps (tmpi);
@@ -560,15 +539,15 @@ SSE_INLINE __m128 sin_ps (
    x = _mm_add_ps (x, _mm_mul_ps (tmp, *(__m128 *)SSEMATH_PS_MINUS_DP3));
 
    // set sign bit
-   __m128  sign_bit = _mm_and_ps (ang, *(__m128 *)SSEMATH_PI32_MASK_SIGN);
-   __m128 const  swap_sign_bit = _mm_castsi128_ps (_mm_slli_epi32 (_mm_and_si128 (tmpi, _mm_set1_epi32 (4)), 29));
+   __m128 sign_bit = _mm_and_ps (ang, *(__m128 *)SSEMATH_PI32_MASK_SIGN);
+   __m128 swap_sign_bit = _mm_castsi128_ps (_mm_slli_epi32 (_mm_and_si128 (tmpi, _mm_set1_epi32 (4)), 29));
    sign_bit = _mm_xor_ps (sign_bit, swap_sign_bit);
 
    // xx = x ^ 2
-   __m128 const  xx = _mm_mul_ps (x, x);
+   __m128 xx = _mm_mul_ps (x, x);
 
    // cosine polynom
-   __m128  y = *(__m128 *)SSEMATH_PS_COS_P0;
+   __m128 y = *(__m128 *)SSEMATH_PS_COS_P0;
    y = _mm_mul_ps (y, xx);
    y = _mm_add_ps (y, *(__m128 *)SSEMATH_PS_COS_P1);
    y = _mm_mul_ps (y, xx);
@@ -579,7 +558,7 @@ SSE_INLINE __m128 sin_ps (
    y = _mm_add_ps (y, _mm_set1_ps (1.0f));
 
    // sine polynom
-   __m128  y2 = *(__m128 *)SSEMATH_PS_SIN_P0;
+   __m128 y2 = *(__m128 *)SSEMATH_PS_SIN_P0;
    y2 = _mm_mul_ps (y2, xx);
    y2 = _mm_add_ps (y2, *(__m128 *)SSEMATH_PS_SIN_P1);
    y2 = _mm_mul_ps (y2, xx);
@@ -591,7 +570,7 @@ SSE_INLINE __m128 sin_ps (
    // use mask to select polynom
    tmpi = _mm_and_si128 (tmpi, _mm_set1_epi32 (2));
    tmpi = _mm_cmpeq_epi32 (tmpi, _mm_setzero_si128 ());
-   __m128 const  poly_mask = _mm_castsi128_ps (tmpi);
+   __m128 poly_mask = _mm_castsi128_ps (tmpi);
    y2 = _mm_and_ps (poly_mask, y2);
    y = _mm_andnot_ps (poly_mask, y);
    y = _mm_add_ps (y, y2);
@@ -608,16 +587,16 @@ precision.
 \return Returns \f$\cos({ang})\f$
 */
 SSE_INLINE __m128 cos_ps (
-   __m128 const  ang   //!< Angle in radian
+   __m128 ang   //!< Angle in radian
 ) {
    // abs( x )
-   __m128  x = _mm_and_ps (ang, *(__m128 *)SSEMATH_PI32_INVMASK_SIGN);
+   __m128 x = _mm_and_ps (ang, *(__m128 *)SSEMATH_PI32_INVMASK_SIGN);
 
    // tmp = x / ( PI / 4 )
-   __m128  tmp = _mm_mul_ps (x, *(__m128 *)SSEMATH_PS_4_PI);
+   __m128 tmp = _mm_mul_ps (x, *(__m128 *)SSEMATH_PS_4_PI);
 
    // from cephes: j = ( j + 1 ) & ( ~1 )
-   __m128i  tmpi = _mm_cvttps_epi32 (tmp);
+  __m128i tmpi = _mm_cvttps_epi32 (tmp);
    tmpi = _mm_add_epi32 (tmpi, _mm_set1_epi32 (1));
    tmpi = _mm_and_si128 (tmpi, _mm_set1_epi32 (~1));
    tmp = _mm_cvtepi32_ps (tmpi);
@@ -629,13 +608,13 @@ SSE_INLINE __m128 cos_ps (
 
    // set sign bit
    tmpi = _mm_sub_epi32 (tmpi, _mm_set1_epi32 (2));
-   __m128 const  sign_bit = _mm_castsi128_ps (_mm_slli_epi32 (_mm_andnot_si128 (tmpi, _mm_set1_epi32 (4)), 29));
+   __m128 sign_bit = _mm_castsi128_ps (_mm_slli_epi32 (_mm_andnot_si128 (tmpi, _mm_set1_epi32 (4)), 29));
 
    // xx = x ^ 2
-   __m128 const  xx = _mm_mul_ps (x, x);
+   __m128 xx = _mm_mul_ps (x, x);
 
    // cosine polynom
-   __m128  y = *(__m128 *)SSEMATH_PS_COS_P0;
+   __m128 y = *(__m128 *)SSEMATH_PS_COS_P0;
    y = _mm_mul_ps (y, xx);
    y = _mm_add_ps (y, *(__m128 *)SSEMATH_PS_COS_P1);
    y = _mm_mul_ps (y, xx);
@@ -646,7 +625,7 @@ SSE_INLINE __m128 cos_ps (
    y = _mm_add_ps (y, _mm_set1_ps (1.0f));
 
    // sine polynom
-   __m128  y2 = *(__m128 *)SSEMATH_PS_SIN_P0;
+   __m128 y2 = *(__m128 *)SSEMATH_PS_SIN_P0;
    y2 = _mm_mul_ps (y2, xx);
    y2 = _mm_add_ps (y2, *(__m128 *)SSEMATH_PS_SIN_P1);
    y2 = _mm_mul_ps (y2, xx);
@@ -658,7 +637,7 @@ SSE_INLINE __m128 cos_ps (
    // use mask to select polynom
    tmpi = _mm_and_si128 (tmpi, _mm_set1_epi32 (2));
    tmpi = _mm_cmpeq_epi32 (tmpi, _mm_setzero_si128 ());
-   __m128 const  poly_mask = _mm_castsi128_ps (tmpi);
+   __m128 poly_mask = _mm_castsi128_ps (tmpi);
    y2 = _mm_and_ps (poly_mask, y2);
    y = _mm_andnot_ps (poly_mask, y);
    y = _mm_add_ps (y, y2);
@@ -675,18 +654,18 @@ precision.
 \return Returns \f$\sin({ang})\f$ and \f$\cos({ang})\f$
 */
 SSE_INLINE void sincos_ps (
-   __m128 const  ang,      //!< Angle in radian
+   __m128 ang,      //!< Angle in radian
    __m128 &rSin,    //!< Returns \f$\sin({ang})\f$
    __m128 &rCos     //!< Returns \f$\cos({ang})\f$
 ) {
    // abs( x )
-   __m128  x = _mm_and_ps (ang, *(__m128 *)SSEMATH_PI32_INVMASK_SIGN);
+   __m128 x = _mm_and_ps (ang, *(__m128 *)SSEMATH_PI32_INVMASK_SIGN);
 
    // tmp = x / ( PI / 4 )
-   __m128  tmp = _mm_mul_ps (x, *(__m128 *)SSEMATH_PS_4_PI);
+   __m128 tmp = _mm_mul_ps (x, *(__m128 *)SSEMATH_PS_4_PI);
 
    // from cephes: j = ( j + 1 ) & ( ~1 )
-   __m128i  tmpi1 = _mm_cvttps_epi32 (tmp);
+  __m128i tmpi1 = _mm_cvttps_epi32 (tmp);
    tmpi1 = _mm_add_epi32 (tmpi1, _mm_set1_epi32 (1));
    tmpi1 = _mm_and_si128 (tmpi1, _mm_set1_epi32 (~1));
    tmp = _mm_cvtepi32_ps (tmpi1);
@@ -697,19 +676,19 @@ SSE_INLINE void sincos_ps (
    x = _mm_add_ps (x, _mm_mul_ps (tmp, *(__m128 *)SSEMATH_PS_MINUS_DP3));
 
    // set cosine sign bit
-   __m128i const  tmpi2 = _mm_sub_epi32 (tmpi1, _mm_set1_epi32 (2));
-   __m128 const  sign_bit_cos = _mm_castsi128_ps (_mm_slli_epi32 (_mm_andnot_si128 (tmpi2, _mm_set1_epi32 (4)), 29));
+   __m128i tmpi2 = _mm_sub_epi32 (tmpi1, _mm_set1_epi32 (2));
+   __m128 sign_bit_cos = _mm_castsi128_ps (_mm_slli_epi32 (_mm_andnot_si128 (tmpi2, _mm_set1_epi32 (4)), 29));
 
    // set sine sign bit
-   __m128  sign_bit_sin = _mm_and_ps (ang, *(__m128 *)SSEMATH_PI32_MASK_SIGN);
-   __m128 const  swap_sign_bit_sin = _mm_castsi128_ps (_mm_slli_epi32 (_mm_and_si128 (tmpi1, _mm_set1_epi32 (4)), 29));
+   __m128 sign_bit_sin = _mm_and_ps (ang, *(__m128 *)SSEMATH_PI32_MASK_SIGN);
+   __m128 swap_sign_bit_sin = _mm_castsi128_ps (_mm_slli_epi32 (_mm_and_si128 (tmpi1, _mm_set1_epi32 (4)), 29));
    sign_bit_sin = _mm_xor_ps (sign_bit_sin, swap_sign_bit_sin);
 
    // xx = x ^ 2
-   __m128 const  xx = _mm_mul_ps (x, x);
+   __m128 xx = _mm_mul_ps (x, x);
 
    // cosine polynom
-   __m128  y = *(__m128 *)SSEMATH_PS_COS_P0;
+   __m128 y = *(__m128 *)SSEMATH_PS_COS_P0;
    y = _mm_mul_ps (y, xx);
    y = _mm_add_ps (y, *(__m128 *)SSEMATH_PS_COS_P1);
    y = _mm_mul_ps (y, xx);
@@ -720,7 +699,7 @@ SSE_INLINE void sincos_ps (
    y = _mm_add_ps (y, _mm_set1_ps (1.0f));
 
    // sine polynom
-   __m128  y2 = *(__m128 *)SSEMATH_PS_SIN_P0;
+   __m128 y2 = *(__m128 *)SSEMATH_PS_SIN_P0;
    y2 = _mm_mul_ps (y2, xx);
    y2 = _mm_add_ps (y2, *(__m128 *)SSEMATH_PS_SIN_P1);
    y2 = _mm_mul_ps (y2, xx);
@@ -732,9 +711,9 @@ SSE_INLINE void sincos_ps (
    // use masks to select polynom
    tmpi1 = _mm_and_si128 (tmpi1, _mm_set1_epi32 (2));
    tmpi1 = _mm_cmpeq_epi32 (tmpi1, _mm_setzero_si128 ());
-   __m128 const  poly_mask = _mm_castsi128_ps (tmpi1);
-   __m128 const  ysin2 = _mm_and_ps (poly_mask, y2);
-   __m128 const  ysin1 = _mm_andnot_ps (poly_mask, y);
+   __m128 poly_mask = _mm_castsi128_ps (tmpi1);
+   __m128 ysin2 = _mm_and_ps (poly_mask, y2);
+   __m128 ysin1 = _mm_andnot_ps (poly_mask, y);
    y2 = _mm_sub_ps (y2, ysin2);
    y = _mm_sub_ps (y, ysin1);
 
@@ -751,22 +730,22 @@ precision.
 \return Returns \f$\tan({ang})\f$
 */
 SSE_INLINE __m128 tan_ps (
-   __m128 const  ang   //!< Angle in radian
+   __m128 ang   //!< Angle in radian
 ) {
    // abs( x )
-   __m128  x = _mm_and_ps (ang, *(__m128 *)SSEMATH_PI32_INVMASK_SIGN);
+   __m128 x = _mm_and_ps (ang, *(__m128 *)SSEMATH_PI32_INVMASK_SIGN);
 
    // tmp = x / ( PI / 4 )
-   __m128  tmp = _mm_mul_ps (x, *(__m128 *)SSEMATH_PS_4_PI);
+   __m128 tmp = _mm_mul_ps (x, *(__m128 *)SSEMATH_PS_4_PI);
 
    // from cephes: j = ( j + 1 ) & ( ~1 )
-   __m128i  tmpi = _mm_cvttps_epi32 (tmp);
+  __m128i tmpi = _mm_cvttps_epi32 (tmp);
    tmpi = _mm_add_epi32 (tmpi, _mm_set1_epi32 (1));
    tmpi = _mm_and_si128 (tmpi, _mm_set1_epi32 (~1));
    tmp = _mm_cvtepi32_ps (tmpi);
 
    // mask for selecting correct value
-   __m128  mask = _mm_cmple_ps (*(__m128 *)SSEMATH_PS_TAN_B0, x);
+   __m128 mask = _mm_cmple_ps (*(__m128 *)SSEMATH_PS_TAN_B0, x);
 
    // x = ( ( x - y * DP1 ) - y * DP2 ) - y * DP3;
    x = _mm_add_ps (x, _mm_mul_ps (tmp, *(__m128 *)SSEMATH_PS_MINUS_DP1));
@@ -774,10 +753,10 @@ SSE_INLINE __m128 tan_ps (
    x = _mm_add_ps (x, _mm_mul_ps (tmp, *(__m128 *)SSEMATH_PS_MINUS_DP3));
 
    // xx = x ^ 2
-   __m128 const  xx = _mm_mul_ps (x, x);
+   __m128 xx = _mm_mul_ps (x, x);
 
    // tangens polynom
-   __m128  y = *(__m128 *)SSEMATH_PS_TAN_P0;
+   __m128 y = *(__m128 *)SSEMATH_PS_TAN_P0;
    y = _mm_mul_ps (y, xx);
    y = _mm_add_ps (y, *(__m128 *)SSEMATH_PS_TAN_P1);
    y = _mm_mul_ps (y, xx);
@@ -800,16 +779,16 @@ SSE_INLINE __m128 tan_ps (
    // if ( tmpi & 2 ) y = -1.0 / y;
    tmpi = _mm_and_si128 (tmpi, _mm_set1_epi32 (2));
    tmpi = _mm_cmpeq_epi32 (tmpi, _mm_setzero_si128 ());
-   __m128 const  mask2 = _mm_castsi128_ps (tmpi);
+   __m128 mask2 = _mm_castsi128_ps (tmpi);
 
    // z = -1 / y
-   __m128  z = _mm_div_ps (_mm_set1_ps (-1.0f), y);
+   __m128 z = _mm_div_ps (_mm_set1_ps (-1.0f), y);
    y = _mm_and_ps (mask2, y);
    z = _mm_andnot_ps (mask2, z);
    y = _mm_add_ps (y, z);
 
    // toggle sign
-   __m128 const  sign_bit = _mm_and_ps (ang, *(__m128 *)SSEMATH_PI32_MASK_SIGN);
+   __m128 sign_bit = _mm_and_ps (ang, *(__m128 *)SSEMATH_PI32_MASK_SIGN);
    return _mm_xor_ps (y, sign_bit);
 }
 
@@ -819,16 +798,16 @@ natural logarithm
 \return Returns \f$\ln({val})\f$
 */
 SSE_INLINE __m128 log_ps (
-   __m128 const  val   //!< Value
+   __m128 val   //!< Value
 ) {
    // get exponent
-   __m128i  tmpi = _mm_srli_epi32 (_mm_castps_si128 (val), 23);
+  __m128i tmpi = _mm_srli_epi32 (_mm_castps_si128 (val), 23);
    tmpi = _mm_sub_epi32 (tmpi, _mm_set1_epi32 (0x7f));
-   __m128  exp = _mm_cvtepi32_ps (tmpi);
+   __m128 exp = _mm_cvtepi32_ps (tmpi);
    exp = _mm_add_ps (exp, _mm_set1_ps (1.0f));
 
    // only keep mantissa
-   __m128  x = _mm_and_ps (val, *(__m128 *)SSEMATH_PI32_INVMASK_MANT);
+   __m128 x = _mm_and_ps (val, *(__m128 *)SSEMATH_PI32_INVMASK_MANT);
    x = _mm_or_ps (x, _mm_set1_ps (0.5f));
 
    /*
@@ -842,18 +821,18 @@ SSE_INLINE __m128 log_ps (
        x = x - 1.0;
    }
    */
-   __m128 const  mask = _mm_cmplt_ps (x, *(__m128 *)SSEMATH_PS_SQRT1_2);
-   __m128  tmp = _mm_and_ps (x, mask);
+   __m128 mask = _mm_cmplt_ps (x, *(__m128 *)SSEMATH_PS_SQRT1_2);
+   __m128 tmp = _mm_and_ps (x, mask);
    x = _mm_sub_ps (x, _mm_set1_ps (1.0f));
    exp = _mm_sub_ps (exp, _mm_and_ps (_mm_set1_ps (1.0f), mask));
    x = _mm_add_ps (x, tmp);
-   __m128 const  invalid_mask = _mm_cmple_ps (val, _mm_setzero_ps ());
+   __m128 invalid_mask = _mm_cmple_ps (val, _mm_setzero_ps ());
 
    // xx = x ^ 2
-   __m128 const  xx = _mm_mul_ps (x, x);
+   __m128 xx = _mm_mul_ps (x, x);
 
    // logarithm polynom
-   __m128  y = *(__m128 *)SSEMATH_PS_LOG_P0;
+   __m128 y = *(__m128 *)SSEMATH_PS_LOG_P0;
    y = _mm_mul_ps (y, x);
    y = _mm_add_ps (y, *(__m128 *)SSEMATH_PS_LOG_P1);
    y = _mm_mul_ps (y, x);
@@ -889,16 +868,16 @@ base-2 logarithm
 \return Returns \f$\log_2({val})\f$
 */
 SSE_INLINE __m128 log2_ps (
-   __m128 const  val   //!< Value
+   __m128 val   //!< Value
 ) {
    // get exponent
-   __m128i  tmpi = _mm_srli_epi32 (_mm_castps_si128 (val), 23);
+  __m128i tmpi = _mm_srli_epi32 (_mm_castps_si128 (val), 23);
    tmpi = _mm_sub_epi32 (tmpi, _mm_set1_epi32 (0x7f));
-   __m128  exp = _mm_cvtepi32_ps (tmpi);
+   __m128 exp = _mm_cvtepi32_ps (tmpi);
    exp = _mm_add_ps (exp, _mm_set1_ps (1.0f));
 
    // only keep mantissa
-   __m128  x = _mm_and_ps (val, *(__m128 *)SSEMATH_PI32_INVMASK_MANT);
+   __m128 x = _mm_and_ps (val, *(__m128 *)SSEMATH_PI32_INVMASK_MANT);
    x = _mm_or_ps (x, _mm_set1_ps (0.5f));
 
    /*
@@ -912,18 +891,18 @@ SSE_INLINE __m128 log2_ps (
        x = x - 1.0;
    }
    */
-   __m128 const  mask = _mm_cmplt_ps (x, *(__m128 *)SSEMATH_PS_SQRT1_2);
-   __m128  tmp = _mm_and_ps (x, mask);
+   __m128 mask = _mm_cmplt_ps (x, *(__m128 *)SSEMATH_PS_SQRT1_2);
+   __m128 tmp = _mm_and_ps (x, mask);
    x = _mm_sub_ps (x, _mm_set1_ps (1.0f));
    exp = _mm_sub_ps (exp, _mm_and_ps (_mm_set1_ps (1.0f), mask));
    x = _mm_add_ps (x, tmp);
-   __m128 const  invalid_mask = _mm_cmple_ps (val, _mm_setzero_ps ());
+   __m128 invalid_mask = _mm_cmple_ps (val, _mm_setzero_ps ());
 
    // xx = x ^ 2
-   __m128 const  xx = _mm_mul_ps (x, x);
+   __m128 xx = _mm_mul_ps (x, x);
 
    // logarithm polynom
-   __m128  y = *(__m128 *)SSEMATH_PS_LOG_P0;
+   __m128 y = *(__m128 *)SSEMATH_PS_LOG_P0;
    y = _mm_mul_ps (y, x);
    y = _mm_add_ps (y, *(__m128 *)SSEMATH_PS_LOG_P1);
    y = _mm_mul_ps (y, x);
@@ -945,7 +924,7 @@ SSE_INLINE __m128 log2_ps (
    y = _mm_sub_ps (y, _mm_mul_ps (xx, _mm_set1_ps (0.5f)));
 
    // Multiply log of fraction by log2(e) and base 2 exponent by 1
-   __m128  z = _mm_mul_ps (x, *(__m128 *)SSEMATH_PS_LOG2EA);
+   __m128 z = _mm_mul_ps (x, *(__m128 *)SSEMATH_PS_LOG2EA);
    z = _mm_add_ps (z, y);
    z = _mm_add_ps (z, _mm_mul_ps (y, *(__m128 *)SSEMATH_PS_LOG2EA));
    z = _mm_add_ps (z, x);
@@ -961,16 +940,16 @@ base-10 logarithm
 \return Returns \f$\log_{10}({val})\f$
 */
 SSE_INLINE __m128 log10_ps (
-   __m128 const  val   //!< Value
+   __m128 val   //!< Value
 ) {
    // get exponent
-   __m128i  tmpi = _mm_srli_epi32 (_mm_castps_si128 (val), 23);
+  __m128i tmpi = _mm_srli_epi32 (_mm_castps_si128 (val), 23);
    tmpi = _mm_sub_epi32 (tmpi, _mm_set1_epi32 (0x7f));
-   __m128  exp = _mm_cvtepi32_ps (tmpi);
+   __m128 exp = _mm_cvtepi32_ps (tmpi);
    exp = _mm_add_ps (exp, _mm_set1_ps (1.0f));
 
    // only keep mantissa
-   __m128  x = _mm_and_ps (val, *(__m128 *)SSEMATH_PI32_INVMASK_MANT);
+   __m128 x = _mm_and_ps (val, *(__m128 *)SSEMATH_PI32_INVMASK_MANT);
    x = _mm_or_ps (x, _mm_set1_ps (0.5f));
 
    /*
@@ -984,18 +963,18 @@ SSE_INLINE __m128 log10_ps (
        x = x - 1.0;
    }
    */
-   __m128 const  mask = _mm_cmplt_ps (x, *(__m128 *)SSEMATH_PS_SQRT1_2);
-   __m128  tmp = _mm_and_ps (x, mask);
+   __m128 mask = _mm_cmplt_ps (x, *(__m128 *)SSEMATH_PS_SQRT1_2);
+   __m128 tmp = _mm_and_ps (x, mask);
    x = _mm_sub_ps (x, _mm_set1_ps (1.0f));
    exp = _mm_sub_ps (exp, _mm_and_ps (_mm_set1_ps (1.0f), mask));
    x = _mm_add_ps (x, tmp);
-   __m128 const  invalid_mask = _mm_cmple_ps (val, _mm_setzero_ps ());
+   __m128 invalid_mask = _mm_cmple_ps (val, _mm_setzero_ps ());
 
    // xx = x ^ 2
-   __m128 const  xx = _mm_mul_ps (x, x);
+   __m128 xx = _mm_mul_ps (x, x);
 
    // logarithm polynom
-   __m128  y = *(__m128 *)SSEMATH_PS_LOG_P0;
+   __m128 y = *(__m128 *)SSEMATH_PS_LOG_P0;
    y = _mm_mul_ps (y, x);
    y = _mm_add_ps (y, *(__m128 *)SSEMATH_PS_LOG_P1);
    y = _mm_mul_ps (y, x);
@@ -1017,9 +996,9 @@ SSE_INLINE __m128 log10_ps (
    y = _mm_sub_ps (y, _mm_mul_ps (xx, _mm_set1_ps (0.5f)));
 
    // multiply log of fraction by log10(e) and base 2 exponent by log10(2)
-   __m128 const  eb = _mm_mul_ps (exp, *(__m128 *)SSEMATH_PS_LOG102B);
-   __m128 const  ea = _mm_mul_ps (exp, *(__m128 *)SSEMATH_PS_LOG102A);
-   __m128  z = _mm_mul_ps (_mm_add_ps (x, y), *(__m128 *)SSEMATH_PS_LOG10EB);
+   __m128 eb = _mm_mul_ps (exp, *(__m128 *)SSEMATH_PS_LOG102B);
+   __m128 ea = _mm_mul_ps (exp, *(__m128 *)SSEMATH_PS_LOG102A);
+   __m128 z = _mm_mul_ps (_mm_add_ps (x, y), *(__m128 *)SSEMATH_PS_LOG10EB);
    z = _mm_add_ps (z, _mm_mul_ps (y, *(__m128 *)SSEMATH_PS_LOG10EA));
    z = _mm_add_ps (z, eb);
    z = _mm_add_ps (z, _mm_mul_ps (x, *(__m128 *)SSEMATH_PS_LOG10EA));
@@ -1035,29 +1014,29 @@ exponential function
 \return Returns \f$e^{val}\f$
 */
 SSE_INLINE __m128 exp_ps (
-   __m128 const  val   //!< Value
+   __m128 val   //!< Value
 ) {
    // express exp( x ) = exp( y + x * log2( e ) )
-   __m128  fx = _mm_mul_ps (val, *(__m128 *)SSEMATH_PS_LOG2E);
+   __m128 fx = _mm_mul_ps (val, *(__m128 *)SSEMATH_PS_LOG2E);
    fx = _mm_add_ps (fx, _mm_set1_ps (0.5f));
 
    // tmp = floor( fx )
-   __m128i  tmpi = _mm_cvttps_epi32 (fx);
-   __m128 const  tmp = _mm_cvtepi32_ps (tmpi);
+  __m128i tmpi = _mm_cvttps_epi32 (fx);
+   __m128 tmp = _mm_cvtepi32_ps (tmpi);
 
    // if tmp is greater subtract 1
-   __m128  mask = _mm_cmple_ps (fx, tmp);
+   __m128 mask = _mm_cmple_ps (fx, tmp);
    mask = _mm_and_ps (mask, _mm_set1_ps (1.0f));
    fx = _mm_sub_ps (tmp, mask);
 
-   __m128  x = _mm_sub_ps (val, _mm_mul_ps (fx, *(__m128 *)SSEMATH_PS_EXP_C1));
+   __m128 x = _mm_sub_ps (val, _mm_mul_ps (fx, *(__m128 *)SSEMATH_PS_EXP_C1));
    x = _mm_sub_ps (x, _mm_mul_ps (fx, *(__m128 *)SSEMATH_PS_EXP_C2));
 
    // xx = x ^ 2
-   __m128 const  xx = _mm_mul_ps (x, x);
+   __m128 xx = _mm_mul_ps (x, x);
 
    // exponential polynom
-   __m128  y = *(__m128 *)SSEMATH_PS_EXP_P0;
+   __m128 y = *(__m128 *)SSEMATH_PS_EXP_P0;
    y = _mm_mul_ps (y, x);
    y = _mm_add_ps (y, *(__m128 *)SSEMATH_PS_EXP_P1);
    y = _mm_mul_ps (y, x);
@@ -1086,22 +1065,22 @@ base-2 exponential function
 \return Returns \f$2^{val}\f$
 */
 SSE_INLINE __m128 exp2_ps (
-   __m128 const  val   //!< Value
+   __m128 val   //!< Value
 ) {
    // separate into integer and fractional parts
-   __m128i  trunc = _mm_cvttps_epi32 (val);
-   __m128i const  sign_off = _mm_srli_epi32 (_mm_castps_si128 (val), 31);
+  __m128i trunc = _mm_cvttps_epi32 (val);
+   __m128i sign_off = _mm_srli_epi32 (_mm_castps_si128 (val), 31);
    trunc = _mm_sub_epi32 (trunc, sign_off);
-   __m128  px = _mm_cvtepi32_ps (trunc);
-   __m128  x = _mm_sub_ps (val, px);
+   __m128 px = _mm_cvtepi32_ps (trunc);
+   __m128 x = _mm_sub_ps (val, px);
 
-   __m128 const  mask = _mm_cmplt_ps (_mm_set1_ps (0.5f), x);
-   __m128 const  tmp = _mm_and_ps (mask, _mm_set1_ps (1.0f));
+   __m128 mask = _mm_cmplt_ps (_mm_set1_ps (0.5f), x);
+   __m128 tmp = _mm_and_ps (mask, _mm_set1_ps (1.0f));
    x = _mm_sub_ps (x, tmp);
-   __m128 const  mask_0 = _mm_cmpeq_ps (val, _mm_setzero_ps ());
+   __m128 mask_0 = _mm_cmpeq_ps (val, _mm_setzero_ps ());
 
    // exponential polynom
-   __m128  y = *(__m128 *)SSEMATH_PS_EXP2_P0;
+   __m128 y = *(__m128 *)SSEMATH_PS_EXP2_P0;
    y = _mm_mul_ps (y, x);
    y = _mm_add_ps (y, *(__m128 *)SSEMATH_PS_EXP2_P1);
    y = _mm_mul_ps (y, x);
@@ -1116,9 +1095,9 @@ SSE_INLINE __m128 exp2_ps (
    y = _mm_add_ps (y, _mm_set1_ps (1.0f));
 
    // y = y * 2 ^ fx
-   __m128 const  one = _mm_and_ps (mask_0, _mm_set1_ps (1.0f));
+   __m128 one = _mm_and_ps (mask_0, _mm_set1_ps (1.0f));
    px = _mm_add_ps (px, tmp);
-   __m128i  tmpi = _mm_cvttps_epi32 (px);
+  __m128i tmpi = _mm_cvttps_epi32 (px);
    tmpi = _mm_add_epi32 (tmpi, _mm_set1_epi32 (0x7f));
    tmpi = _mm_slli_epi32 (tmpi, 23);
    y = _mm_mul_ps (y, _mm_castsi128_ps (tmpi));
@@ -1135,21 +1114,21 @@ base-10 exponential function
 \return Returns \f$10^{val}\f$
 */
 SSE_INLINE __m128 exp10_ps (
-   __m128 const  val   //!< Value
+   __m128 val   //!< Value
 ) {
    // express 10 ^ x = 10 ^ ( g + n log10( 2 ) )
-   __m128  px = _mm_mul_ps (val, *(__m128 *)SSEMATH_PS_LOG210);
-   __m128  qx = _mm_add_ps (px, _mm_set1_ps (0.5f));
-   __m128i  trunc = _mm_cvttps_epi32 (qx);
-   __m128i const  sign_off = _mm_srli_epi32 (_mm_castps_si128 (qx), 31);
+   __m128 px = _mm_mul_ps (val, *(__m128 *)SSEMATH_PS_LOG210);
+   __m128 qx = _mm_add_ps (px, _mm_set1_ps (0.5f));
+  __m128i trunc = _mm_cvttps_epi32 (qx);
+   __m128i sign_off = _mm_srli_epi32 (_mm_castps_si128 (qx), 31);
    trunc = _mm_sub_epi32 (trunc, sign_off);
    qx = _mm_cvtepi32_ps (trunc);
-   __m128  x = _mm_sub_ps (val, _mm_mul_ps (qx, *(__m128 *)SSEMATH_PS_LOG102A));
+   __m128 x = _mm_sub_ps (val, _mm_mul_ps (qx, *(__m128 *)SSEMATH_PS_LOG102A));
    x = _mm_sub_ps (x, _mm_mul_ps (qx, *(__m128 *)SSEMATH_PS_LOG102B));
-   __m128 const  mask_0 = _mm_cmpeq_ps (val, _mm_setzero_ps ());
+   __m128 mask_0 = _mm_cmpeq_ps (val, _mm_setzero_ps ());
 
    // exponential polynom
-   __m128  y = *(__m128 *)SSEMATH_PS_EXP10_P0;
+   __m128 y = *(__m128 *)SSEMATH_PS_EXP10_P0;
    y = _mm_mul_ps (y, x);
    y = _mm_add_ps (y, *(__m128 *)SSEMATH_PS_EXP10_P1);
    y = _mm_mul_ps (y, x);
@@ -1164,8 +1143,8 @@ SSE_INLINE __m128 exp10_ps (
    y = _mm_add_ps (y, _mm_set1_ps (1.0f));
 
    // y = y * 2 ^ fx
-   __m128 const  one = _mm_and_ps (mask_0, _mm_set1_ps (1.0f));
-   __m128i  tmpi = _mm_cvttps_epi32 (qx);
+   __m128 one = _mm_and_ps (mask_0, _mm_set1_ps (1.0f));
+  __m128i tmpi = _mm_cvttps_epi32 (qx);
    tmpi = _mm_add_epi32 (tmpi, _mm_set1_epi32 (0x7f));
    tmpi = _mm_slli_epi32 (tmpi, 23);
    y = _mm_mul_ps (y, _mm_castsi128_ps (tmpi));
@@ -1186,12 +1165,12 @@ exponentiation
   \f$0^{exp}\,=\,\inf\,({exp}\,<\,0)\f$
 */
 SSE_INLINE __m128 pow_ps (
-   __m128 const  base, //!< Base
-   __m128 const  exp   //!< Exponent
+   __m128 base, //!< Base
+   __m128 exp   //!< Exponent
 ) {
 #if 0
-   __m128 const  k = _mm_mul_ps (exp, _mm_set1_ps (1.4426950408889634f));
-   __m128  y = exp2_ps (_mm_mul_ps (k, log_ps (base)));
+   __m128 k = _mm_mul_ps (exp, _mm_set1_ps (1.4426950408889634f));
+   __m128 y = exp2_ps (_mm_mul_ps (k, log_ps (base)));
 #else
    /*
    y = exp2( exp * k * log( base ) )
@@ -1200,13 +1179,13 @@ SSE_INLINE __m128 pow_ps (
    */
 
    // get exponent
-   __m128i  tmpi = _mm_srli_epi32 (_mm_castps_si128 (base), 23);
+  __m128i tmpi = _mm_srli_epi32 (_mm_castps_si128 (base), 23);
    tmpi = _mm_sub_epi32 (tmpi, _mm_set1_epi32 (0x7f));
-   __m128  xp = _mm_cvtepi32_ps (tmpi);
+   __m128 xp = _mm_cvtepi32_ps (tmpi);
    xp = _mm_add_ps (xp, _mm_set1_ps (1.0f));
 
    // only keep mantissa
-   __m128  x = _mm_and_ps (base, *(__m128 *)SSEMATH_PI32_INVMASK_MANT);
+   __m128 x = _mm_and_ps (base, *(__m128 *)SSEMATH_PI32_INVMASK_MANT);
    x = _mm_or_ps (x, _mm_set1_ps (0.5f));
 
    /*
@@ -1220,17 +1199,17 @@ SSE_INLINE __m128 pow_ps (
        x = x - 1.0;
    }
    */
-   __m128 const  mask = _mm_cmplt_ps (x, *(__m128 *)SSEMATH_PS_SQRT1_2);
-   __m128  tmp = _mm_and_ps (x, mask);
+   __m128 mask = _mm_cmplt_ps (x, *(__m128 *)SSEMATH_PS_SQRT1_2);
+   __m128 tmp = _mm_and_ps (x, mask);
    x = _mm_sub_ps (x, _mm_set1_ps (1.0f));
    xp = _mm_sub_ps (xp, _mm_and_ps (_mm_set1_ps (1.0f), mask));
    x = _mm_add_ps (x, tmp);
 
    // xx = x ^ 2
-   __m128 const  xx = _mm_mul_ps (x, x);
+   __m128 xx = _mm_mul_ps (x, x);
 
    // logarithm polynom
-   __m128  y = *(__m128 *)SSEMATH_PS_LOG_P0;
+   __m128 y = *(__m128 *)SSEMATH_PS_LOG_P0;
    y = _mm_mul_ps (y, x);
    y = _mm_add_ps (y, *(__m128 *)SSEMATH_PS_LOG_P1);
    y = _mm_mul_ps (y, x);
@@ -1256,7 +1235,7 @@ SSE_INLINE __m128 pow_ps (
    x = _mm_add_ps (x, _mm_mul_ps (xp, *(__m128 *)SSEMATH_PS_LOG_Q2));
    x = _mm_add_ps (x, y);
 
-   __m128 const  k = _mm_mul_ps (exp, _mm_set1_ps (1.4426950408889634f));
+   __m128 k = _mm_mul_ps (exp, _mm_set1_ps (1.4426950408889634f));
    x = _mm_mul_ps (x, k);
 
    /*
@@ -1266,13 +1245,13 @@ SSE_INLINE __m128 pow_ps (
    */
 
    // separate into integer and fractional parts
-   __m128i  trunc = _mm_cvttps_epi32 (x);
-   __m128i const  sign_off = _mm_srli_epi32 (_mm_castps_si128 (x), 31);
+  __m128i trunc = _mm_cvttps_epi32 (x);
+   __m128i sign_off = _mm_srli_epi32 (_mm_castps_si128 (x), 31);
    trunc = _mm_sub_epi32 (trunc, sign_off);
-   __m128  px = _mm_cvtepi32_ps (trunc);
+   __m128 px = _mm_cvtepi32_ps (trunc);
    x = _mm_sub_ps (x, px);
 
-   __m128 const  mask2 = _mm_cmplt_ps (_mm_set1_ps (0.5f), x);
+   __m128 mask2 = _mm_cmplt_ps (_mm_set1_ps (0.5f), x);
    tmp = _mm_and_ps (mask2, _mm_set1_ps (1.0f));
    x = _mm_sub_ps (x, tmp);
 
@@ -1305,10 +1284,10 @@ SSE_INLINE __m128 pow_ps (
    else if ( x == 0 && y < 0 ) z = inf;
    else if ( x == 0 ) z = 0;
    */
-   __m128 const  mask_x0 = _mm_cmpeq_ps (base, _mm_setzero_ps ());
-   __m128 const  mask_y0 = _mm_cmpeq_ps (exp, _mm_setzero_ps ());
-   __m128 const  mask_inf = _mm_and_ps (mask_x0, _mm_cmplt_ps (exp, _mm_setzero_ps ()));
-   __m128 const  mask_0 = _mm_or_ps (mask_x0, mask_y0);
+   __m128 mask_x0 = _mm_cmpeq_ps (base, _mm_setzero_ps ());
+   __m128 mask_y0 = _mm_cmpeq_ps (exp, _mm_setzero_ps ());
+   __m128 mask_inf = _mm_and_ps (mask_x0, _mm_cmplt_ps (exp, _mm_setzero_ps ()));
+   __m128 mask_0 = _mm_or_ps (mask_x0, mask_y0);
    y = _mm_andnot_ps (mask_0, y);
    y = _mm_add_ps (y, _mm_and_ps (mask_y0, _mm_set1_ps (1.0f)));
    return _mm_add_ps (y, _mm_and_ps (mask_inf, *(__m128 *)SSEMATH_PI32_INF));
@@ -1320,25 +1299,25 @@ cube root
 \return Returns \f$\sqrt[3]{val}\f$
 */
 SSE_INLINE __m128 cbrt_ps (
-   __m128 const  val   //!< Value
+   __m128 val   //!< Value
 ) {
    // abs( x )
-   __m128  x = _mm_and_ps (val, *(__m128 *)SSEMATH_PI32_INVMASK_SIGN);
-   __m128  z = x;
+   __m128 x = _mm_and_ps (val, *(__m128 *)SSEMATH_PI32_INVMASK_SIGN);
+   __m128 z = x;
 
    // get exponent
-   __m128i  tmpi = _mm_srli_epi32 (_mm_castps_si128 (x), 23);
+  __m128i tmpi = _mm_srli_epi32 (_mm_castps_si128 (x), 23);
    tmpi = _mm_sub_epi32 (tmpi, _mm_set1_epi32 (0x7f));
    tmpi = _mm_add_epi32 (tmpi, _mm_set1_epi32 (1));
-   __m128  exp = _mm_cvtepi32_ps (tmpi);
+   __m128 exp = _mm_cvtepi32_ps (tmpi);
 
    // only keep mantissa
    x = _mm_and_ps (x, *(__m128 *)SSEMATH_PI32_INVMASK_MANT);
    x = _mm_or_ps (x, _mm_set1_ps (0.5f));
-   __m128 const  mask_explt0 = _mm_cmplt_ps (exp, _mm_setzero_ps ());
+   __m128 mask_explt0 = _mm_cmplt_ps (exp, _mm_setzero_ps ());
 
    // cbrt polynom
-   __m128  y = *(__m128 *)SSEMATH_PS_CBRT_P0;
+   __m128 y = *(__m128 *)SSEMATH_PS_CBRT_P0;
    y = _mm_mul_ps (y, x);
    y = _mm_add_ps (y, *(__m128 *)SSEMATH_PS_CBRT_P1);
    y = _mm_mul_ps (y, x);
@@ -1349,26 +1328,26 @@ SSE_INLINE __m128 cbrt_ps (
    y = _mm_add_ps (y, *(__m128 *)SSEMATH_PS_CBRT_P4);
 
    // save sign bit of exponent
-   __m128 const  sign_exp = _mm_and_ps (exp, *(__m128 *)SSEMATH_PI32_MASK_SIGN);
+   __m128 sign_exp = _mm_and_ps (exp, *(__m128 *)SSEMATH_PI32_MASK_SIGN);
 
    // integer abs( exp )
    exp = _mm_and_ps (exp, *(__m128 *)SSEMATH_PI32_INVMASK_SIGN);
    tmpi = _mm_cvtps_epi32 (exp);
 
    // exponent handling
-   __m128i  rem = tmpi;
-   __m128  tmp = _mm_mul_ps (exp, _mm_set1_ps (0.33333333333f));
+  __m128i rem = tmpi;
+   __m128 tmp = _mm_mul_ps (exp, _mm_set1_ps (0.33333333333f));
    tmpi = _mm_cvttps_epi32 (tmp);
    exp = _mm_cvtepi32_ps (tmpi);
    tmp = _mm_mul_ps (exp, _mm_set1_ps (3.0f));
    tmpi = _mm_cvtps_epi32 (tmp);
    rem = _mm_sub_epi32 (rem, tmpi);
-   __m128 const  mask_rem1 = _mm_castsi128_ps (_mm_cmpeq_epi32 (rem, _mm_set1_epi32 (1)));
-   __m128 const  mask_rem2 = _mm_castsi128_ps (_mm_cmpeq_epi32 (rem, _mm_set1_epi32 (2)));
+   __m128 mask_rem1 = _mm_castsi128_ps (_mm_cmpeq_epi32 (rem, _mm_set1_epi32 (1)));
+   __m128 mask_rem2 = _mm_castsi128_ps (_mm_cmpeq_epi32 (rem, _mm_set1_epi32 (2)));
 
    // select factor for y
-   __m128  mask = _mm_andnot_ps (mask_explt0, mask_rem1);
-   __m128  fac = _mm_and_ps (mask, *(__m128 *)SSEMATH_PS_CBRT2);
+   __m128 mask = _mm_andnot_ps (mask_explt0, mask_rem1);
+   __m128 fac = _mm_and_ps (mask, *(__m128 *)SSEMATH_PS_CBRT2);
    mask = _mm_andnot_ps (mask_explt0, mask_rem2);
    mask = _mm_and_ps (mask, *(__m128 *)SSEMATH_PS_CBRT4);
    fac = _mm_or_ps (fac, mask);
@@ -1399,7 +1378,7 @@ SSE_INLINE __m128 cbrt_ps (
    y = _mm_sub_ps (y, z);
 
    // toggle sign
-   __m128 const  sign_bit = _mm_and_ps (val, *(__m128 *)SSEMATH_PI32_MASK_SIGN);
+   __m128 sign_bit = _mm_and_ps (val, *(__m128 *)SSEMATH_PI32_MASK_SIGN);
    return _mm_xor_ps (y, sign_bit);
 }
 
@@ -1410,29 +1389,29 @@ The value \p val must be in the range from -1.0 to 1.0 inclusive.
 \return Returns \f$\arcsin({val})\f$ in radians. If \f$\left|{val}\right|\,>\,1\f$ NaN is returned.
 */
 SSE_INLINE __m128 asin_ps (
-   __m128 const  val   //!< Value
+   __m128 val   //!< Value
 ) {
    // abs( x )
-   __m128  x = _mm_and_ps (val, *(__m128 *)SSEMATH_PI32_INVMASK_SIGN);
+   __m128 x = _mm_and_ps (val, *(__m128 *)SSEMATH_PI32_INVMASK_SIGN);
 
    // mask for polynom selection
-   __m128 const  poly_mask = _mm_cmplt_ps (_mm_set1_ps (0.5f), x);
+   __m128 poly_mask = _mm_cmplt_ps (_mm_set1_ps (0.5f), x);
 
    // calculate both cases
-   __m128  z1 = _mm_mul_ps (_mm_set1_ps (0.5f), _mm_sub_ps (_mm_set1_ps (1.0f), x));
-   __m128  x1 = _mm_sqrt_ps (z1);
-   __m128  z2 = _mm_mul_ps (x, x);
+   __m128 z1 = _mm_mul_ps (_mm_set1_ps (0.5f), _mm_sub_ps (_mm_set1_ps (1.0f), x));
+   __m128 x1 = _mm_sqrt_ps (z1);
+   __m128 z2 = _mm_mul_ps (x, x);
 
    // use mask to select case
    z1 = _mm_and_ps (poly_mask, z1);
    z2 = _mm_andnot_ps (poly_mask, z2);
-   __m128 const  z = _mm_add_ps (z1, z2);
+   __m128 z = _mm_add_ps (z1, z2);
    x1 = _mm_and_ps (poly_mask, x1);
    x = _mm_andnot_ps (poly_mask, x);
    x = _mm_add_ps (x, x1);
 
    // inverse sine polynom
-   __m128  y = *(__m128 *)SSEMATH_PS_ASIN_P0;
+   __m128 y = *(__m128 *)SSEMATH_PS_ASIN_P0;
    y = _mm_mul_ps (y, z);
    y = _mm_add_ps (y, *(__m128 *)SSEMATH_PS_ASIN_P1);
    y = _mm_mul_ps (y, z);
@@ -1446,18 +1425,18 @@ SSE_INLINE __m128 asin_ps (
    y = _mm_add_ps (y, x);
 
    // adjustment
-   __m128  y2 = _mm_sub_ps (*(__m128 *)SSEMATH_PS_PI_2, _mm_add_ps (y, y));
+   __m128 y2 = _mm_sub_ps (*(__m128 *)SSEMATH_PS_PI_2, _mm_add_ps (y, y));
    y2 = _mm_and_ps (poly_mask, y2);
    y = _mm_andnot_ps (poly_mask, y);
    y = _mm_add_ps (y, y2);
 
    // toggle sign
-   __m128 const  sign_bit = _mm_and_ps (val, *(__m128 *)SSEMATH_PI32_MASK_SIGN);
+   __m128 sign_bit = _mm_and_ps (val, *(__m128 *)SSEMATH_PI32_MASK_SIGN);
    y = _mm_xor_ps (y, sign_bit);
 
    // invalid values become NaN
-   __m128 const  abs_val = _mm_and_ps (val, *(__m128 *)SSEMATH_PI32_INVMASK_SIGN);
-   __m128 const  invalid_mask = _mm_cmplt_ps (_mm_set1_ps (1.0f), abs_val);
+   __m128 abs_val = _mm_and_ps (val, *(__m128 *)SSEMATH_PI32_INVMASK_SIGN);
+   __m128 invalid_mask = _mm_cmplt_ps (_mm_set1_ps (1.0f), abs_val);
    return _mm_or_ps (y, invalid_mask);
 }
 
@@ -1468,36 +1447,36 @@ The value \p val must be in the range from -1.0 to 1.0 inclusive.
 \return Returns \f$\arccos({val})\f$ in radians. If \f$\left|{val}\right|\,>\,1\f$ NaN is returned.
 */
 SSE_INLINE __m128 acos_ps (
-   __m128 const  val   //!< Value
+   __m128 val   //!< Value
 ) {
    // mask for value selection
-   __m128 const  poly_mask1 = _mm_cmplt_ps (val, _mm_set1_ps (-0.5f));
-   __m128 const  poly_mask2 = _mm_cmplt_ps (_mm_set1_ps (0.5f), val);
+   __m128 poly_mask1 = _mm_cmplt_ps (val, _mm_set1_ps (-0.5f));
+   __m128 poly_mask2 = _mm_cmplt_ps (_mm_set1_ps (0.5f), val);
 
    // calculate values
-   __m128  x1 = _mm_add_ps (_mm_set1_ps (1.0f), val);
-   __m128  x2 = _mm_sub_ps (_mm_set1_ps (1.0f), val);
+   __m128 x1 = _mm_add_ps (_mm_set1_ps (1.0f), val);
+   __m128 x2 = _mm_sub_ps (_mm_set1_ps (1.0f), val);
 
    // use mask to select case
    x1 = _mm_and_ps (poly_mask1, x1);
    x2 = _mm_and_ps (poly_mask2, x2);
-   __m128  x = _mm_add_ps (x1, x2);
+   __m128 x = _mm_add_ps (x1, x2);
    x = _mm_sqrt_ps (_mm_mul_ps (_mm_set1_ps (0.5f), x));
 
    // include third case (this mask is inverted)
-   __m128 const  poly_mask3 = _mm_or_ps (poly_mask1, poly_mask2);
-   __m128  x3 = _mm_andnot_ps (poly_mask3, val);
+   __m128 poly_mask3 = _mm_or_ps (poly_mask1, poly_mask2);
+   __m128 x3 = _mm_andnot_ps (poly_mask3, val);
    x = _mm_add_ps (x, x3);
 
    // save sign bit
-   __m128 const  sign_bit = _mm_and_ps (x, *(__m128 *)SSEMATH_PI32_MASK_SIGN);
+   __m128 sign_bit = _mm_and_ps (x, *(__m128 *)SSEMATH_PI32_MASK_SIGN);
 
    // abs( x )
    x = _mm_and_ps (x, *(__m128 *)SSEMATH_PI32_INVMASK_SIGN);
 
    // inverse sine polynom
-   __m128 const  z = _mm_mul_ps (x, x);
-   __m128  y = *(__m128 *)SSEMATH_PS_ASIN_P0;
+   __m128 z = _mm_mul_ps (x, x);
+   __m128 y = *(__m128 *)SSEMATH_PS_ASIN_P0;
    y = _mm_mul_ps (y, z);
    y = _mm_add_ps (y, *(__m128 *)SSEMATH_PS_ASIN_P1);
    y = _mm_mul_ps (y, z);
@@ -1514,22 +1493,22 @@ SSE_INLINE __m128 acos_ps (
    x = _mm_xor_ps (y, sign_bit);
 
    // get multiplicators and offsets for different cases
-   __m128 const  fact1 = _mm_and_ps (poly_mask1, _mm_set1_ps (-2.0f));
-   __m128 const  fact2 = _mm_and_ps (poly_mask2, _mm_set1_ps (2.0f));
-   __m128  fact = _mm_add_ps (fact1, fact2);
-   __m128 const  fact3 = _mm_andnot_ps (poly_mask3, _mm_set1_ps (-1.0f));
+   __m128 fact1 = _mm_and_ps (poly_mask1, _mm_set1_ps (-2.0f));
+   __m128 fact2 = _mm_and_ps (poly_mask2, _mm_set1_ps (2.0f));
+   __m128 fact = _mm_add_ps (fact1, fact2);
+   __m128 fact3 = _mm_andnot_ps (poly_mask3, _mm_set1_ps (-1.0f));
    fact = _mm_add_ps (fact, fact3);
    x = _mm_mul_ps (x, fact);
-   __m128 const  offs1 = _mm_and_ps (poly_mask1, *(__m128 *)SSEMATH_PS_PI);
-   __m128 const  offs2 = _mm_and_ps (poly_mask2, _mm_setzero_ps ());
-   __m128  offs = _mm_add_ps (offs1, offs2);
-   __m128 const  offs3 = _mm_andnot_ps (poly_mask3, *(__m128 *)SSEMATH_PS_PI_2);
+   __m128 offs1 = _mm_and_ps (poly_mask1, *(__m128 *)SSEMATH_PS_PI);
+   __m128 offs2 = _mm_and_ps (poly_mask2, _mm_setzero_ps ());
+   __m128 offs = _mm_add_ps (offs1, offs2);
+   __m128 offs3 = _mm_andnot_ps (poly_mask3, *(__m128 *)SSEMATH_PS_PI_2);
    offs = _mm_add_ps (offs, offs3);
    x = _mm_add_ps (x, offs);
 
    // invalid values become NaN
-   __m128 const  abs_val = _mm_and_ps (val, *(__m128 *)SSEMATH_PI32_INVMASK_SIGN);
-   __m128 const  invalid_mask = _mm_cmplt_ps (_mm_set1_ps (1.0f), abs_val);
+   __m128 abs_val = _mm_and_ps (val, *(__m128 *)SSEMATH_PI32_INVMASK_SIGN);
+   __m128 invalid_mask = _mm_cmplt_ps (_mm_set1_ps (1.0f), abs_val);
    return _mm_or_ps (x, invalid_mask);
 }
 
@@ -1539,30 +1518,30 @@ inverse tangens
 \return Returns \f$\arctan({val})\f$ in the range \f$\left[-\frac{\pi}{2}, \frac{\pi}{2}\right]\f$ radians.
 */
 SSE_INLINE __m128 atan_ps (
-   __m128 const  val   //!< Value
+   __m128 val   //!< Value
 ) {
    // abs( x )
-   __m128  x = _mm_and_ps (val, *(__m128 *)SSEMATH_PI32_INVMASK_SIGN);
+   __m128 x = _mm_and_ps (val, *(__m128 *)SSEMATH_PI32_INVMASK_SIGN);
 
    // mask for case selection
-   __m128 const  mask1 = _mm_cmplt_ps (*(__m128 *)SSEMATH_PS_ATAN_Q0, x);
-   __m128 const  mask2 = _mm_andnot_ps (mask1, _mm_cmplt_ps (*(__m128 *)SSEMATH_PS_ATAN_Q1, x));
+   __m128 mask1 = _mm_cmplt_ps (*(__m128 *)SSEMATH_PS_ATAN_Q0, x);
+   __m128 mask2 = _mm_andnot_ps (mask1, _mm_cmplt_ps (*(__m128 *)SSEMATH_PS_ATAN_Q1, x));
 
    // this mask is inverted
-   __m128 const  mask3 = _mm_or_ps (mask1, mask2);
+   __m128 mask3 = _mm_or_ps (mask1, mask2);
 
    // range reduction
-   __m128  y = _mm_and_ps (mask1, *(__m128 *)SSEMATH_PS_PI_2);
+   __m128 y = _mm_and_ps (mask1, *(__m128 *)SSEMATH_PS_PI_2);
    y = _mm_add_ps (y, _mm_and_ps (mask2, *(__m128 *)SSEMATH_PS_PI_4));
-   __m128 const  x1 = _mm_div_ps (_mm_set1_ps (-1.0f), x);
-   __m128 const  x2 = _mm_div_ps (_mm_sub_ps (x, _mm_set1_ps (1.0f)), _mm_add_ps (x, _mm_set1_ps (1.0f)));
+   __m128 x1 = _mm_div_ps (_mm_set1_ps (-1.0f), x);
+   __m128 x2 = _mm_div_ps (_mm_sub_ps (x, _mm_set1_ps (1.0f)), _mm_add_ps (x, _mm_set1_ps (1.0f)));
    x = _mm_andnot_ps (mask3, x);
    x = _mm_add_ps (x, _mm_and_ps (mask1, x1));
    x = _mm_add_ps (x, _mm_and_ps (mask2, x2));
 
    // inverse tangent polynom
-   __m128 const  z = _mm_mul_ps (x, x);
-   __m128  tmp = *(__m128 *)SSEMATH_PS_ATAN_P0;
+   __m128 z = _mm_mul_ps (x, x);
+   __m128 tmp = *(__m128 *)SSEMATH_PS_ATAN_P0;
    tmp = _mm_mul_ps (tmp, z);
    tmp = _mm_add_ps (tmp, *(__m128 *)SSEMATH_PS_ATAN_P1);
    tmp = _mm_mul_ps (tmp, z);
@@ -1575,7 +1554,7 @@ SSE_INLINE __m128 atan_ps (
    tmp = _mm_add_ps (tmp, y);
 
    // toggle sign
-   __m128 const  sign_bit = _mm_and_ps (val, *(__m128 *)SSEMATH_PI32_MASK_SIGN);
+   __m128 sign_bit = _mm_and_ps (val, *(__m128 *)SSEMATH_PI32_MASK_SIGN);
    return _mm_xor_ps (tmp, sign_bit);
 }
 
@@ -1585,27 +1564,27 @@ inverse tangens
 \return Returns \f$\arctan(\frac{y}{x})\f$ in the range \f$\left[-\pi, \pi\right]\f$ radians.
 */
 SSE_INLINE __m128 atan2_ps (
-   __m128 const  y,    //!< Y value
-   __m128 const  x     //!< X value
+   __m128 y,    //!< Y value
+   __m128 x     //!< X value
 ) {
    // build special constant values
-   __m128  mask_ygt0 = _mm_cmplt_ps (_mm_setzero_ps (), y);
-   __m128  mask_ylt0 = _mm_cmplt_ps (y, _mm_setzero_ps ());
-   __m128  tmp1 = _mm_and_ps (mask_ygt0, *(__m128 *)SSEMATH_PS_PI_2);
-   __m128  tmp2 = _mm_and_ps (mask_ylt0, *(__m128 *)SSEMATH_PS_PI_2);
-   __m128  val = _mm_sub_ps (tmp1, tmp2);
+   __m128 mask_ygt0 = _mm_cmplt_ps (_mm_setzero_ps (), y);
+   __m128 mask_ylt0 = _mm_cmplt_ps (y, _mm_setzero_ps ());
+   __m128 tmp1 = _mm_and_ps (mask_ygt0, *(__m128 *)SSEMATH_PS_PI_2);
+   __m128 tmp2 = _mm_and_ps (mask_ylt0, *(__m128 *)SSEMATH_PS_PI_2);
+   __m128 val = _mm_sub_ps (tmp1, tmp2);
 
    // offset for atan value
-   __m128 const  mask_xlt0 = _mm_cmplt_ps (x, _mm_setzero_ps ());
+   __m128 mask_xlt0 = _mm_cmplt_ps (x, _mm_setzero_ps ());
    mask_ygt0 = _mm_andnot_ps (mask_ylt0, mask_xlt0);
    mask_ylt0 = _mm_and_ps (mask_ylt0, mask_xlt0);
    tmp1 = _mm_and_ps (mask_ygt0, *(__m128 *)SSEMATH_PS_PI);
    tmp2 = _mm_and_ps (mask_ylt0, *(__m128 *)SSEMATH_PS_PI);
-   __m128 const  offs = _mm_sub_ps (tmp1, tmp2);
+   __m128 offs = _mm_sub_ps (tmp1, tmp2);
 
    // calculate atan( y / x )
-   __m128 const  mask_xeq0 = _mm_cmpeq_ps (x, _mm_setzero_ps ());
-   __m128  atan = atan_ps (_mm_div_ps (y, x));
+   __m128 mask_xeq0 = _mm_cmpeq_ps (x, _mm_setzero_ps ());
+   __m128 atan = atan_ps (_mm_div_ps (y, x));
 
    // add offset and select result or special value
    atan = _mm_add_ps (atan, offs);

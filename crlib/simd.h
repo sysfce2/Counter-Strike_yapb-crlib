@@ -9,27 +9,42 @@
 
 #include <crlib/basic.h>
 
-#if defined (CR_HAS_SIMD)
-#  include CR_INTRIN_INCLUDE
+#if defined (CR_HAS_SIMD_SSE)
 #  if defined (CR_ARCH_ARM)
-#     include <crlib/ssemath/sincos_arm.h>
+#     include <crlib/simd/sse2neon.h>
+#  else
+#     include <smmintrin.h>
+#  endif
+#elif defined (CR_HAS_SIMD_NEON)
+#  include <arm_neon.h>
 #endif
+
+namespace cr::simd {
+#if defined (CR_HAS_SIMD_SSE)
+#  include <crlib/simd/sse2.h>
+#elif defined (CR_HAS_SIMD_NEON)
+#  include <crlib/simd/neon.h>
 #endif
+}
 
 CR_NAMESPACE_BEGIN
 
 #if defined (CR_HAS_SIMD)
 
-namespace ssemath {
-#  include <crlib/ssemath/ssemath.h>
-}
-
+#if defined (CR_HAS_SIMD_SSE)
 CR_SIMD_ALIGNED const auto simd_EPS = _mm_set1_ps (kFloatEpsilon);
+#else
+CR_SIMD_ALIGNED const auto simd_EPS = vdupq_n_f32 (kFloatEpsilon);
+#endif
+
+// forward declaration of vector
+template <typename T> class Vec3D;
 
 // simple wrapper for vector
 class CR_SIMD_ALIGNED SimdVec3Wrap final {
 private:
-   template <bool AVOID_NAN = false> static inline CR_SIMD_TARGET_AIL ("sse4.1") __m128 _mm_dot4_ps (__m128 v0, __m128 v1) {
+#if defined (CR_HAS_SIMD_SSE)
+   template <bool AVOID_NAN = false> static CR_SIMD_TARGET_AIL ("sse4.1") __m128 simd_dot4 (__m128 v0, __m128 v1) {
       if (cpuflags.sse41) {
          if constexpr (AVOID_NAN) {
             return _mm_dp_ps (v0, v1, 0x7f);
@@ -45,6 +60,18 @@ private:
       }
       return had0;
    }
+#else
+   template <bool AVOID_NAN = false> static CR_FORCE_INLINE float32x4_t simd_dot4 (float32x4_t v0, float32x4_t v1) {
+      auto mul0 = vmulq_f32 (v0, v1);
+      auto sum1 = vaddq_f32 (mul0, vrev64q_f32 (mul0));
+      auto sum2 = vaddq_f32 (sum1, vcombine_f32 (vget_high_f32 (sum1), vget_low_f32 (sum1)));
+
+      if constexpr (AVOID_NAN) {
+         sum2 = vaddq_f32 (sum2, simd_EPS); // avoid NaN's
+      }
+      return sum2;
+}
+#endif
 
 public:
 #if defined (CR_CXX_MSVC)
@@ -52,8 +79,11 @@ public:
 #   pragma warning(disable: 4201)
 #endif
    union {
+#if defined (CR_HAS_SIMD_SSE)
       __m128 m { _mm_setzero_ps () };
-
+#else
+      float32x4_t m { vdupq_n_f32 (0) };
+#endif
       struct {
          float x, y, z, w;
       };
@@ -63,108 +93,130 @@ public:
 #   pragma warning(pop) 
 #endif
 
-   SimdVec3Wrap (const float &x, const float &y, const float &z) {
-      m = _mm_set_ps (0.0f, z, y, x);
+   SimdVec3Wrap (const float *data) {
+#if defined(CR_HAS_SIMD_SSE)
+      m = _mm_loadu_ps (data);
+#else
+      m = vld1q_f32 (data);
+#endif
    }
 
    SimdVec3Wrap (const float &x, const float &y) {
+#if defined(CR_HAS_SIMD_SSE)
       m = _mm_set_ps (0.0f, 0.0f, y, x);
+#else
+      float CR_SIMD_ALIGNED data[4] = { 0.0f, 0.0f, y, x };
+      m = vld1q_f32 (data);
+#endif
    }
 
+#if defined(CR_HAS_SIMD_SSE)
    constexpr SimdVec3Wrap (__m128 m) : m (m) {}
+#else
+   constexpr SimdVec3Wrap (float32x4_t m) : m (m) {}
+#endif
 
 public:
    constexpr SimdVec3Wrap () : x (0.0f), y (0.0f), z (0.0f), w (0.0f) {}
    ~SimdVec3Wrap () = default;
 
 public:
+#if defined (CR_HAS_SIMD_SSE)
    CR_SIMD_TARGET ("sse4.1")
    SimdVec3Wrap normalize () const {
-#if defined(CR_ARCH_ARM)
-      return { _mm_div_ps (m, _mm_sqrt_ps (_mm_dp_ps (m, m, 0x7f))) };
-#else
-      return { _mm_div_ps (m, _mm_sqrt_ps (_mm_dot4_ps <true> (m, m))) };
-#endif
+      return { _mm_div_ps (m, _mm_sqrt_ps (simd_dot4 <true> (m, m))) };
    }
 
+   CR_SIMD_TARGET ("sse4.1")
    float hypot () const {
-      return _mm_cvtss_f32 (_mm_sqrt_ps (_mm_dot4_ps (m, m)));
+      return _mm_cvtss_f32 (_mm_sqrt_ps (simd_dot4 (m, m)));
    }
 
+   CR_SIMD_TARGET ("sse4.1")
+   float hypot2d () const {
+      __m128 mul0 = _mm_mul_ps (m, m);
+      return _mm_cvtss_f32 (_mm_sqrt_ps (_mm_hadd_ps (mul0, mul0)));
+   }
+
+   CR_SIMD_TARGET ("sse4.1")
    float dot (SimdVec3Wrap rhs) const {
-      return _mm_cvtss_f32 (_mm_dot4_ps (m, rhs.m));
+      return _mm_cvtss_f32 (simd_dot4 (m, rhs.m));
    }
 
-   SimdVec3Wrap cross (SimdVec3Wrap rhs) const {
+   CR_FORCE_INLINE SimdVec3Wrap cross (SimdVec3Wrap rhs) const {
       return _mm_sub_ps (
          _mm_mul_ps (_mm_shuffle_ps (m, m, _MM_SHUFFLE (3, 0, 2, 1)), _mm_shuffle_ps (rhs.m, rhs.m, _MM_SHUFFLE (3, 1, 0, 2))),
          _mm_mul_ps (_mm_shuffle_ps (m, m, _MM_SHUFFLE (3, 1, 0, 2)), _mm_shuffle_ps (rhs.m, rhs.m, _MM_SHUFFLE (3, 0, 2, 1)))
       );
    }
 
-#if defined (CR_ARCH_ARM)
-   void angleVectors (SimdVec3Wrap &sines, SimdVec3Wrap &cosines) {
-      static constexpr CR_SIMD_ALIGNED float d2r[] = {
-         kDegreeToRadians, kDegreeToRadians,
-         kDegreeToRadians, kDegreeToRadians
-      };
-      neon_sincos_ps (_mm_mul_ps (m, _mm_load_ps (d2r)), sines.m, cosines.m);
-   }
-#else
    // this function directly taken from rehlds project https://github.com/dreamstalker/rehlds
-   void angleVectors (float *forward, float *right, float *upward) {
-      static constexpr CR_SIMD_ALIGNED float d2r[] = {
+   template <typename T> CR_FORCE_INLINE void angleVectors (T *forward, T *right, T *upward) {
+      static constexpr CR_SIMD_ALIGNED float kDegToRad[] = {
          kDegreeToRadians, kDegreeToRadians,
          kDegreeToRadians, kDegreeToRadians
       };
 
-      static constexpr CR_SIMD_ALIGNED uint32_t negmask[4] = {
-         0x80000000, 0x80000000, 0x80000000, 0x80000000
+      static constexpr CR_SIMD_ALIGNED float kNeg03[4] = {
+         -0.0, 0.0f, 0.0f, -0.0f
       };
 
-      static constexpr CR_SIMD_ALIGNED uint32_t negmask_1001[4] = {
-         0x80000000, 0, 0, 0x80000000
-      };
+      __m128 cos0, sin0;
+      simd::sincos_ps (_mm_mul_ps (m, _mm_load_ps (kDegToRad)), cos0, sin0);
 
-      __m128 s, c;
-      ssemath::sincos_ps (_mm_mul_ps (m, _mm_load_ps (d2r)), s, c);
+      auto shf0 = _mm_shuffle_ps (sin0, cos0, _MM_SHUFFLE (2, 1, 0, 0));
+      auto shf1 = _mm_shuffle_ps (sin0, sin0, _MM_SHUFFLE (0, 0, 2, 1));
+      auto mul0 = _mm_mul_ps (shf0, shf1);
 
-      auto m1 = _mm_shuffle_ps (c, s, 0x90); // [cp][cp][sy][sr]
-      auto m2 = _mm_shuffle_ps (c, c, 0x09); // [cy][cr][cp][cp]
-      auto cp_mults = _mm_mul_ps (m1, m2); // [cp * cy][cp * cr][cp * sy][cp * sr];
+      shf0 = _mm_shuffle_ps (sin0, cos0, _MM_SHUFFLE (0, 1, 1, 1));
+      shf1 = _mm_shuffle_ps (cos0, sin0, _MM_SHUFFLE (2, 2, 0, 0));
+      shf0 = _mm_shuffle_ps (shf0, shf0, _MM_SHUFFLE (3, 0, 2, 0));
 
-      m1 = _mm_shuffle_ps (c, s, 0x15); // [cy][cy][sy][sp]
-      m2 = _mm_shuffle_ps (s, c, 0xa0); // [sp][sp][cr][cr]
-      m1 = _mm_shuffle_ps (m1, m1, 0xc8); // [cy][sy][cy][sp]
+      auto shf2 = _mm_shuffle_ps (cos0, cos0, _MM_SHUFFLE (1, 0, 2, 2));
+      shf2 = _mm_mul_ps (shf2, _mm_mul_ps (shf0, shf1));
 
-      auto m3 = _mm_shuffle_ps (s, s, 0x4a); // [sr][sr][sp][sy];
-      m3 = _mm_mul_ps (m3, _mm_mul_ps (m1, m2)); // [sp*cy*sr][sp*sy*sr][cr*cy*sp][cr*sp*sy]
+      shf1 = _mm_shuffle_ps (cos0, sin0, _MM_SHUFFLE (1, 2, 1, 1));
+      shf0 = _mm_shuffle_ps (sin0, cos0, _MM_SHUFFLE (2, 2, 1, 2));
+      shf1 = _mm_shuffle_ps (shf1, shf1, _MM_SHUFFLE (3, 1, 2, 0));
 
-      m2 = _mm_shuffle_ps (s, c, 0x65); // [sy][sy][cr][cy]
-      m1 = _mm_shuffle_ps (c, s, 0xa6); // [cr][cy][sr][sr]
-      m2 = _mm_shuffle_ps (m2, m2, 0xd8); // [sy][cr][sy][cy]
-      m1 = _mm_xor_ps (m1, _mm_load_ps (const_cast <float *> (reinterpret_cast <const float *> (&negmask_1001)))); // [-cr][cy][sr][-sr]
-      m1 = _mm_mul_ps (m1, m2); // [-cr*sy][cy*cr][sr*sy][-sr*cy]
+      shf0 = _mm_xor_ps (shf0, _mm_load_ps (kNeg03));
+      shf0 = _mm_mul_ps (shf0, shf1);
 
-      m3 = _mm_add_ps (m3, m1);
+      shf2 = _mm_add_ps (shf2, shf0);
 
       if (forward) {
-         _mm_storel_pi (reinterpret_cast <__m64 *> (forward), _mm_shuffle_ps (cp_mults, cp_mults, 0x08));
-         forward[2] = -_mm_cvtss_f32 (s);
+         _mm_storel_pi (reinterpret_cast <__m64 *> (forward->data), _mm_shuffle_ps (mul0, mul0, _MM_SHUFFLE (0, 0, 2, 0)));
+         forward->data[2] = -_mm_cvtss_f32 (cos0);
       }
 
       if (right) {
-         auto r = _mm_shuffle_ps (m3, cp_mults, 0xF4); // [m3(0)][m3(1)][cp(3)][cp(3)]
-         r = _mm_xor_ps (r, _mm_load_ps (const_cast <float *> (reinterpret_cast <const float *> (&negmask))));
+         auto shf3 = _mm_shuffle_ps (shf2, mul0, _MM_SHUFFLE (3, 3, 1, 0));
+         shf3 = _mm_xor_ps (shf3, _mm_set1_ps (kNeg03[0]));
 
-         _mm_storel_pi (reinterpret_cast <__m64 *> (right), r);
-         _mm_store_ss (right + 2, _mm_shuffle_ps (r, r, 0x02));
+         _mm_storel_pi (reinterpret_cast <__m64 *> (right->data), shf3);
+         _mm_store_ss (&right->data[2], _mm_shuffle_ps (shf3, shf3, _MM_SHUFFLE (0, 0, 0, 2)));
       }
 
       if (upward) {
-         _mm_storel_pi (reinterpret_cast <__m64 *> (upward), _mm_shuffle_ps (m3, m3, 0x0e));
-         upward[2] = _mm_cvtss_f32 (_mm_shuffle_ps (cp_mults, cp_mults, 0x01));
+         _mm_storel_pi (reinterpret_cast <__m64 *> (upward->data), _mm_shuffle_ps (shf2, shf2, _MM_SHUFFLE (0, 0, 3, 2)));
+         upward->data[2] = _mm_cvtss_f32 (_mm_shuffle_ps (mul0, mul0, _MM_SHUFFLE (0, 0, 0, 1)));
       }
+   }
+#else
+   CR_FORCE_INLINE SimdVec3Wrap normalize () const {
+      return { simd::div_ps (m, simd::sqrt_ps (simd_dot4 <true> (m, m))) };
+   }
+
+   CR_FORCE_INLINE float hypot () const {
+      return vgetq_lane_f32 (simd::sqrt_ps (simd_dot4 (m, m)), 0);
+   }
+
+   CR_FORCE_INLINE void angleVectors (SimdVec3Wrap &sines, SimdVec3Wrap &cosines) {
+      static constexpr CR_SIMD_ALIGNED float kDegToRad[] = {
+         kDegreeToRadians, kDegreeToRadians,
+         kDegreeToRadians, kDegreeToRadians
+      };
+      simd::sincos_ps (vmulq_f32 (m, vld1q_f32 (kDegToRad)), sines.m, cosines.m);
    }
 #endif
 };
@@ -185,14 +237,14 @@ private:
 
 public:
    // use default implementations
-   StrLen *strlen { ::strlen };
-   StrCmp *strcmp { ::strcmp };
-   MemCmp *memcmp { ::memcmp };
-   StrNCmp *strncmp { ::strncmp };
+   StrLen *strlen_ { ::strlen };
+   StrCmp *strcmp_ { ::strcmp };
+   MemCmp *memcmp_ { ::memcmp };
+   StrNCmp *strncmp_ { ::strncmp };
 
 private:
-#if defined (CR_HAS_SIMD)
-   static inline size_t CR_SIMD_TARGET_AIL ("sse4.2") simd_sse42_strlen (const char *s) {
+#if defined (CR_HAS_SIMD_SSE)
+   static size_t CR_SIMD_TARGET_AIL ("sse4.2") simd_sse42_strlen (const char *s) {
       size_t result = 0;
 
       auto mem = reinterpret_cast<__m128i *> (const_cast <char *> (s));
@@ -210,7 +262,7 @@ private:
       }
    }
 
-   static inline int CR_SIMD_TARGET_AIL ("sse4.2") simd_sse42_memcmp (const void *s1, const void *s2, size_t n) {
+   static int CR_SIMD_TARGET_AIL ("sse4.2") simd_sse42_memcmp (const void *s1, const void *s2, size_t n) {
       if (n == 0 || s1 == s2) {
          return 0;
       }
@@ -250,7 +302,7 @@ private:
       return 0;
    }
 
-   static inline int CR_SIMD_TARGET_AIL ("sse4.2") simd_sse42_strcmp (const char *s1, const char *s2) {
+   static int CR_SIMD_TARGET_AIL ("sse4.2") simd_sse42_strcmp (const char *s1, const char *s2) {
       if (s1 == s2) {
          return 0;
       }
@@ -286,7 +338,7 @@ private:
       return 0;
    }
 
-   static inline int CR_SIMD_TARGET_AIL ("sse4.2") simd_sse42_strncmp (const char *s1, const char *s2, size_t n) {
+   static int CR_SIMD_TARGET_AIL ("sse4.2") simd_sse42_strncmp (const char *s1, const char *s2, size_t n) {
       if (n == 0 || s1 == s2) {
          return 0;
       }
@@ -326,12 +378,12 @@ private:
 public:
    void init () {
       // this is not effective when builds are done with native optimizations
-#if defined (CR_HAS_SIMD) && !defined (CR_NATIVE_BUILD)
-      if (cpuflags.sse42 || plat.arm) {
-         this->strlen = reinterpret_cast <StrLen *> (simd_sse42_strlen);
-         this->strcmp = reinterpret_cast <StrCmp *> (simd_sse42_strcmp);
-         this->memcmp = reinterpret_cast <MemCmp *> (simd_sse42_memcmp);
-         this->strncmp = reinterpret_cast <StrNCmp *> (simd_sse42_strncmp);
+#if defined (CR_HAS_SIMD_SSE) && !defined (CR_NATIVE_BUILD)
+      if (cpuflags.sse42) {
+         strlen_ = reinterpret_cast <StrLen *> (simd_sse42_strlen);
+         strcmp_ = reinterpret_cast <StrCmp *> (simd_sse42_strcmp);
+         memcmp_ = reinterpret_cast <MemCmp *> (simd_sse42_memcmp);
+         strncmp_ = reinterpret_cast <StrNCmp *> (simd_sse42_strncmp);
       }
 #endif
    }
@@ -343,7 +395,7 @@ CR_EXPOSE_GLOBAL_SINGLETON (SimdString, simdstring);
 // declares libc function that replaced by crlib version
 #define DECLARE_CRLIB_LIBC_FN(fn) \
    template <typename ...Args> static inline auto fn (Args &&...args) { \
-      return SimdString::instance ().fn (cr::forward <Args> (args)...); \
+      return SimdString::instance ().fn##_ (cr::forward <Args> (args)...); \
    } \
 
 // declare our replacements
