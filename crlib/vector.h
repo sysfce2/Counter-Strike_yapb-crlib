@@ -172,11 +172,11 @@ public:
    }
 
    T distance (const Vec3D &rhs) const {
-      return apx::sqrtf ((*this - rhs).lengthSq ());
+      return cr::sqrtf ((*this - rhs).lengthSq ());
    }
 
    T distance2d (const Vec3D &rhs) const {
-      return apx::sqrtf ((*this - rhs).lengthSq2d ());
+      return cr::sqrtf ((*this - rhs).lengthSq2d ());
    }
 
    T distanceSq (const Vec3D &rhs) const {
@@ -278,11 +278,12 @@ public:
    void angleVectors (Vec3D *forward, Vec3D *right, Vec3D *upward) const {
 #if defined (CR_HAS_SIMD_SSE)
       SimdVec3Wrap { data }.angleVectors <Vec3D> (forward, right, upward);
-#elif defined (CR_HAS_SIMD_NEON)
+#endif
+
+#if defined (CR_HAS_SIMD_NEON)
       static SimdVec3Wrap s, c;
       SimdVec3Wrap { data }.angleVectors (s, c);
 #else
-
       static Vec3D s, c, r;
       r = { cr::deg2rad (x), cr::deg2rad (y), cr::deg2rad (z) };
 

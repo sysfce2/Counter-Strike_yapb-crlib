@@ -137,65 +137,6 @@ float floorf (const float value) {
 #endif
 }
 
-// approximation functions
-namespace apx {
-CR_FORCE_INLINE float sqrtf (const float value) {
-#if defined (CR_HAS_SIMD_SSE)
-   return cr::sqrtf (value);
-#else
-   union {
-      float f;
-      uint32_t u;
-   } val { value };
-   val.u = (val.u >> 1U) + 0x1fbb4000;
-   return val.f;
-#endif
-}
-
-CR_FORCE_INLINE float rsqrtf (const float value) {
-#if defined (CR_HAS_SIMD_SSE)
-   return cr::rsqrtf (value);
-#else
-   union {
-      float f;
-      uint32_t u;
-   } val = { value };
-   val.u = 0x5f1ffff9 - (val.u >> 1U);
-   val.f *= 0.703952253f * (2.38924456f - value * cr::sqrf (val.f));
-   return val.f;
-#endif
-}
-
-// not used, but just to not lost :)
-#if defined (CR_HAS_SIMD_SSE)
-
-CR_FORCE_INLINE float rsqrtf_sse (const float value) {
-   __m128 num0 = _mm_load_ss (&value);
-   __m128 mul0 = _mm_mul_ss (num0, _mm_set_ss (0.5f));
-   __m128 tmp0 = num0;
-   __m128i tmp1 = _mm_castps_si128 (tmp0);
-
-   tmp1 = _mm_sub_epi32 (_mm_set1_epi32 (0x5f3759df), _mm_srli_epi32 (tmp1, 1));
-   tmp0 = _mm_castsi128_ps (tmp1);
-   tmp0 = _mm_mul_ss (tmp0, _mm_sub_ss (_mm_set_ss (1.5f), _mm_mul_ss (mul0, _mm_mul_ss (tmp0, tmp0))));
-
-   return _mm_cvtss_f32 (tmp0);
-}
-
-CR_FORCE_INLINE float sqrtf_sse (const float value) {
-   __m128 num0 = _mm_load_ss (&value);
-   __m128 tmp0 = num0;
-   __m128i tmp1 = _mm_castps_si128 (tmp0);
-
-   tmp1 = _mm_add_epi32 (_mm_set1_epi32 (0x1fbb4000), _mm_srli_epi32 (tmp1, 1));
-   tmp0 = _mm_castsi128_ps (tmp1);
-
-   return _mm_cvtss_f32 (tmp0);
-}
-
-#endif
-}
-
 CR_FORCE_INLINE void sincosf (const float &x, float &s, float &c) {
 #if defined (CR_HAS_SIMD_SSE)
    __m128 _s, _c;
@@ -210,8 +151,8 @@ CR_FORCE_INLINE void sincosf (const float &x, float &s, float &c) {
    s = vgetq_lane_f32 (_s, 0);
    c = vgetq_lane_f32 (_c, 0);
 #else
-   c = cr::cosf (x);
    s = cr::sinf (x);
+   c = cr::cosf (x);
 #endif
 }
 
