@@ -107,11 +107,6 @@ CR_NAMESPACE_BEGIN
 #  define CR_SIMD_TARGET_AIL(dest) __attribute__((__always_inline__, target(dest))) inline
 #endif
 
-// ship windows xp release builds only with msvc
-#if defined (CR_CXX_MSVC) && !defined(CR_DEBUG)
-#  define CR_HAS_WINXP_SUPPORT
-#endif
-
 // set the minimal glibc as we can
 #if defined (CR_ARCH_ARM)
 #  define GLIBC_VERSION_MIN "2.17"
