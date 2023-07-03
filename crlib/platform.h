@@ -108,8 +108,10 @@ CR_NAMESPACE_BEGIN
 #endif
 
 // set the minimal glibc as we can
-#if defined (CR_ARCH_ARM)
+#if defined (CR_ARCH_ARM64)
 #  define GLIBC_VERSION_MIN "2.17"
+#elif defined (CR_ARCH_ARM32)
+#  define GLIBC_VERSION_MIN "2.4"
 #elif defined (CR_ARCH_X64) && !defined (CR_ARCH_ARM)
 #  define GLIBC_VERSION_MIN "2.2.5"
 #else
@@ -122,6 +124,11 @@ CR_NAMESPACE_BEGIN
    __asm__ (".symver dladdr, dladdr@GLIBC_" GLIBC_VERSION_MIN);
    __asm__ (".symver dlclose, dlclose@GLIBC_" GLIBC_VERSION_MIN);
    __asm__ (".symver dlopen, dlopen@GLIBC_" GLIBC_VERSION_MIN);
+
+#if defined (CR_ARCH_ARM)
+   __asm__ (".symver powf, powf@GLIBC_" GLIBC_VERSION_MIN);
+#endif
+
 #endif
 
 CR_NAMESPACE_END
