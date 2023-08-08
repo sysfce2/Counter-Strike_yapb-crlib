@@ -47,7 +47,7 @@ private:
 
       virtual LambdaWrapper *clone (void *obj) const override {
          if (!obj) {
-            return Memory::getAndConstruct <LambdaFunctor> (*this);;
+            return Memory::getAndConstruct <LambdaFunctor> (*this);
          }
          return Memory::construct (reinterpret_cast <LambdaFunctor *> (obj), *this);
       }

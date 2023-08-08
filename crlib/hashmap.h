@@ -154,7 +154,7 @@ private:
       size_t index = getIndex (key);
 
       while (contents_[index].status == Status::Occupied && contents_[index].key != key) {
-         index = (++index % contents_.length ());
+         index = (index + 1) % contents_.length ();
       }
       return contents_[index].val;
    }
@@ -315,7 +315,7 @@ public:
       size_t index = getIndex (key);
 
       while (contents_[index].status == Status::Occupied && contents_[index].key != key) {
-         index = (++index % contents_.length ());
+         index = (index + 1) % contents_.length ();
       }
       return contents_[index].status == Status::Occupied;
    }

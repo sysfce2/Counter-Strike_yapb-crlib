@@ -21,7 +21,7 @@
 
 #pragma once
 
-constexpr auto c_sincof_p0 = -1.9515295891E-4f;;
+constexpr auto c_sincof_p0 = -1.9515295891E-4f;
 constexpr auto c_sincof_p1 = 8.3321608736E-3f;
 constexpr auto c_sincof_p2 = -1.6666654611E-1f;
 

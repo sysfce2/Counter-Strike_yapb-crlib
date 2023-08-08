@@ -116,7 +116,7 @@ public:
    }
 
 public:
-   constexpr bool empty () const  {
+   constexpr bool empty () const {
       return length_ == 0;
    }
 
@@ -875,7 +875,7 @@ public:
 
    template <typename ...Args> String joinPath (Args &&...args) noexcept {
       Array <String> data ({ cr::forward <Args> (args)... });
-      return String::join (data, PATH_SEP);
+      return String::join (data, kPathSeparator);
    }
 
    template <typename U> U *format (const U *fmt) noexcept {

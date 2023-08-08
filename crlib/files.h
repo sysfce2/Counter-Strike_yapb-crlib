@@ -137,13 +137,13 @@ public:
 
 public:
    static inline void makePath (const char  *path) {
-      auto dir = const_cast <char *> (path) + sizeof (PATH_SEP);
+      auto dir = const_cast <char *> (path) + sizeof (kPathSeparator);
 
       for (auto str = dir; *str != kNullChar; ++str) {
-         if (*str ==  *PATH_SEP) {
+         if (*str ==  *kPathSeparator) {
             *str = kNullChar;
             plat.createDirectory (path);
-            *str = *PATH_SEP;
+            *str = *kPathSeparator;
          }
       }
       plat.createDirectory (path);

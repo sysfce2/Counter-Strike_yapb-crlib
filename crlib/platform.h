@@ -134,8 +134,8 @@ CR_NAMESPACE_BEGIN
 CR_NAMESPACE_END
 
 #if defined(CR_WINDOWS)
-constexpr auto PATH_SEP = "\\";
-constexpr auto DLL_SUFFIX = ".dll";
+constexpr auto kPathSeparator = "\\";
+constexpr auto kLibrarySuffix = ".dll";
 
 // raise windows api version if doesn't build for xp
 #if !defined(CR_HAS_WINXP_SUPPORT) && !defined (CR_CXX_MSVC)
@@ -188,11 +188,11 @@ constexpr auto DLL_SUFFIX = ".dll";
 #  include <direct.h>
 #  include <io.h>
 #else
-constexpr auto PATH_SEP = "/";
+constexpr auto kPathSeparator = "/";
 #  if defined (CR_OSX)
-      constexpr auto DLL_SUFFIX = ".dylib";
+      constexpr auto kLibrarySuffix = ".dylib";
 #  else
-      constexpr auto DLL_SUFFIX = ".so";
+      constexpr auto kLibrarySuffix = ".so";
 #endif
 #  include <unistd.h>
 #  include <strings.h>
