@@ -263,10 +263,18 @@ struct Platform : public Singleton <Platform> {
    }
 
    // helper platform-dependant functions
-   template <typename U> bool checkPointer (U *ptr) {
+   template <typename U> bool isValidPtr (U *ptr) {
 #if defined(CR_WINDOWS)
-      if (IsBadCodePtr (reinterpret_cast <FARPROC> (ptr))) {
-         return false;
+      MEMORY_BASIC_INFORMATION mbi = { 0 };
+
+      if (VirtualQuery (ptr, &mbi, sizeof (mbi))) {
+         auto mask = PAGE_READONLY | PAGE_READWRITE | PAGE_WRITECOPY | PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_WRITECOPY;
+         auto result = !(mbi.Protect & mask);
+
+         if (mbi.Protect & (PAGE_GUARD | PAGE_NOACCESS)) {
+            return !result;
+         }
+         return !result;
       }
 #else
       (void) (ptr);
