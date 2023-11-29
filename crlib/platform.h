@@ -265,9 +265,9 @@ struct Platform : public Singleton <Platform> {
    // helper platform-dependant functions
    template <typename U> bool isValidPtr (U *ptr) {
 #if defined(CR_WINDOWS)
-      MEMORY_BASIC_INFORMATION mbi = { 0 };
+      MEMORY_BASIC_INFORMATION mbi {};
 
-      if (VirtualQuery (ptr, &mbi, sizeof (mbi))) {
+      if (VirtualQuery (reinterpret_cast <LPVOID> (ptr), &mbi, sizeof (mbi))) {
          auto mask = PAGE_READONLY | PAGE_READWRITE | PAGE_WRITECOPY | PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_WRITECOPY;
          auto result = !(mbi.Protect & mask);
 
