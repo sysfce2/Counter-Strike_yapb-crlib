@@ -69,6 +69,33 @@ public:
       return handle_ != nullptr;
    }
 
+   static String path (void *address) {
+#if defined (CR_WINDOWS)
+      MEMORY_BASIC_INFORMATION mbi;
+
+      if (!VirtualQuery (address, &mbi, sizeof (mbi))) {
+         return "<unknown>";
+      }
+
+      if (mbi.State != MEM_COMMIT) {
+         return "<unknown>";
+      }
+
+      char dllpath[MAX_PATH] = { 0 };
+      GetModuleFileNameA (reinterpret_cast <Handle> (mbi.AllocationBase), dllpath, cr::bufsize (dllpath));
+
+      return dllpath;
+#else
+      Dl_info dli;
+      plat.bzero (&dli, sizeof (dli));
+
+      if (dladdr (address, &dli)) {
+         return dli.dli_fname;
+      }
+      return "<unknown>";
+#endif
+   }
+
    bool locate (void *address) {
       unloadable_ = false;
 
