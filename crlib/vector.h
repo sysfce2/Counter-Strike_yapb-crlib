@@ -327,6 +327,11 @@ public:
 
       return s_right;
    }
+
+public:
+   static bool bboxIntersects (const Vec3D <float> &min1, const Vec3D <float> &max1, const Vec3D <float> &min2, const Vec3D <float> &max2) {
+      return min1.x < max2.x && max1.x > min2.x && min1.y < max2.y && max1.y > min2.y && min1.z < max2.z && max1.z > min2.z;
+   }
 };
 
 // default is float

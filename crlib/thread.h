@@ -336,7 +336,7 @@ private:
    bool initialized_ {};
    pthread_t thread_ {};
 #endif
-   UniquePtr <Func> m_invokable;
+   UniquePtr <Func> invokable_;
 
 private:
 #if defined (CR_WINDOWS)
@@ -345,7 +345,7 @@ private:
    static void *worker (void *pthis) {
 #endif
       assert (pthis);
-      (*reinterpret_cast <Thread *> (pthis)->m_invokable) ();
+      (*reinterpret_cast <Thread *> (pthis)->invokable_) ();
 
 #if defined (CR_WINDOWS)
       return 0;
@@ -356,7 +356,7 @@ private:
 
 public:
    explicit Thread (Func &&callback) {
-      m_invokable = makeUnique <Func> (cr::move (callback));
+      invokable_ = makeUnique <Func> (cr::move (callback));
 
 #if defined(CR_WINDOWS)
       thread_ =  CreateThread (nullptr, 0, worker, this, 0, nullptr);
@@ -369,7 +369,7 @@ public:
 #endif
 
       if (!ok ()) {
-         m_invokable.reset ();
+         invokable_.reset ();
       }
    }
 
@@ -383,7 +383,7 @@ public:
       rhs.thread_ = 0;
       rhs.initialized_ = false;
 #endif
-      cr::swap (m_invokable, rhs.m_invokable);
+      cr::swap (invokable_, rhs.invokable_);
    }
 
    ~Thread () noexcept {

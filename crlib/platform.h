@@ -48,9 +48,9 @@ CR_NAMESPACE_BEGIN
 #  error "Can't configure export macros. Compiler unrecognized."
 #endif
 
-#if defined(__x86_64) || defined(__x86_64__) || defined(__amd64__) || defined(__amd64) || defined (__aarch64__) || (defined(_MSC_VER) && defined(_M_X64))
+#if defined(__x86_64) || defined(__x86_64__) || defined(__amd64__) || defined(__amd64) || defined (__aarch64__) || (defined(_MSC_VER) && defined(_M_X64)) || defined(__powerpc64__)
 #  define CR_ARCH_X64
-#elif defined(__i686) || defined(__i686__) || defined(__i386) || defined(__i386__) || defined(i386) || (defined(_MSC_VER) && defined(_M_IX86))
+#elif defined(__i686) || defined(__i686__) || defined(__i386) || defined(__i386__) || defined(i386) || (defined(_MSC_VER) && defined(_M_IX86)) || defined(__powerpc__)
 #  define CR_ARCH_X86
 #endif
 
@@ -63,6 +63,17 @@ CR_NAMESPACE_BEGIN
 #if defined (CR_ARCH_ARM32) || defined (CR_ARCH_ARM64)
 #   define CR_ARCH_ARM
 #endif
+
+#if defined(__powerpc64__)
+#  define CR_ARCH_PPC64
+#elif defined(__powerpc__)
+#  define CR_ARCH_PPC32
+#endif
+
+#if defined (CR_ARCH_PPC32) || defined (CR_ARCH_PPC64)
+#   define CR_ARCH_PPC
+#endif
+
 
 #if !defined(CR_DISABLE_SIMD)
 #  if !defined (CR_ARCH_ARM)
@@ -99,7 +110,7 @@ CR_NAMESPACE_BEGIN
 #  define __PLACEMENT_NEW_INLINE
 #endif
 
-#if (defined (CR_CXX_MSVC) && !defined (CR_CXX_CLANG)) || defined (CR_ARCH_ARM)
+#if (defined (CR_CXX_MSVC) && !defined (CR_CXX_CLANG)) || defined (CR_ARCH_ARM) || defined (CR_ARCH_PPC)
 #  define CR_SIMD_TARGET(dest) CR_FORCE_INLINE
 #  define CR_SIMD_TARGET_AIL(dest) CR_FORCE_INLINE
 #else
@@ -108,7 +119,7 @@ CR_NAMESPACE_BEGIN
 #endif
 
 // set the minimal glibc as we can
-#if defined (CR_ARCH_ARM64)
+#if defined (CR_ARCH_ARM64) || defined (CR_ARCH_PPC64)
 #  define GLIBC_VERSION_MIN "2.17"
 #elif defined (CR_ARCH_ARM32)
 #  define GLIBC_VERSION_MIN "2.4"
@@ -138,9 +149,14 @@ constexpr auto kPathSeparator = "\\";
 constexpr auto kLibrarySuffix = ".dll";
 
 // raise windows api version if doesn't build for xp
-#if !defined(CR_HAS_WINXP_SUPPORT) && !defined (CR_CXX_MSVC)
+#if !defined(CR_HAS_WINXP_SUPPORT) && !defined(CR_CXX_MSVC)
+#  undef _WIN32_WINNT
 #  define _WIN32_WINNT 0x0600
 #  define WINVER 0x0600
+#endif
+
+#if !defined (NOMINMAX)
+#  define NOMINMAX
 #endif
 
 #  define WIN32_LEAN_AND_MEAN
@@ -166,7 +182,6 @@ constexpr auto kLibrarySuffix = ".dll";
 #  define NONLS
 #  define NOMEMMGR
 #  define NOMETAFILE
-#  define NOMINMAX
 #  define NOMSG
 #  define NOOPENFILE
 #  define NOSCROLL
@@ -228,6 +243,7 @@ struct Platform : public Singleton <Platform> {
    bool android = false;
    bool x64 = false;
    bool arm = false;
+   bool ppc = false;
 
    char appName[64] = {};
 
@@ -255,11 +271,20 @@ struct Platform : public Singleton <Platform> {
 #if defined(CR_ARCH_ARM)
       arm = true;
 #endif
+
+#if defined(CR_ARCH_PPC)
+      ppc = true;
+#endif
    }
 
    // set the app name
    void setAppName (const char *name) {
       snprintf (appName, cr::bufsize (appName), "%s", name);
+   }
+
+   // running on no-x86 platform ?
+   bool isNonX86 () const {
+      return arm || ppc;
    }
 
    // helper platform-dependant functions

@@ -143,7 +143,6 @@ namespace detail {
    };
 
    struct SocketInit {
-   public:
       static void start () {
 #if defined(CR_WINDOWS)
          WSADATA wsa;
@@ -174,9 +173,9 @@ public:
       addrinfo  hints {}, *result = nullptr;
       plat.bzero (&hints, sizeof (hints));
 
-      constexpr auto NumericServ = 0x00000008;
+      constexpr auto kNumericServ = 0x00000008;
 
-      hints.ai_flags = NumericServ;
+      hints.ai_flags = kNumericServ;
       hints.ai_family = AF_INET;
       hints.ai_socktype = SOCK_STREAM;
 
@@ -200,13 +199,8 @@ public:
       };
       auto timeouts = getTimeouts ();
 
-      if (setsockopt (socket_, SOL_SOCKET, SO_RCVTIMEO, timeouts.first, timeouts.second) == -1) {
-         logger.message ("Unable to set SO_RCVTIMEO.");
-      }
-
-      if (setsockopt (socket_, SOL_SOCKET, SO_SNDTIMEO, timeouts.first, timeouts.second) == -1) {
-         logger.message ("Unable to set SO_SNDTIMEO.");
-      }
+      setsockopt (socket_, SOL_SOCKET, SO_RCVTIMEO, timeouts.first, timeouts.second);
+      setsockopt (socket_, SOL_SOCKET, SO_SNDTIMEO, timeouts.first, timeouts.second);
 
       if (::connect (socket_, result->ai_addr, static_cast <int32_t> (result->ai_addrlen)) == -1) {
          disconnect ();
@@ -291,7 +285,7 @@ private:
       bool isFinished = false;
       int32_t pos = 0, symbols = 0, errors = 0;
 
-      // prase response header
+      // parse response header
       while (!isFinished && pos < chunkSize_) {
          if (socket->recv (&buffer[pos], 1) < 1) {
             if (++errors > MaxReceiveErrors) {
@@ -397,7 +391,7 @@ public:
          if (length > 0) {
             file.write (buffer.data (), length);
          }
-         else if (++errors > 12) {
+         else if (++errors > MaxReceiveErrors) {
             break;
          }
       }

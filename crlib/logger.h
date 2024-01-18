@@ -107,7 +107,7 @@ public:
       disableLogWrite_ = false;
    }
 
-   void disableLogWrite(bool enable) {
+   void disableLogWrite (bool enable) {
       disableLogWrite_ = enable;
    }
 };
