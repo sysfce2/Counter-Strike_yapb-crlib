@@ -74,7 +74,6 @@ CR_NAMESPACE_BEGIN
 #   define CR_ARCH_PPC
 #endif
 
-
 #if !defined(CR_DISABLE_SIMD)
 #  if !defined (CR_ARCH_ARM)
 #     define CR_HAS_SIMD_SSE
@@ -135,11 +134,7 @@ CR_NAMESPACE_BEGIN
    __asm__ (".symver dladdr, dladdr@GLIBC_" GLIBC_VERSION_MIN);
    __asm__ (".symver dlclose, dlclose@GLIBC_" GLIBC_VERSION_MIN);
    __asm__ (".symver dlopen, dlopen@GLIBC_" GLIBC_VERSION_MIN);
-
-#if defined (CR_ARCH_ARM)
    __asm__ (".symver powf, powf@GLIBC_" GLIBC_VERSION_MIN);
-#endif
-
 #endif
 
 CR_NAMESPACE_END
