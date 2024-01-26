@@ -340,7 +340,7 @@ private:
 
 private:
 #if defined (CR_WINDOWS)
-   static DWORD __stdcall worker (void *pthis) {
+   static unsigned int __stdcall worker (void *pthis) {
 #else
    static void *worker (void *pthis) {
 #endif
@@ -359,7 +359,7 @@ public:
       invokable_ = makeUnique <Func> (cr::move (callback));
 
 #if defined(CR_WINDOWS)
-      thread_ =  CreateThread (nullptr, 0, worker, this, 0, nullptr);
+      thread_ = reinterpret_cast <HANDLE> (_beginthreadex (nullptr, 0, worker, this, 0, nullptr));
 #else
 #if !defined(GLIBC_PTHREAD_WORKAROUND)
       initialized_ = (pthread_create (&thread_, nullptr, worker, this) == 0);

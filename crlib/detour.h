@@ -85,7 +85,11 @@ private:
    }
 
 public:
-   Detour () = default;
+   Detour (const Detour &) = delete;
+   Detour &operator=(const Detour &) = delete;
+
+public:
+   explicit Detour () = default;
 
    Detour (StringRef module, StringRef name, T *address) {
       initialize (module, name, address);

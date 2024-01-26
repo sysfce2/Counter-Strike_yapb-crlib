@@ -34,11 +34,8 @@ public:
          plat.abort ();
       }
 #endif
-#if defined (CR_WINDOWS)
-      auto memory = reinterpret_cast <T *> (HeapAlloc (GetProcessHeap (), 0, size));
-#else
       auto memory = reinterpret_cast <T *> (malloc (size));
-#endif
+
       if (!memory) {
          char errmsg[256] {};
          snprintf (errmsg, cr::bufsize (errmsg), "Failed to allocate %zd megabytes of memory. Closing down.", size / 1024 / 1024);
@@ -49,11 +46,7 @@ public:
    }
 
    template <typename T> static constexpr void release (T *memory) noexcept {
-#if defined (CR_WINDOWS)
-      HeapFree (GetProcessHeap (), 0, memory);
-#else
       free (memory);
-#endif
       memory = nullptr;
    }
 

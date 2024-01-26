@@ -46,7 +46,7 @@ private:
 #if defined (CR_WINDOWS)
       __cpuidex (reinterpret_cast <int32_t *> (data), 1, 0);
 #else
-      __get_cpuid (0x1, &data[0], &data[1], &data[2], &data[3]);
+      __get_cpuid (0x1, &data[eax], &data[ebx], &data[ecx], &data[edx]);
 #endif
       sse3 = !!(data[ecx] & CpuCap::SSE3);
       ssse3 = !!(data[ecx] & CpuCap::SSSE3);

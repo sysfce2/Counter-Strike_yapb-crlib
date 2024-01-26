@@ -116,7 +116,7 @@ CR_FORCE_INLINE float log10 (const float value) {
 CR_SIMD_TARGET_AIL ("sse4.1")
 float ceilf (const float value) {
 #if defined (CR_HAS_SIMD_SSE)
-   if (cpuflags.sse41) {
+   if (cpuflags.sse42) {
       return _mm_cvtss_f32 (_mm_ceil_ps (_mm_load_ss (&value)));
    }
    return _mm_cvtss_f32 (simd::ceil_ps (_mm_load_ss (&value)));
@@ -128,7 +128,7 @@ float ceilf (const float value) {
 CR_SIMD_TARGET_AIL ("sse4.1")
 float floorf (const float value) {
 #if defined (CR_HAS_SIMD_SSE)
-   if (cpuflags.sse41) {
+   if (cpuflags.sse42) {
       return _mm_cvtss_f32 (_mm_floor_ps (_mm_load_ss (&value)));
    }
    return _mm_cvtss_f32 (simd::floor_ps (_mm_load_ss (&value)));
@@ -182,7 +182,7 @@ template <int D> CR_SIMD_TARGET ("sse4.1") float _wrapAngleFn (float x) {
    __m128 add0 = _mm_add_ss (div0, _mm_set_ss (0.5f));
    __m128 flr0;
 
-   if (cpuflags.sse41) {
+   if (cpuflags.sse42) {
       flr0 = _mm_floor_ss (_mm_setzero_ps (), add0);
    }
    else {

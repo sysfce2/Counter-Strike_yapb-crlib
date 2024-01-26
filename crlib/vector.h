@@ -149,7 +149,7 @@ public:
 public:
    T length () const {
 #if defined (CR_HAS_SIMD)
-      return SimdVec3Wrap { data }.hypot ();
+      return SimdVec3Wrap { x, y, z }.hypot ();
 #else
       return cr::sqrtf (lengthSq ());
 #endif
@@ -160,8 +160,8 @@ public:
    }
 
    T length2d () const {
-#if defined (CR_HAS_SIMD_SSE)
-      return SimdVec3Wrap { x, y }.hypot2d ();
+#if defined (CR_HAS_SIMD)
+      return SimdVec3Wrap { x, y }.hypot ();
 #else
       return cr::sqrtf (lengthSq2d ());
 #endif
@@ -193,12 +193,12 @@ public:
 
    Vec3D normalize () const {
 #if defined (CR_HAS_SIMD)
-      return SimdVec3Wrap { data }.normalize ();
+      return SimdVec3Wrap { x, y, z }.normalize ();
 #else
-      auto len = length () + cr::kFloatEpsilon;
+      auto len = length ();
 
       if (cr::fzero (len)) {
-         return { 0.0f, 0.0f, 1.0f };
+         return { 0.0f, 0.0f, kFloatEpsilon };
       }
       len = 1.0f / len;
       return { x * len, y * len, z * len };
@@ -206,27 +206,23 @@ public:
    }
 
    Vec3D normalize2d () const {
-#if defined (CR_HAS_SIMD)
-      return SimdVec3Wrap { x, y }.normalize ();
-#else
-      auto len = length2d () + cr::kFloatEpsilon;
+      auto len = length2d ();
 
       if (cr::fzero (len)) {
-         return { 0.0f, 1.0f, 0.0f };
+         return { 0.0f, kFloatEpsilon, 0.0f };
       }
       len = 1.0f / len;
       return { x * len, y * len, 0.0f };
-#endif
    }
 
    Vec3D normalize_apx () const {
-      const float length = cr::rsqrtf (lengthSq () + kFloatEpsilon);
-      return { x * length, y * length, z * length };
+      const auto len = cr::rsqrtf (lengthSq () + kFloatEpsilon);
+      return { x * len, y * len, z * len };
    }
 
    Vec3D normalize2d_apx () const {
-      const float length = cr::rsqrtf (lengthSq2d () + kFloatEpsilon);
-      return { x * length, y * length, 0.0f };
+      const auto len = cr::rsqrtf (lengthSq2d () + kFloatEpsilon);
+      return { x * len, y * len, 0.0f };
    }
 
    constexpr bool empty () const {
@@ -277,12 +273,12 @@ public:
    // (vertical angle).
    void angleVectors (Vec3D *forward, Vec3D *right, Vec3D *upward) const {
 #if defined (CR_HAS_SIMD_SSE)
-      SimdVec3Wrap { data }.angleVectors <Vec3D> (forward, right, upward);
+      SimdVec3Wrap { x, y, z }.angleVectors <Vec3D> (forward, right, upward);
 #endif
 
 #if defined (CR_HAS_SIMD_NEON)
       static SimdVec3Wrap s, c;
-      SimdVec3Wrap { data }.angleVectors (s, c);
+      SimdVec3Wrap { x, y, z }.angleVectors (s, c);
 #else
       static Vec3D s, c, r;
       r = { cr::deg2rad (x), cr::deg2rad (y), cr::deg2rad (z) };
