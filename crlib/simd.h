@@ -188,11 +188,11 @@ public:
    }
 #else
    CR_FORCE_INLINE SimdVec3Wrap normalize () const {
-      return { _simd_div (m, simd::sqrt_ps (_simd_dpps <0xff> (m, m))) };
+      return { _simd_div (m, simd::sqrt_ps (_simd_dpps (m, m))) };
    }
 
    CR_FORCE_INLINE float hypot () const {
-      return vgetq_lane_f32 (simd::sqrt_ps (_simd_dpps <0x71> (m, m)), 0);
+      return vgetq_lane_f32 (simd::sqrt_ps (_simd_dpps (m, m)), 0);
    }
 
    CR_FORCE_INLINE void angleVectors (SimdVec3Wrap &sines, SimdVec3Wrap &cosines) {
