@@ -18,6 +18,10 @@ CR_NAMESPACE_BEGIN
 #  define CR_WINDOWS
 #endif
 
+#if defined(__ANDROID__)
+#  define CR_ANDROID
+#endif
+
 #if !defined (CR_DEBUG) && (defined(DEBUG) || defined(_DEBUG))
 #  define CR_DEBUG
 #endif
@@ -228,6 +232,7 @@ constexpr auto kPathSeparator = "/";
 #include <time.h>
 
 CR_NAMESPACE_BEGIN
+
 // undef bzero under android
 #if defined (CR_ANDROID)
 #  undef bzero
