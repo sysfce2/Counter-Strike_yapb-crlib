@@ -10,24 +10,27 @@
 CR_NAMESPACE_BEGIN
 
 // set the storage time function
-static class TimerStorage final : public NonCopyable {
+class TimerStorage final : public Singleton <TimerStorage> {
 private:
-   Lambda <float ()> timefn_;
+   float *timefn_ {};
 
 public:
-   constexpr TimerStorage () = default;
+   explicit TimerStorage () = default;
    ~TimerStorage () = default;
 
 public:
-   constexpr void setTimeFunction (Lambda <float ()> &&tfn) {
-      timefn_ = cr::move (tfn);
+   void setTimeAddress (float *timefn) {
+      timefn_ = timefn;
    }
 
 public:
-   constexpr float get () const {
-      return timefn_ ();
+   float value () const {
+      return *timefn_;
    }
-} timerStorage;
+};
+
+// expose global timer storage
+CR_EXPOSE_GLOBAL_SINGLETON (TimerStorage, timerStorage);
 
 // invalid timer value
 namespace detail {
@@ -42,43 +45,43 @@ private:
    float timestamp_ { detail::kInvalidTimerValue };
 
 public:
-   constexpr CountdownTimer () = default;
-   explicit constexpr CountdownTimer (const float duration) { start (duration); }
+   CountdownTimer () = default;
+   explicit CountdownTimer (const float duration) { start (duration); }
 
 public:
-   constexpr void reset () { timestamp_ = timerStorage.get () + duration_; }
+   void reset () { timestamp_ = timerStorage.value () + duration_; }
 
-   constexpr void start (const float duration) {
+   void start (const float duration) {
       duration_ = duration;
       reset ();
    }
 
-   constexpr void invalidate () {
+   void invalidate () {
       timestamp_ = detail::kInvalidTimerValue;
    }
 
 public:
-   constexpr bool started () const {
+   bool started () const {
       return timestamp_ > 0.0f;
    }
 
-   constexpr bool elapsed () const {
-      return timestamp_ < timerStorage.get ();
+   bool elapsed () const {
+      return timestamp_ < timerStorage.value ();
    }
 
-   constexpr float elapsedTime () const {
-      return timerStorage.get () - timestamp_ + duration_;
+   float elapsedTime () const {
+      return timerStorage.value () - timestamp_ + duration_;
    }
 
-   constexpr float timestamp () const {
+   float timestamp () const {
       return timestamp_;
    }
 
-   constexpr float remainingTime () const {
-      return timestamp_ - timerStorage.get ();
+   float remainingTime () const {
+      return timestamp_ - timerStorage.value ();
    }
 
-   constexpr float countdownDuration () const {
+   float countdownDuration () const {
       return started () ? duration_ : 0.0f;
    }
 };
@@ -89,36 +92,36 @@ private:
    float timestamp_ { detail::kInvalidTimerValue };
 
 public:
-   constexpr IntervalTimer () = default;
+   IntervalTimer () = default;
 
 public:
-   constexpr void reset () {
-      timestamp_ = timerStorage.get ();
+   void reset () {
+      timestamp_ = timerStorage.value ();
    }
 
-   constexpr void start () {
-      timestamp_ = timerStorage.get ();
+   void start () {
+      timestamp_ = timerStorage.value ();
    }
 
-   constexpr void invalidate () {
+   void invalidate () {
       timestamp_ = -detail::kInvalidTimerValue;
    }
 
 public:
-   constexpr bool started () const {
+   bool started () const {
       return timestamp_ > 0.0f;
    }
 
-   constexpr float elapsedTime () const {
-      return started () ? timerStorage.get () - timestamp_ : detail::kMaxTimerValue;
+   float elapsedTime () const {
+      return started () ? timerStorage.value () - timestamp_ : detail::kMaxTimerValue;
    }
 
-   constexpr bool lessThen (const float duration) const {
-      return timerStorage.get () - timestamp_ < duration;
+   bool lessThen (const float duration) const {
+      return timerStorage.value () - timestamp_ < duration;
    }
 
-   constexpr bool greaterThen (const float duration) const {
-      return timerStorage.get () - timestamp_ > duration;
+   bool greaterThen (const float duration) const {
+      return timerStorage.value () - timestamp_ > duration;
    }
 };
 
