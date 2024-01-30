@@ -212,6 +212,8 @@ constexpr auto kPathSeparator = "/";
       constexpr auto kLibrarySuffix = ".so";
 #endif
 #  include <unistd.h>
+#  include <dirent.h>
+#  include <fnmatch.h>
 #  include <strings.h>
 #  include <sys/time.h>
 #endif
@@ -378,7 +380,7 @@ struct Platform : public Singleton <Platform> {
 #endif
    }
 
-   // anologue of memset
+   // analogue of memset
    template <typename U> void bzero (U *ptr, size_t len) noexcept {
       memset (reinterpret_cast <void *> (ptr), 0, len);
    }
@@ -411,6 +413,17 @@ struct Platform : public Singleton <Platform> {
       }
 #endif
       return result;
+   }
+
+   const char *tmpfname () {
+#if defined (CR_CXX_MSVC)
+      static char name[L_tmpnam_s];
+      tmpnam_s (name);
+
+      return name;
+#else
+      return tmpnam (nullptr);
+#endif
    }
 
    int32_t hardwareConcurrency () {

@@ -374,4 +374,121 @@ public:
    }
 };
 
+namespace detail {
+   struct FileEnumeratorEntry : public NonCopyable {
+      FileEnumeratorEntry () = default;
+      ~FileEnumeratorEntry () = default;
+
+#if defined (CR_WINDOWS)
+      bool next {};
+      String path {};
+      HANDLE handle {};
+      WIN32_FIND_DATAA data {};
+#else
+      String path {};
+      String mask {};
+      DIR *dir {};
+      dirent *entry {};
+#endif
+   };
+}
+
+// file enumerator
+class FileEnumerator : public NonCopyable {
+private:
+   UniquePtr <detail::FileEnumeratorEntry> entries_;
+
+public:
+   FileEnumerator (StringRef mask) : entries_ (cr::makeUnique <detail::FileEnumeratorEntry> ()) {
+      start (mask);
+   }
+
+   ~FileEnumerator () {
+      close ();
+   }
+
+public:
+   void start (StringRef mask) {
+      auto lastSeperatorPos = mask.findLastOf (kPathSeparator);
+      Twin <String, String> pam {};
+
+      if (lastSeperatorPos != StringRef::InvalidIndex) {
+         pam = {
+            mask.substr (0, lastSeperatorPos),
+            mask.substr (1 + lastSeperatorPos)
+         };
+      }
+      else {
+         pam = { ".", mask };
+      }
+      entries_->path = pam.first;
+
+#if defined (CR_WINDOWS)
+      entries_->handle = FindFirstFileA (mask.chars (), &entries_->data);
+      entries_->next = entries_->handle != INVALID_HANDLE_VALUE;
+#else
+      entries_->dir = opendir (entries_->path.chars ());
+      entries_->mask = pam.second;
+
+      if (entries_->dir != nullptr) {
+         next ();
+      }
+#endif
+   }
+
+   void close () {
+#if defined (CR_WINDOWS)
+      if (entries_->handle != INVALID_HANDLE_VALUE) {
+         FindClose (entries_->handle);
+
+         entries_->handle = INVALID_HANDLE_VALUE;
+         entries_->next = false;
+      }
+#else
+      if (entries_->dir != nullptr) {
+         closedir (entries_->dir);
+         entries_->dir = nullptr;
+      }
+#endif
+   }
+
+   bool next () {
+#if defined (CR_WINDOWS)
+      entries_->next = !!FindNextFileA (entries_->handle, &entries_->data);
+      return entries_->next;
+#else
+      while ((entries_->entry = readdir (entries_->dir)) != nullptr) {
+         if (!fnmatch (entries_->mask.chars (), entries_->entry->d_name, FNM_CASEFOLD | FNM_NOESCAPE | FNM_PERIOD)) {
+            return true;
+         }
+      }
+      return false;
+#endif
+   }
+
+   bool stillValid () const {
+#if defined (CR_WINDOWS)
+      return entries_->next;
+#else
+      return entries_->dir != nullptr && entries_->entry != nullptr;
+#endif
+   }
+
+   String getMatch () const {
+      StringRef match {};
+
+#if defined (CR_WINDOWS)
+      match = entries_->data.cFileName;
+#else
+      match = entries_->entry->d_name;
+#endif
+      return String::join ({ entries_->path, match }, kPathSeparator);
+   }
+
+public:
+   operator bool () const {
+      return stillValid ();
+   }
+};
+
 CR_NAMESPACE_END

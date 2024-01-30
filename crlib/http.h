@@ -315,7 +315,7 @@ private:
       size_t responseCodeStart = response.find ("HTTP/1.1");
 
       if (responseCodeStart != String::InvalidIndex) {
-         String respCode = response.substr (responseCodeStart + 9, 3);
+         String respCode = response.substr (responseCodeStart + cr::bufsize ("HTTP 1/1 "), 3);
          respCode.trim ();
 
          return static_cast <HttpClientResult> (respCode.int_ ());
@@ -456,6 +456,7 @@ public:
       // send the main request
       if (socket->send (request.chars (), static_cast <int32_t> (request.length ())) < 1) {
          statusCode_ = HttpClientResult::SocketError;
+
          return false;
       }
 
@@ -485,7 +486,6 @@ public:
          return false;
       }
       statusCode_ = parseResponseHeader (socket.get (), buffer.data ());
-
       return statusCode_ == HttpClientResult::Ok;
    }
 
