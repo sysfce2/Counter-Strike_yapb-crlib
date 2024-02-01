@@ -415,15 +415,24 @@ struct Platform : public Singleton <Platform> {
       return result;
    }
 
-   const char *tmpfname () {
+   [[nodiscard]] const char *tmpfname () noexcept {
 #if defined (CR_CXX_MSVC)
       static char name[L_tmpnam_s];
       tmpnam_s (name);
 
-      return name;
+      if (name[0] == '\\') {
+         for (auto i = 0; name[i] != '\0'; i++) {
+            name[i] = name[i + 1];
+         }
+      }
 #else
-      return tmpnam (nullptr);
+      char templ[PATH_MAX] { "/tmp/crtmp-XXXXXX" };
+      static char name[PATH_MAX] {};
+
+      strncpy (name, templ, cr::bufsize (name));
+      mkstemp (name);
 #endif
+      return name;
    }
 
    int32_t hardwareConcurrency () {
