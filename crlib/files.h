@@ -262,6 +262,9 @@ public:
    }
 
    void close () {
+      if (!contents_) {
+         return;
+      }
       MemFileStorage::instance ().unload (contents_);
 
       length_ = 0;
