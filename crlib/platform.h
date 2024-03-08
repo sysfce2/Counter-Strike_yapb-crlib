@@ -312,12 +312,12 @@ struct Platform : public Singleton <Platform> {
       return true;
    }
 
-   bool createDirectory (const char *dir) {
+   bool createDirectory (const char *dir, int mode = -1) {
       int result = 1;
 #if defined(CR_WINDOWS)
       result = _mkdir (dir);
 #else
-      result = mkdir (dir, 0777);
+      result = mkdir (dir, mode == -1 ? (S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH) : mode);
 #endif
       return result == 0;
    }
