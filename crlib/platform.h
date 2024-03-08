@@ -316,6 +316,7 @@ struct Platform : public Singleton <Platform> {
       int result = 1;
 #if defined(CR_WINDOWS)
       result = _mkdir (dir);
+      (void) mode;
 #else
       result = mkdir (dir, mode == -1 ? (S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH) : mode);
 #endif
