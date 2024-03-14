@@ -82,7 +82,7 @@ public:
       }
 
       char dllpath[MAX_PATH] = { 0 };
-      GetModuleFileNameA (reinterpret_cast <Handle> (mbi.AllocationBase), dllpath, cr::bufsize (dllpath));
+      GetModuleFileNameA (reinterpret_cast <Handle> (mbi.AllocationBase), dllpath, static_cast <DWORD> (cr::bufsize (dllpath)));
 
       return dllpath;
 #else
