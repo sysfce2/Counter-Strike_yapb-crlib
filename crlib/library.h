@@ -61,7 +61,7 @@ public:
 #else
       auto loadFlags = RTLD_NOW | RTLD_LOCAL;
 
-#if defined (CR_LINUX) && !defined (CR_ANDROID) && !defined (__SANITIZE_ADDRESS__)
+#if defined (CR_LINUX) && !defined (CR_ANDROID) && !defined (__SANITIZE_ADDRESS__) && defined (__GLIBC__)
       loadFlags |= RTLD_DEEPBIND;
 #endif
       handle_ = dlopen (file.chars (), loadFlags);
