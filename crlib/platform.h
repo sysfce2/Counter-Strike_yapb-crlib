@@ -134,14 +134,15 @@ CR_NAMESPACE_BEGIN
 
 // avoid linking to high GLIBC versions
 #if defined (CR_LINUX) && !defined (CR_ANDROID)
+#  if defined (__GLIBC__)
    __asm__ (".symver powf, powf@GLIBC_" GLIBC_VERSION_MIN);
-
-#  if defined (__GLIBC__) && __GLIBC__ >= 2 && __GLIBC_MINOR__ < 34
+#     if __GLIBC__ >= 2 && __GLIBC_MINOR__ < 34
          __asm__ (".symver dlsym, dlsym@GLIBC_" GLIBC_VERSION_MIN);
          __asm__ (".symver dladdr, dladdr@GLIBC_" GLIBC_VERSION_MIN);
          __asm__ (".symver dlclose, dlclose@GLIBC_" GLIBC_VERSION_MIN);
          __asm__ (".symver dlopen, dlopen@GLIBC_" GLIBC_VERSION_MIN);
 #     endif
+#  endif
 #endif
 
 CR_NAMESPACE_END
