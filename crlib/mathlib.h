@@ -113,6 +113,14 @@ CR_FORCE_INLINE float log10 (const float value) {
 #endif
 }
 
+CR_FORCE_INLINE float roundf (const float value) {
+#if defined (CR_HAS_SIMD_SSE)
+   return _mm_cvtss_f32 (simd::round_ps (_mm_load_ss (&value)));
+#else
+   return ::roundf (value);
+#endif
+}
+
 CR_SIMD_TARGET_AIL ("sse4.1")
 float ceilf (const float value) {
 #if defined (CR_HAS_SIMD_SSE)
