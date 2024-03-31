@@ -225,6 +225,19 @@ public:
       return { x * len, y * len, 0.0f };
    }
 
+   T normalizeInPlace () {
+      const auto len = length ();
+
+      if (cr::fzero (len)) {
+         *this = { 0.0f, 0.0f, kFloatEpsilon };
+      }
+      else {
+         const auto mul = 1.0f / len;
+         *this = { x * mul, y * mul, z * mul };
+      }
+      return len;
+   }
+
    constexpr bool empty () const {
       return cr::fzero (x) && cr::fzero (y) && cr::fzero (z);
    }
