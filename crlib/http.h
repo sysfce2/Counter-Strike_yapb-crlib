@@ -318,7 +318,7 @@ private:
          String respCode = response.substr (responseCodeStart + cr::bufsize ("HTTP 1/1 "), 3);
          respCode.trim ();
 
-         return static_cast <HttpClientResult> (respCode.int_ ());
+         return static_cast <HttpClientResult> (respCode.as <int> ());
       }
       return HttpClientResult::NotFound;
    }
@@ -438,7 +438,7 @@ public:
       if (boundarySlash != String::InvalidIndex) {
          boundaryName = localPath.substr (boundarySlash + 1);
       }
-      StringRef boundaryLine = strings.format ("---crlib_upload_boundary_%d%d%d%d", rg.get (0, 9), rg.get (0, 9), rg.get (0, 9), rg.get (0, 9));
+      StringRef boundaryLine = strings.format ("---crlib_upload_boundary_%d%d%d%d", rg (0, 9), rg (0, 9), rg (0, 9), rg (0, 9));
 
       String request, start, end;
       start.appendf ("--%s\r\n", boundaryLine);

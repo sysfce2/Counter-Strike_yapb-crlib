@@ -12,81 +12,74 @@
 
 CR_NAMESPACE_BEGIN
 
-// random number generator, credits goes to https://prng.di.unimi.it/xoshiro128starstar.c
-class Xoshiro128 final : public Singleton <Xoshiro128> {
+namespace detail {
+   class SplitMix32 final {
+   private:
+      uint32_t state_ {};
+
+   public:
+      explicit SplitMix32 (const uint32_t state) noexcept : state_ (state) {}
+
+   public:
+      [[nodiscard]] decltype (auto) next () noexcept {
+         auto z = (state_ += 0x9e3779b9);
+         z = (z ^ (z >> 16)) * 0x85ebca6b;
+         z = (z ^ (z >> 13)) * 0xc2b2ae35;
+         return z ^ (z >> 16);
+      }
+   };
+}
+
+// random number generator (xoshiro based)
+class RWrand final : public Singleton <RWrand> {
 private:
-   uint32_t states_[4] {};
-   uint32_t states2_[4] {};
-   static constexpr uint64_t limit_ { static_cast <uint64_t> (1) << 32ull };
+   static constexpr uint64_t kRandMax { static_cast <uint64_t> (1) << 32ull };
 
 private:
-   constexpr uint32_t rotl32 (const uint32_t x, int32_t k) {
+   uint32_t states_[3] {};
+
+public:
+   explicit RWrand () noexcept  {
+      const auto seed = static_cast <uint32_t> (time (nullptr));
+
+      detail::SplitMix32 smix (seed);
+
+      for (auto &state : states_) {
+         state = smix.next ();
+      }
+   }
+   ~RWrand () = default;
+
+
+private:
+   [[nodiscard]] decltype (auto) rotl (const uint32_t x, const int32_t k) noexcept  {
       return (x << k) | (x >> (32 - k));
    }
 
-   constexpr uint32_t splitmix32 (uint32_t &x) {
-      uint32_t z = (x += 0x9e3779b9);
-      z = (z ^ (z >> 16)) * 0x85ebca6b;
-      z = (z ^ (z >> 13)) * 0xc2b2ae35;
-      return z ^ (z >> 16);
+   [[nodiscard]] decltype (auto) next () noexcept {
+      states_[0] = rotl (states_[0] + states_[1] + states_[2], 16);
+      states_[1] = states_[0];
+      states_[2] = states_[1];
+
+      return states_[0];
    }
 
-   constexpr void seeder (uint32_t *state) {
-      uint32_t seed = 0;
-
-      state[0] = splitmix32 (seed);
-      state[1] = splitmix32 (seed);
-      state[2] = splitmix32 (seed);
-      state[3] = splitmix32 (seed);
-   }
-
-private:
-   constexpr uint32_t scramble (uint32_t *states, const uint32_t result) {
-      const uint32_t t = states[1] << 9;
-
-      states[2] ^= states[0];
-      states[3] ^= states[1];
-      states[1] ^= states[2];
-      states[0] ^= states[3];
-      states[2] ^= t;
-      states[3] = rotl32 (states[3], 11);
-
-      return result;
-   }
-
-   template <typename U> constexpr uint32_t next () {
+public:
+   template <typename U> [[nodiscard]] decltype (auto) operator () (const U low, const U high) noexcept {
       if constexpr (cr::is_same <U, int32_t>::value) {
-         return scramble (states_, rotl32 (states_[0] + states_[3], 7) + states_[0]);
+         return static_cast <int32_t> (next () * (static_cast <double> (high) - static_cast <double> (low) + 1.0) / kRandMax + static_cast <double> (low));
       }
       else if constexpr (cr::is_same <U, float>::value) {
-         return scramble (states2_, states2_[0] + states2_[3]);
+         return static_cast <float> (next () * (static_cast <double> (high) - static_cast <double> (low)) / (kRandMax - 1) + static_cast <double> (low));
       }
    }
 
-public:
-   constexpr explicit Xoshiro128 () {
-      seeder (states_);
-      seeder (states2_);
-   }
-
-public:
-   template <typename U, typename Void = void> constexpr U get (U, U) = delete;
-
-   template <typename Void = void> constexpr int32_t get (int32_t low, int32_t high) {
-      return static_cast <int32_t> (next <int32_t> () * (static_cast <double> (high) - static_cast <double> (low) + 1.0) / limit_ + static_cast <double> (low));
-   }
-
-   template <typename Void = void> constexpr float get (float low, float high) {
-      return static_cast <float> (next <float> () * (static_cast <double> (high) - static_cast <double> (low)) / (limit_ - 1) + static_cast <double> (low));
-   }
-
-public:
-   constexpr bool chance (int32_t limit) {
-      return get <int32_t> (0, 100) < limit;
+   template <int32_t Low = 0, int32_t High = 100> [[nodiscard]] decltype (auto) chance (const int32_t limit) noexcept {
+      return operator () <int32_t> (Low, High) <= limit;
    }
 };
 
 // expose global random generator
-CR_EXPOSE_GLOBAL_SINGLETON (Xoshiro128, rg);
+CR_EXPOSE_GLOBAL_SINGLETON (RWrand, rg);
 
 CR_NAMESPACE_END

@@ -137,12 +137,13 @@ public:
    }
 
 public:
-   int32_t int_ () const {
-      return atoi (chars ());
-   }
-
-   float float_ () const {
-      return static_cast <float> (atof (chars ()));
+   template <typename U> constexpr U as () const {
+      if constexpr (cr::is_same <U, float>::value) {
+         return static_cast <float> (atof (chars ()));
+      }
+      else if constexpr (cr::is_same <U, int>::value) {
+         return atoi (chars ());
+      }
    }
 
    bool startsWith (StringRef prefix) const {
@@ -692,12 +693,13 @@ public:
    }
 
 public:
-   int32_t int_ () const {
-      return str ().int_ ();
-   }
-
-   float float_ () const {
-      return str ().float_ ();
+   template <typename U> constexpr U as () const {
+      if constexpr (cr::is_same <U, float>::value) {
+         return str ().as <float> ();
+      }
+      else if constexpr (cr::is_same <U, int>::value) {
+         return str ().as <int> ();
+      }
    }
 
    // for range-based loops
