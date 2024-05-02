@@ -10,11 +10,8 @@
 #include <crlib/basic.h>
 
 #if defined (CR_HAS_SIMD_SSE)
-#  if defined (CR_ARCH_ARM)
-#     include <crlib/simd/sse2neon.h>
-#  else
-#     include <smmintrin.h>
-#  endif
+#  include <smmintrin.h>
+# 
 #elif defined (CR_HAS_SIMD_NEON)
 #  include <arm_neon.h>
 #endif
@@ -27,6 +24,10 @@ namespace cr::simd {
 #endif
 }
 
+#if defined (CR_HAS_SIMD_NEON)
+#  include <crlib/simd/sse2neon.h>
+#endif
+
 CR_NAMESPACE_BEGIN
 
 #if defined (CR_HAS_SIMD)
@@ -38,7 +39,13 @@ template <typename T> class Vec3D;
 class CR_SIMD_ALIGNED SimdVec3Wrap final {
 private:
 #if defined (CR_HAS_SIMD_SSE)
+   template <typename U> __m128 _simd_load_mask (const U *mask) const {
+      return _mm_load_ps (reinterpret_cast <float *> (*const_cast <U **> (&mask)));
+   };
+#endif
+
    template <int XmmMask> static CR_SIMD_TARGET_AIL ("sse4.1") __m128 _simd_dpps (__m128 v0, __m128 v1) {
+#if defined (CR_HAS_SIMD_SSE)
       if (cpuflags.sse42) {
          return _mm_dp_ps (v0, v1, XmmMask);
       }
@@ -47,28 +54,14 @@ private:
       const auto had1 = _mm_hadd_ps (had0, had0);
 
       return had1;
+#else
+      return _mm_dp_ps (v0, v1, XmmMask);
+#endif
    }
 
    static CR_FORCE_INLINE __m128 _simd_div (__m128 v0, __m128 v1) {
       return _mm_andnot_ps (_mm_cmpeq_ps (v1, _mm_setzero_ps ()), _mm_div_ps (v0, v1));
    }
-
-   template <typename U> __m128 _simd_load_mask (const U *mask) const {
-      return _mm_load_ps (reinterpret_cast <float *> (*const_cast <U **> (&mask)));
-   };
-#else
-   static CR_FORCE_INLINE float32x4_t _simd_dpps (float32x4_t v0, float32x4_t v1) {
-      auto mul0 = vmulq_f32 (v0, v1);
-      auto sum1 = vaddq_f32 (mul0, vrev64q_f32 (mul0));
-      auto sum2 = vaddq_f32 (sum1, vcombine_f32 (vget_high_f32 (sum1), vget_low_f32 (sum1)));
-
-      return sum2;
-   }
-
-   static CR_FORCE_INLINE float32x4_t _simd_div (float32x4_t v0, float32x4_t v1) {
-      return vbicq_s32 (simd::div_ps (v0, v1), vceqq_f32 (v1, vdupq_n_f32 (0)));
-   }
-#endif
 
 public:
 #if defined (CR_CXX_MSVC)
@@ -119,7 +112,6 @@ public:
    ~SimdVec3Wrap () = default;
 
 public:
-#if defined (CR_HAS_SIMD_SSE)
    CR_SIMD_TARGET ("sse4.1")
    SimdVec3Wrap normalize () const {
       return _simd_div (m, _mm_sqrt_ps (_simd_dpps <0xff> (m, m)));
@@ -130,6 +122,7 @@ public:
       return _mm_cvtss_f32 (_mm_sqrt_ps (_simd_dpps <0x71> (m, m)));
    }
 
+#if defined (CR_HAS_SIMD_SSE)
    // this function directly taken from rehlds project https://github.com/dreamstalker/rehlds
    template <typename T> CR_FORCE_INLINE void angleVectors (T *forward, T *right, T *upward) {
       constexpr CR_SIMD_ALIGNED float kDegToRad[] = {
@@ -187,14 +180,6 @@ public:
       }
    }
 #else
-   CR_FORCE_INLINE SimdVec3Wrap normalize () const {
-      return { _simd_div (m, simd::sqrt_ps (_simd_dpps (m, m))) };
-   }
-
-   CR_FORCE_INLINE float hypot () const {
-      return vgetq_lane_f32 (simd::sqrt_ps (_simd_dpps (m, m)), 0);
-   }
-
    CR_FORCE_INLINE void angleVectors (SimdVec3Wrap &sines, SimdVec3Wrap &cosines) {
       static constexpr CR_SIMD_ALIGNED float kDegToRad[] = {
          kDegreeToRadians, kDegreeToRadians,
