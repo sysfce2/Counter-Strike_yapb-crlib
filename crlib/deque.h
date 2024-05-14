@@ -110,8 +110,8 @@ public:
    { }
 
    Deque (Deque &&rhs) : contents_ (rhs.contents_), capacity_ (rhs.capacity_) {
-      index_.first (rhs.index_.first);
-      index_.second (rhs.index_.second);
+      index_.first = rhs.index_.first;
+      index_.second = rhs.index_.second;
 
       rhs.reset ();
    }
