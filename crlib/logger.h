@@ -73,10 +73,6 @@ public:
       auto msg = strings.format (fmt, cr::forward <Args> (args)...);
 
       logToFile ("FATAL", msg);
-
-      if (printFun_) {
-         printFun_ (msg);
-      }
       plat.abort (msg);
    }
 
