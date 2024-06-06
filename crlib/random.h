@@ -52,11 +52,11 @@ public:
 
 
 private:
-   [[nodiscard]] decltype (auto) rotl (const uint32_t x, const int32_t k) noexcept  {
+   [[nodiscard]] uint32_t rotl (const uint32_t x, const int32_t k) noexcept  {
       return (x << k) | (x >> (32 - k));
    }
 
-   [[nodiscard]] decltype (auto) next () noexcept {
+   [[nodiscard]] uint32_t next () noexcept {
       states_[0] = rotl (states_[0] + states_[1] + states_[2], 16);
       states_[1] = states_[0];
       states_[2] = states_[1];
