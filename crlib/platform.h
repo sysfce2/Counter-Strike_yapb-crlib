@@ -304,7 +304,7 @@ struct Platform : public Singleton <Platform> {
       MEMORY_BASIC_INFORMATION mbi {};
 
       if (VirtualQuery (reinterpret_cast <LPVOID> (ptr), &mbi, sizeof (mbi))) {
-         auto result = (mbi.Protect & PAGE_READONLY | PAGE_READWRITE | PAGE_WRITECOPY | PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_WRITECOPY);
+         auto result = (mbi.Protect & (PAGE_READONLY | PAGE_READWRITE | PAGE_WRITECOPY | PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_WRITECOPY));
 
          if (mbi.Protect & (PAGE_GUARD | PAGE_NOACCESS)) {
             result = false;
