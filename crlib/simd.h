@@ -49,11 +49,20 @@ private:
       if (cpuflags.sse42) {
          return _mm_dp_ps (v0, v1, XmmMask);
       }
-      const auto mul0 = _mm_mul_ps (v0, v1);
-      const auto had0 = _mm_hadd_ps (mul0, mul0);
-      const auto had1 = _mm_hadd_ps (had0, had0);
+      else if (cpuflags.sse3) {
+         const auto mul0 = _mm_mul_ps (v0, v1);
+         const auto had0 = _mm_hadd_ps (mul0, mul0);
+         const auto had1 = _mm_hadd_ps (had0, had0);
 
-      return had1;
+         return had1;
+      }
+
+      const auto mul0 = _mm_mul_ps (v0, v1);
+      const auto shf1 = _mm_shuffle_ps (mul0, mul0, _MM_SHUFFLE (0, 3, 2, 1));
+      const auto shf2 = _mm_shuffle_ps (mul0, mul0, _MM_SHUFFLE (1, 0, 3, 2));
+      const auto shf3 = _mm_shuffle_ps (mul0, mul0, _MM_SHUFFLE (2, 1, 0, 3));
+
+      return _mm_add_ss (_mm_add_ss (_mm_add_ss (mul0, shf1), shf2), shf3);
 #else
       return _mm_dp_ps (v0, v1, XmmMask);
 #endif
