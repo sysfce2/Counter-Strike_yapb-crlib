@@ -180,18 +180,61 @@ constexpr float deg2rad (const float d) {
    return d * kDegreeToRadians;
 }
 
-template <int D> float _wrapAngleFn (float x) {
-   return x - 2.0f * static_cast <float> (D) * cr::floorf (x / (2.0f * static_cast <float> (D)) + 0.5f);
+namespace detail {
+   template <int D> CR_SIMD_TARGET ("sse4.1") float sse4_wrapAngleFn (float x) {
+      __m128 v0 = _mm_load_ss (&x);
+      __m128 v1 = _mm_set_ss (static_cast <float> (D));
+
+      __m128 mul0 = _mm_mul_ss (_mm_set_ss (2.0f), v1);
+      __m128 div0 = _mm_div_ss (v0, mul0);
+      __m128 add0 = _mm_add_ss (div0, _mm_set_ss (0.5f));
+      __m128 flr0 = _mm_floor_ss (_mm_setzero_ps (), add0);
+
+      __m128 mul1 = _mm_mul_ss (mul0, flr0);
+      __m128 sub0 = _mm_sub_ss (v0, mul1);
+
+      return _mm_cvtss_f32 (sub0);
+   }
+
+   template <int D> CR_FORCE_INLINE float sse2_wrapAngleFn (float x) {
+      __m128 v0 = _mm_load_ss (&x);
+      __m128 v1 = _mm_set_ss (static_cast <float> (D));
+
+      __m128 mul0 = _mm_mul_ss (_mm_set_ss (2.0f), v1);
+      __m128 div0 = _mm_div_ss (v0, mul0);
+      __m128 add0 = _mm_add_ss (div0, _mm_set_ss (0.5f));
+      __m128 flr0 = simd::floor_ps (add0);
+
+      __m128 mul1 = _mm_mul_ss (mul0, flr0);
+      __m128 sub0 = _mm_sub_ss (v0, mul1);
+
+      return _mm_cvtss_f32 (sub0);
+   }
+
+   template <int D> CR_FORCE_INLINE float scalar_wrapAngleFn (float x) {
+      return x - 2.0f * static_cast <float> (D) * cr::floorf (x / (2.0f * static_cast <float> (D)) + 0.5f);
+   }
+
+   template <int D> CR_FORCE_INLINE float _wrapAngleFn (float x) {
+   #if defined (CR_HAS_SIMD_SSE)
+      if (cpuflags.sse42) {
+         return sse4_wrapAngleFn <D> (x);
+      }
+      return sse2_wrapAngleFn <D> (x);
+   #else
+      return scalar_wrapAngleFn <D> (x);
+   #endif
+   }
 }
 
 // adds or subtracts 360.0f enough times need to given angle in order to set it into the range[0.0, 360.0f).
 CR_FORCE_INLINE float wrapAngle360 (float a) {
-   return _wrapAngleFn <360> (a);
+   return detail::_wrapAngleFn <360> (a);
 }
 
 // adds or subtracts 360.0f enough times need to given angle in order to set it into the range [-180.0, 180.0f).
 CR_FORCE_INLINE float wrapAngle (const float a) {
-   return _wrapAngleFn <180> (a);
+   return detail::_wrapAngleFn <180> (a);
 }
 
 CR_FORCE_INLINE float anglesDifference (const float a, const float b) {
