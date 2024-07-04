@@ -181,6 +181,7 @@ constexpr float deg2rad (const float d) {
 }
 
 namespace detail {
+#if defined (CR_HAS_SIMD_SSE)
    template <int D> CR_SIMD_TARGET ("sse4.1") float sse4_wrapAngleFn (float x) {
       __m128 v0 = _mm_load_ss (&x);
       __m128 v1 = _mm_set_ss (static_cast <float> (D));
@@ -210,6 +211,7 @@ namespace detail {
 
       return _mm_cvtss_f32 (sub0);
    }
+#endif
 
    template <int D> CR_FORCE_INLINE float scalar_wrapAngleFn (float x) {
       return x - 2.0f * static_cast <float> (D) * cr::floorf (x / (2.0f * static_cast <float> (D)) + 0.5f);
