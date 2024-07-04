@@ -180,29 +180,8 @@ constexpr float deg2rad (const float d) {
    return d * kDegreeToRadians;
 }
 
-template <int D> CR_SIMD_TARGET ("sse4.1") float _wrapAngleFn (float x) {
-#if defined (CR_HAS_SIMD_SSE)
-   __m128 v0 = _mm_load_ss (&x);
-   __m128 v1 = _mm_set_ss (static_cast <float> (D));
-
-   __m128 mul0 = _mm_mul_ss (_mm_set_ss (2.0f), v1);
-   __m128 div0 = _mm_div_ss (v0, mul0);
-   __m128 add0 = _mm_add_ss (div0, _mm_set_ss (0.5f));
-   __m128 flr0;
-
-   if (cpuflags.sse42) {
-      flr0 = _mm_floor_ss (_mm_setzero_ps (), add0);
-   }
-   else {
-      flr0 = simd::floor_ps (add0);
-   }
-   __m128 mul1 = _mm_mul_ss (mul0, flr0);
-   __m128 sub0 = _mm_sub_ss (v0, mul1);
-
-   return _mm_cvtss_f32 (sub0);
-#else
+template <int D> float _wrapAngleFn (float x) {
    return x - 2.0f * static_cast <float> (D) * cr::floorf (x / (2.0f * static_cast <float> (D)) + 0.5f);
-#endif
 }
 
 // adds or subtracts 360.0f enough times need to given angle in order to set it into the range[0.0, 360.0f).
