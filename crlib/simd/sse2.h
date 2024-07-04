@@ -317,10 +317,6 @@ ceiling function
 SSE_INLINE __m128 ceil_ps (
    __m128 val   //!< Value
 ) {
-#if __SSE4_1__
-   return _mm_ceil_ps (val);
-#else
-
    // truncate value and add offset depending on sign
   __m128i trunc = _mm_cvttps_epi32 (val);
    __m128 mask = _mm_castsi128_ps (_mm_cmpeq_epi32 (trunc, _mm_set1_epi32 (0x80000000u)));
@@ -332,7 +328,6 @@ SSE_INLINE __m128 ceil_ps (
    __m128 x = _mm_cvtepi32_ps (trunc);
    x = _mm_andnot_ps (mask, x);
    return _mm_add_ps (x, _mm_and_ps (mask, val));
-#endif // __SSE4_1__
 }
 
 /**
@@ -343,10 +338,6 @@ floor function
 SSE_INLINE __m128 floor_ps (
    __m128 val   //!< Value
 ) {
-#if __SSE4_1__
-   return _mm_floor_ps (val);
-#else
-
    // truncate value and add offset depending on sign
   __m128i trunc = _mm_cvttps_epi32 (val);
    __m128 mask = _mm_castsi128_ps (_mm_cmpeq_epi32 (trunc, _mm_set1_epi32 (0x80000000u)));
@@ -358,7 +349,6 @@ SSE_INLINE __m128 floor_ps (
    __m128 x = _mm_cvtepi32_ps (trunc);
    x = _mm_andnot_ps (mask, x);
    return _mm_add_ps (x, _mm_and_ps (mask, val));
-#endif // __SSE4_1__
 }
 
 /**

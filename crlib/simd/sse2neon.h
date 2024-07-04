@@ -62,7 +62,7 @@
 #ifndef SSE2NEON_PRECISE_MINMAX
 #define SSE2NEON_PRECISE_MINMAX (0)
 #endif
-/* _mm_rcp_ps and _mm_div_ps */
+/* _mm_rcp_ps */
 #ifndef SSE2NEON_PRECISE_DIV
 #define SSE2NEON_PRECISE_DIV (0)
 #endif
@@ -104,6 +104,17 @@
 #define _sse2neon_unlikely(x) (x)
 #else
 #pragma message("Macro name collisions may happen with unsupported compilers.")
+#endif
+
+
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma push_macro("FORCE_INLINE_OPTNONE")
+#define FORCE_INLINE_OPTNONE static inline __attribute__((optimize("O0")))
+#elif defined(__clang__)
+#pragma push_macro("FORCE_INLINE_OPTNONE")
+#define FORCE_INLINE_OPTNONE static inline __attribute__((optnone))
+#else
+#define FORCE_INLINE_OPTNONE FORCE_INLINE
 #endif
 
 #if !defined(__clang__) && defined(__GNUC__) && __GNUC__ < 10
@@ -241,7 +252,9 @@ FORCE_INLINE void _sse2neon_smp_mb(void)
 #pragma GCC push_options
 #endif
 #else
-#error "Unsupported target. Must be either ARMv7-A+NEON or ARMv8-A."
+#error \
+    "Unsupported target. Must be either ARMv7-A+NEON or ARMv8-A \
+(you could try setting target explicitly with -march or -mcpu)"
 #endif
 #endif
 
@@ -379,6 +392,11 @@ typedef float64x2_t __m128d; /* 128-bit vector containing 2 doubles */
 typedef float32x4_t __m128d;
 #endif
 typedef int64x2_t __m128i; /* 128-bit vector containing integers */
+
+// Some intrinsics operate on unaligned data types.
+typedef int16_t ALIGN_STRUCT(1) unaligned_int16_t;
+typedef int32_t ALIGN_STRUCT(1) unaligned_int32_t;
+typedef int64_t ALIGN_STRUCT(1) unaligned_int64_t;
 
 // __int64 is defined in the Intrinsics Guide which maps to different datatype
 // in different data model
@@ -572,8 +590,8 @@ FORCE_INLINE __m128d _mm_ceil_pd(__m128d);
 FORCE_INLINE __m128 _mm_ceil_ps(__m128);
 FORCE_INLINE __m128d _mm_floor_pd(__m128d);
 FORCE_INLINE __m128 _mm_floor_ps(__m128);
-FORCE_INLINE __m128d _mm_round_pd(__m128d, int);
-FORCE_INLINE __m128 _mm_round_ps(__m128, int);
+FORCE_INLINE_OPTNONE __m128d _mm_round_pd(__m128d, int);
+FORCE_INLINE_OPTNONE __m128 _mm_round_ps(__m128, int);
 // SSE4.2
 FORCE_INLINE uint32_t _mm_crc32_u8(uint32_t, uint8_t);
 
@@ -1722,7 +1740,7 @@ FORCE_INLINE int64_t _mm_cvttss_si64(__m128 a)
 // https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm_div_ps
 FORCE_INLINE __m128 _mm_div_ps(__m128 a, __m128 b)
 {
-#if (defined(__aarch64__) || defined(_M_ARM64)) && !SSE2NEON_PRECISE_DIV
+#if defined(__aarch64__) || defined(_M_ARM64)
     return vreinterpretq_m128_f32(
         vdivq_f32(vreinterpretq_f32_m128(a), vreinterpretq_f32_m128(b)));
 #else
@@ -1925,7 +1943,7 @@ FORCE_INLINE __m128 _mm_loadu_ps(const float *p)
 FORCE_INLINE __m128i _mm_loadu_si16(const void *p)
 {
     return vreinterpretq_m128i_s16(
-        vsetq_lane_s16(*(const int16_t *) p, vdupq_n_s16(0), 0));
+        vsetq_lane_s16(*(const unaligned_int16_t *) p, vdupq_n_s16(0), 0));
 }
 
 // Load unaligned 64-bit integer from memory into the first element of dst.
@@ -1933,7 +1951,7 @@ FORCE_INLINE __m128i _mm_loadu_si16(const void *p)
 FORCE_INLINE __m128i _mm_loadu_si64(const void *p)
 {
     return vreinterpretq_m128i_s64(
-        vcombine_s64(vld1_s64((const int64_t *) p), vdup_n_s64(0)));
+        vsetq_lane_s64(*(const unaligned_int64_t *) p, vdupq_n_s64(0), 0));
 }
 
 // Allocate size bytes of memory, aligned to the alignment specified in align,
@@ -2155,7 +2173,7 @@ FORCE_INLINE int _mm_movemask_ps(__m128 a)
 // Multiply packed single-precision (32-bit) floating-point elements in a and b,
 // and store the results in dst.
 // https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm_mul_ps
-FORCE_INLINE __m128 _mm_mul_ps(__m128 a, __m128 b)
+FORCE_INLINE_OPTNONE __m128 _mm_mul_ps(__m128 a, __m128 b)
 {
     return vreinterpretq_m128_f32(
         vmulq_f32(vreinterpretq_f32_m128(a), vreinterpretq_f32_m128(b)));
@@ -3836,7 +3854,7 @@ FORCE_INLINE __m128 _mm_cvtepi32_ps(__m128i a)
 // Convert packed double-precision (64-bit) floating-point elements in a to
 // packed 32-bit integers, and store the results in dst.
 // https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm_cvtpd_epi32
-FORCE_INLINE __m128i _mm_cvtpd_epi32(__m128d a)
+FORCE_INLINE_OPTNONE __m128i _mm_cvtpd_epi32(__m128d a)
 {
 // vrnd32xq_f64 not supported on clang
 #if defined(__ARM_FEATURE_FRINT) && !defined(__clang__)
@@ -3855,7 +3873,7 @@ FORCE_INLINE __m128i _mm_cvtpd_epi32(__m128d a)
 // Convert packed double-precision (64-bit) floating-point elements in a to
 // packed 32-bit integers, and store the results in dst.
 // https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm_cvtpd_pi32
-FORCE_INLINE __m64 _mm_cvtpd_pi32(__m128d a)
+FORCE_INLINE_OPTNONE __m64 _mm_cvtpd_pi32(__m128d a)
 {
     __m128d rnd = _mm_round_pd(a, _MM_FROUND_CUR_DIRECTION);
     double d0 = ((double *) &rnd)[0];
@@ -4358,7 +4376,7 @@ FORCE_INLINE __m128d _mm_loadu_pd(const double *p)
 // https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm_loadu_si128
 FORCE_INLINE __m128i _mm_loadu_si128(const __m128i *p)
 {
-    return vreinterpretq_m128i_s32(vld1q_s32((const int32_t *) p));
+    return vreinterpretq_m128i_s32(vld1q_s32((const unaligned_int32_t *) p));
 }
 
 // Load unaligned 32-bit integer from memory into the first element of dst.
@@ -4366,7 +4384,7 @@ FORCE_INLINE __m128i _mm_loadu_si128(const __m128i *p)
 FORCE_INLINE __m128i _mm_loadu_si32(const void *p)
 {
     return vreinterpretq_m128i_s32(
-        vsetq_lane_s32(*(const int32_t *) p, vdupq_n_s32(0), 0));
+        vsetq_lane_s32(*(const unaligned_int32_t *) p, vdupq_n_s32(0), 0));
 }
 
 // Multiply packed signed 16-bit integers in a and b, producing intermediate
@@ -7414,7 +7432,7 @@ FORCE_INLINE __m128i _mm_packus_epi32(__m128i a, __m128i b)
 // the rounding parameter, and store the results as packed double-precision
 // floating-point elements in dst.
 // https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm_round_pd
-FORCE_INLINE __m128d _mm_round_pd(__m128d a, int rounding)
+FORCE_INLINE_OPTNONE __m128d _mm_round_pd(__m128d a, int rounding)
 {
 #if defined(__aarch64__) || defined(_M_ARM64)
     switch (rounding) {
@@ -7483,7 +7501,7 @@ FORCE_INLINE __m128d _mm_round_pd(__m128d a, int rounding)
 // the rounding parameter, and store the results as packed single-precision
 // floating-point elements in dst.
 // software.intel.com/sites/landingpage/IntrinsicsGuide/#text=_mm_round_ps
-FORCE_INLINE __m128 _mm_round_ps(__m128 a, int rounding)
+FORCE_INLINE_OPTNONE __m128 _mm_round_ps(__m128 a, int rounding)
 {
 #if (defined(__aarch64__) || defined(_M_ARM64)) || \
     defined(__ARM_FEATURE_DIRECTED_ROUNDING)
@@ -7618,7 +7636,7 @@ FORCE_INLINE int _mm_test_mix_ones_zeros(__m128i a, __m128i mask)
     uint64x2_t zeros = vbicq_u64(m, v);
 
     // If both 128-bit variables are populated (non-zero) then return 1.
-    // For comparision purposes, first compact each var down to 32-bits.
+    // For comparison purposes, first compact each var down to 32-bits.
     uint32x2_t reduced = vpmax_u32(vqmovn_u64(ones), vqmovn_u64(zeros));
 
     // if folding minimum is non-zero then both vars must be non-zero
@@ -8527,7 +8545,7 @@ FORCE_INLINE uint32_t _mm_crc32_u8(uint32_t crc, uint8_t v)
     crc = vgetq_lane_u32(vreinterpretq_u32_u64(tmp), 1);
 #else  // Fall back to the generic table lookup approach
     // Adapted from: https://create.stephan-brumme.com/crc32/
-    // Apply half-byte comparision algorithm for the best ratio between
+    // Apply half-byte comparison algorithm for the best ratio between
     // performance and lookup table.
 
     // The lookup table just needs to store every 16th entry
@@ -8694,9 +8712,9 @@ FORCE_INLINE __m128i _mm_aesenc_si128(__m128i a, __m128i RoundKey)
 #define SSE2NEON_AES_B2W(b0, b1, b2, b3)                 \
     (((uint32_t) (b3) << 24) | ((uint32_t) (b2) << 16) | \
      ((uint32_t) (b1) << 8) | (uint32_t) (b0))
-// muliplying 'x' by 2 in GF(2^8)
+// multiplying 'x' by 2 in GF(2^8)
 #define SSE2NEON_AES_F2(x) ((x << 1) ^ (((x >> 7) & 1) * 0x011b /* WPOLY */))
-// muliplying 'x' by 3 in GF(2^8)
+// multiplying 'x' by 3 in GF(2^8)
 #define SSE2NEON_AES_F3(x) (SSE2NEON_AES_F2(x) ^ x)
 #define SSE2NEON_AES_U0(p) \
     SSE2NEON_AES_B2W(SSE2NEON_AES_F2(p), p, p, SSE2NEON_AES_F3(p))
@@ -8781,7 +8799,7 @@ FORCE_INLINE __m128i _mm_aesdec_si128(__m128i a, __m128i RoundKey)
     v ^= (uint8x16_t) vrev32q_u16((uint16x8_t) w);
 
     w = (v << 1) ^ (uint8x16_t) (((int8x16_t) v >> 7) &
-                                 0x1b);  // muliplying 'v' by 2 in GF(2^8)
+                                 0x1b);  // multiplying 'v' by 2 in GF(2^8)
     w ^= (uint8x16_t) vrev32q_u16((uint16x8_t) v);
     w ^= vqtbl1q_u8(v ^ w, vld1q_u8(ror32by8));
 
@@ -9273,6 +9291,7 @@ FORCE_INLINE uint64_t _rdtsc(void)
 #if defined(__GNUC__) || defined(__clang__)
 #pragma pop_macro("ALIGN_STRUCT")
 #pragma pop_macro("FORCE_INLINE")
+#pragma pop_macro("FORCE_INLINE_OPTNONE")
 #endif
 
 #if defined(__GNUC__) && !defined(__clang__)
