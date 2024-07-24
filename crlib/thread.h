@@ -12,63 +12,12 @@
 #if !defined (CR_WINDOWS)
 #  include <sys/mman.h>
 #  include <pthread.h>
+#  include <errno.h>
 #else
 #  include <process.h>
 #endif
 
 CR_NAMESPACE_BEGIN
-
-// @todo: subject to remove, this will not work on <=debian8 centos<=8 in case binary loaded with RTLD_DEEPBIND
-#if defined (CR_LINUX) && !defined (CR_NATIVE_BUILD) && defined(__GLIBC__ ) && __GLIBC__ >= 2 && __GLIBC_MINOR__ >= 34
-#  define GLIBC_PTHREAD_WORKAROUND
-#endif
-
-#if defined (GLIBC_PTHREAD_WORKAROUND)
-// pthread workaround since glibc 2.34 doesn't provide linkage with libpthread
-// and we're need to target binary compiled with latest compiler on ancient distro
-class PthreadWrapper final : public Singleton <PthreadWrapper> {
-private:
-   using MutexTryLock = decltype (&pthread_mutex_trylock);
-   using Join = decltype (&pthread_join);
-   using Detach = decltype (&pthread_detach);
-   using Create = decltype (&pthread_create);
-
-private:
-   SharedLibrary libpthread_;
-
-public:
-   MutexTryLock mutex_trylock = nullptr;
-   Join join = nullptr;
-   Detach detach = nullptr;
-   Create create = nullptr;
-
-private:
-   template <typename T> T resolve (const char *symbol) {
-      auto result = reinterpret_cast <T> (dlsym (RTLD_DEFAULT, symbol));
-
-      if (!result) {
-         if (!libpthread_) {
-            libpthread_.load ("libpthread.so"); // older than glibc 2.34, try load libpthread as workaround
-         }
-         result = libpthread_.resolve <T> (symbol); // ... and lookup there
-      }
-      return result;
-   }
-
-public:
-   explicit PthreadWrapper () {
-      mutex_trylock = resolve <MutexTryLock> ("pthread_mutex_trylock");
-      join = resolve <Join> ("pthread_join");
-      detach = resolve <Detach> ("pthread_detach");
-      create = resolve <Create> ("pthread_create");
-   }
-   ~PthreadWrapper () = default;
-};
-
-// expose thread wrapper
-CR_EXPOSE_GLOBAL_SINGLETON (PthreadWrapper, pthread);
-
-#endif
 
 // simple scoped lock wrapper
 template <typename T> class ScopedLock final : public NonCopyable {
@@ -162,11 +111,7 @@ public:
       return !!TryAcquireSRWLockExclusive (&cs_);
 #endif
 #else
-#if !defined (GLIBC_PTHREAD_WORKAROUND)
       return pthread_mutex_trylock (&mutex_) == 0;
-#else
-      return pthread.mutex_trylock (&mutex_) == 0;
-#endif
 #endif
    }
 
@@ -361,11 +306,7 @@ public:
 #if defined(CR_WINDOWS)
       thread_ = reinterpret_cast <HANDLE> (_beginthreadex (nullptr, 0, worker, this, 0, nullptr));
 #else
-#if !defined(GLIBC_PTHREAD_WORKAROUND)
       initialized_ = (pthread_create (&thread_, nullptr, worker, this) == 0);
-#else
-      initialized_ = (pthread.create (&thread_, nullptr, worker, this) == 0);
-#endif
 #endif
 
       if (!ok ()) {
@@ -394,11 +335,7 @@ public:
       CloseHandle (thread_);
       thread_ = nullptr;
 #else
-#if !defined (GLIBC_PTHREAD_WORKAROUND)
       pthread_detach (thread_);
-#else
-      pthread.detach (thread_);
-#endif
 #endif
    }
 
@@ -418,11 +355,7 @@ public:
 #if defined (CR_WINDOWS)
       WaitForSingleObjectEx (thread_, INFINITE, FALSE);
 #else
-#if !defined (GLIBC_PTHREAD_WORKAROUND)
       pthread_join (thread_, nullptr);
-#else
-      pthread.join (thread_, nullptr);
-#endif
       initialized_ = false;
 #endif
    }

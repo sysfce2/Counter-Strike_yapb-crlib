@@ -16,6 +16,7 @@
 #include <crlib/platform.h>
 #include <crlib/uniqueptr.h>
 #include <crlib/random.h>
+#include <crlib/thread.h>
 
 #if defined (CR_LINUX) || defined (CR_OSX)
 #  include <netinet/in.h>
@@ -106,7 +107,8 @@ CR_DECLARE_SCOPED_ENUM (HttpClientResult,
    HttpOnly = -3,
    Undefined = -4,
    NoLocalFile = -5,
-   LocalFileExists = -6
+   LocalFileExists = -6,
+   NetworkUnavilable = -7
 )
 
 CR_NAMESPACE_BEGIN
@@ -157,11 +159,14 @@ namespace detail {
 
 class Socket final : public NonCopyable {
 private:
+   static constexpr uint32_t kInvalidSocket = static_cast <uint32_t> (~0);
+
+private:
    int32_t socket_;
    uint32_t timeout_;
 
 public:
-   Socket () : socket_ (-1), timeout_ (2)
+   Socket () : socket_ (kInvalidSocket), timeout_ (2)
    { }
 
    ~Socket () {
@@ -182,9 +187,9 @@ public:
       if (getaddrinfo (hostname.chars (), "80", &hints, &result) != 0) {
          return false;
       }
-      socket_ = static_cast <int> (socket (result->ai_family, result->ai_socktype, 0));
+      socket_ = socket (result->ai_family, result->ai_socktype, 0);
 
-      if (socket_ < 0) {
+      if (socket_ == kInvalidSocket) {
          freeaddrinfo (result);
          return false;
       }
@@ -219,11 +224,11 @@ public:
 
    void disconnect () {
 #if defined(CR_WINDOWS)
-      if (socket_ != -1) {
+      if (socket_ != kInvalidSocket) {
          closesocket (socket_);
       }
 #else 
-      if (socket_ != -1)
+      if (socket_ != kInvalidSocket)
          close (socket_);
 #endif
    }
@@ -267,14 +272,16 @@ class HttpClient final : public Singleton <HttpClient> {
 private:
    enum : int32_t {
       MaxReceiveErrors = 12,
-      DefaultSocketTimeout = 32
+      DefaultSocketTimeout = 5
    };
 
 private:
    String userAgent_ = "crlib";
    HttpClientResult statusCode_ = HttpClientResult::Undefined;
    int32_t chunkSize_ = 4096;
-   bool initialized_ = false;
+
+   bool initialized_ {};
+   bool hasConnection = {};
 
 public:
    HttpClient () = default;
@@ -324,15 +331,46 @@ private:
    }
 
 public:
-   void startup () {
+   void startup (StringRef hostCheck  = "", StringRef errMessageIfHostDown = "", uint32_t timeout = DefaultSocketTimeout) {
       detail::SocketInit::start ();
+
       initialized_ = true;
+      hasConnection = false;
+
+      // dummy check to connect some host on startup in a separate, to check if network is available
+      if (!hostCheck.empty ()) {
+         static Thread hostCheckThread { [=] () {
+            auto socket = cr::makeUnique <Socket> ();
+            socket->setTimeout (timeout); // set some magic timeout
+
+            if (!socket->connect (hostCheck)) {
+               hasConnection = false;
+
+               // notify user
+               if (!errMessageIfHostDown.empty ()) {
+                  logger.message (errMessageIfHostDown.chars ());
+               }
+            }
+            else {
+               hasConnection = true;
+            }
+         }};
+      }
+      else {
+         hasConnection = true;
+      }
    }
 
    // simple blocked download
    bool downloadFile (StringRef url, StringRef localPath, int32_t timeout = DefaultSocketTimeout) {
       if (plat.win && !initialized_) {
          plat.abort ("Sockets not initialized.");
+      }
+
+      // check if have network connection
+      if (!hasConnection) {
+         statusCode_ = HttpClientResult::NetworkUnavilable;
+         return false;
       }
 
       if (plat.fileExists (localPath.chars ())) {
@@ -403,6 +441,12 @@ public:
    bool uploadFile (StringRef url, StringRef localPath, const int32_t timeout = DefaultSocketTimeout) {
       if (plat.win && !initialized_) {
          plat.abort ("Sockets not initialized.");
+      }
+
+      // check if have network connection
+      if (!hasConnection) {
+         statusCode_ = HttpClientResult::NetworkUnavilable;
+         return false;
       }
 
       if (!plat.fileExists (localPath.chars ())) {
