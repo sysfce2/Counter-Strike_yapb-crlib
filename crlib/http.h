@@ -108,7 +108,7 @@ CR_DECLARE_SCOPED_ENUM (HttpClientResult,
    Undefined = -4,
    NoLocalFile = -5,
    LocalFileExists = -6,
-   NetworkUnavilable = -7
+   NetworkDisconnected = -7
 )
 
 CR_NAMESPACE_BEGIN
@@ -369,7 +369,7 @@ public:
 
       // check if have network connection
       if (!hasConnection) {
-         statusCode_ = HttpClientResult::NetworkUnavilable;
+         statusCode_ = HttpClientResult::NetworkDisconnected;
          return false;
       }
 
@@ -445,7 +445,7 @@ public:
 
       // check if have network connection
       if (!hasConnection) {
-         statusCode_ = HttpClientResult::NetworkUnavilable;
+         statusCode_ = HttpClientResult::NetworkDisconnected;
          return false;
       }
 
