@@ -108,7 +108,7 @@ CR_DECLARE_SCOPED_ENUM (HttpClientResult,
    Undefined = -4,
    NoLocalFile = -5,
    LocalFileExists = -6,
-   NetworkDisconnected = -7
+   NetworkUnavilable = -7
 )
 
 CR_NAMESPACE_BEGIN
@@ -159,7 +159,7 @@ namespace detail {
 
 class Socket final : public NonCopyable {
 private:
-   static constexpr uint32_t kInvalidSocket = static_cast <uint32_t> (~0);
+   static constexpr int32_t kInvalidSocket = 0xffffff;
 
 private:
    int32_t socket_;
@@ -369,7 +369,7 @@ public:
 
       // check if have network connection
       if (!hasConnection) {
-         statusCode_ = HttpClientResult::NetworkDisconnected;
+         statusCode_ = HttpClientResult::NetworkUnavilable;
          return false;
       }
 
@@ -445,7 +445,7 @@ public:
 
       // check if have network connection
       if (!hasConnection) {
-         statusCode_ = HttpClientResult::NetworkDisconnected;
+         statusCode_ = HttpClientResult::NetworkUnavilable;
          return false;
       }
 
