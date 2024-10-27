@@ -141,7 +141,7 @@ private:
 
       ++length_;
 
-      const auto length = static_cast<float> (length_);
+      const auto length = static_cast <float> (length_);
       const auto capacity = static_cast <float> (contents_.length ());
 
       if (!contents_.empty () && length / capacity >= kLoadFactor) {

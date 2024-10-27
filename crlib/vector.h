@@ -292,7 +292,7 @@ public:
 #if defined (CR_HAS_SIMD_NEON)
       static SimdVec3Wrap s, c;
       SimdVec3Wrap { x, y, z }.angleVectors (s, c);
-#else
+#elif !defined (CR_HAS_SIMD_SSE)
       static Vec3D s, c, r;
       r = { cr::deg2rad (x), cr::deg2rad (y), cr::deg2rad (z) };
 

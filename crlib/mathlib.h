@@ -24,8 +24,19 @@ constexpr float kRadiansToDegree = 180.0f / kMathPi;
 CR_NAMESPACE_END
 
 #include <crlib/simd.h>
+#include <crlib/traits.h>
 
 CR_NAMESPACE_BEGIN
+
+// abs() overload
+template <typename T> constexpr T abs (const T &a) {
+   if constexpr (is_same <T, float>::value) {
+      return ::fabs (a);
+   }
+   else if constexpr (is_same <T, int>::value) {
+      return ::abs (a);
+   }
+}
 
 #if defined (CR_HAS_SIMD_SSE)
 template <> CR_FORCE_INLINE float abs (const float &x) {
@@ -214,7 +225,7 @@ namespace detail {
 #endif
 
    template <int D> CR_FORCE_INLINE float scalar_wrapAngleFn (float x) {
-      return x - 2.0f * static_cast <float> (D) * cr::floorf (x / (2.0f * static_cast <float> (D)) + 0.5f);
+      return x - 2.0f * static_cast <float> (D) * ::floorf (x / (2.0f * static_cast <float> (D)) + 0.5f);
    }
 
    template <int D> CR_FORCE_INLINE float _wrapAngleFn (float x) {

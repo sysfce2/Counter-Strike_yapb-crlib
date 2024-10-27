@@ -25,10 +25,6 @@ template <typename T, size_t N> constexpr size_t bufsize (const T (&)[N]) {
    return N - 1;
 }
 
-template <typename T> constexpr T abs (const T &a) {
-   return a > 0 ? a : -a;
-}
-
 template <typename T> constexpr T bit (const T &a) {
    return static_cast <T> (1ULL << a);
 }
@@ -40,7 +36,6 @@ template <typename T> constexpr T min (const T &a, const T &b) {
 template <typename T> constexpr T max (const T &a, const T &b) {
    return a > b ? a : b;
 }
-
 
 template <typename T> constexpr T clamp (const T &x, const T &a, const T &b) {
    return min (max (x, a), b);

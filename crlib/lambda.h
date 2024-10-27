@@ -34,7 +34,7 @@ private:
 
    public:
       constexpr LambdaFunctor (const LambdaFunctor &rhs) : callee_ { rhs.callee_ } {}
-      constexpr LambdaFunctor (LambdaFunctor &&rhs) : callee_ { cr::move (rhs.callee_) } {}
+      constexpr LambdaFunctor (LambdaFunctor &&rhs) noexcept : callee_ { cr::move (rhs.callee_) } {}
       constexpr LambdaFunctor (const T &callee) : callee_ { callee } {}
       constexpr LambdaFunctor (T &&callee) : callee_ { cr::move (callee) } {}
 
