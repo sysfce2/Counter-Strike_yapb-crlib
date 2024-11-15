@@ -31,7 +31,7 @@ CR_NAMESPACE_BEGIN
 // abs() overload
 template <typename T> constexpr T abs (const T &a) {
    if constexpr (is_same <T, float>::value) {
-      return ::fabs (a);
+      return ::fabsf (a);
    }
    else if constexpr (is_same <T, int>::value) {
       return ::abs (a);
@@ -132,7 +132,11 @@ CR_FORCE_INLINE float roundf (const float value) {
 #endif
 }
 
+#if defined (CR_HAS_SIMD_SSE)
 CR_SIMD_TARGET_AIL ("sse4.1")
+#else
+CR_FORCE_INLINE
+#endif
 float ceilf (const float value) {
 #if defined (CR_HAS_SIMD_SSE)
    if (cpuflags.sse42) {
@@ -144,7 +148,11 @@ float ceilf (const float value) {
 #endif
 }
 
+#if defined (CR_HAS_SIMD_SSE)
 CR_SIMD_TARGET_AIL ("sse4.1")
+#else
+CR_FORCE_INLINE
+#endif
 float floorf (const float value) {
 #if defined (CR_HAS_SIMD_SSE)
    if (cpuflags.sse42) {
