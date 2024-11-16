@@ -133,7 +133,7 @@ CR_FORCE_INLINE float roundf (const float value) {
 }
 
 #if defined (CR_HAS_SIMD_SSE)
-CR_SIMD_TARGET ("sse4.1") inline
+CR_SIMD_TARGET_TIL ("sse4.1")
 #else
 CR_FORCE_INLINE
 #endif
@@ -149,7 +149,7 @@ float ceilf (const float value) {
 }
 
 #if defined (CR_HAS_SIMD_SSE)
-CR_SIMD_TARGET ("sse4.1") inline
+CR_SIMD_TARGET_TIL ("sse4.1")
 #else
 CR_FORCE_INLINE
 #endif

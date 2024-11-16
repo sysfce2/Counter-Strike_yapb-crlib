@@ -116,9 +116,11 @@ CR_NAMESPACE_BEGIN
 #if (defined (CR_CXX_MSVC) && !defined (CR_CXX_CLANG)) || defined (CR_ARCH_ARM) || defined (CR_ARCH_PPC)
 #  define CR_SIMD_TARGET(dest) CR_FORCE_INLINE
 #  define CR_SIMD_TARGET_AIL(dest) CR_FORCE_INLINE
+#  define CR_SIMD_TARGET_TIL(dest) inline
 #else
 #  define CR_SIMD_TARGET(dest) __attribute__((target(dest)))
 #  define CR_SIMD_TARGET_AIL(dest) __attribute__((__always_inline__, target(dest))) inline
+#  define CR_SIMD_TARGET_TIL(dest) __attribute__((target(dest))) inline
 #endif
 
 // set the minimal glibc as we can
