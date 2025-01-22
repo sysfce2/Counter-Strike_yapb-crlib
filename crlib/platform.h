@@ -123,6 +123,9 @@ CR_NAMESPACE_BEGIN
 #  define CR_SIMD_TARGET_TIL(dest) __attribute__((target(dest))) inline
 #endif
 
+// no symbol versioning in native builds
+#if !defined (CR_NATIVE_BUILD)
+
 // set the minimal glibc as we can
 #if defined (CR_ARCH_ARM64) || defined (CR_ARCH_PPC64)
 #  define GLIBC_VERSION_MIN "2.17"
@@ -145,6 +148,7 @@ CR_NAMESPACE_BEGIN
          __asm__ (".symver dlopen, dlopen@GLIBC_" GLIBC_VERSION_MIN);
 #     endif
 #  endif
+#endif
 #endif
 
 CR_NAMESPACE_END
