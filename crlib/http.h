@@ -22,7 +22,7 @@
 #  include <netinet/in.h>
 #  include <sys/socket.h>
 #  include <sys/types.h>
-#  include <sys/uio.h> 
+#  include <sys/uio.h>
 #  include <arpa/inet.h>
 #  include <unistd.h>
 #  include <errno.h>
@@ -166,8 +166,7 @@ private:
    uint32_t timeout_;
 
 public:
-   Socket () : socket_ (kInvalidSocket), timeout_ (2)
-   { }
+   Socket () : socket_ (kInvalidSocket), timeout_ (2) {}
 
    ~Socket () {
       disconnect ();
@@ -194,7 +193,7 @@ public:
          return false;
       }
 
-      auto getTimeouts = [&]() -> Twin <char *, int32_t> {
+      auto getTimeouts = [&] () -> Twin <char *, int32_t> {
 #if defined (CR_WINDOWS)
          DWORD tv = timeout_ * 1000;
 #else
@@ -227,7 +226,7 @@ public:
       if (socket_ != kInvalidSocket) {
          closesocket (socket_);
       }
-#else 
+#else
       if (socket_ != kInvalidSocket)
          close (socket_);
 #endif
@@ -318,8 +317,8 @@ private:
          }
          ++pos;
       }
-      String response { reinterpret_cast <const char *> (buffer) };
-      size_t responseCodeStart = response.find ("HTTP/1.1");
+      String response { reinterpret_cast <const char *> (buffer), static_cast <size_t> (chunkSize_) };
+      const size_t responseCodeStart = response.find ("HTTP/1.1");
 
       if (responseCodeStart != String::InvalidIndex) {
          String respCode = response.substr (responseCodeStart + cr::bufsize ("HTTP 1/1 "), 3);
@@ -331,7 +330,7 @@ private:
    }
 
 public:
-   void startup (StringRef hostCheck  = "", StringRef errMessageIfHostDown = "", uint32_t timeout = DefaultSocketTimeout) {
+   void startup (StringRef hostCheck = "", StringRef errMessageIfHostDown = "", uint32_t timeout = DefaultSocketTimeout) {
       detail::SocketInit::start ();
 
       initialized_ = true;
@@ -354,7 +353,7 @@ public:
             else {
                hasConnection = true;
             }
-         }};
+         } };
       }
       else {
          hasConnection = true;
