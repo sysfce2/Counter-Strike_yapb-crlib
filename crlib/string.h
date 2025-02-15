@@ -845,12 +845,12 @@ inline const char *SNPrintfWrap::cast (const StringRef &value) {
 class StringBuffer final : public Singleton <StringBuffer> {
 public:
    enum : size_t {
-      StaticBufferSize = static_cast <size_t> (768),
-      RotationCount = static_cast <size_t> (32)
+      StaticBufferSize = static_cast <size_t> (1024),
+      RotationCount = static_cast <size_t> (16)
    };
 
 private:
-   char data_[RotationCount + 1][StaticBufferSize] {};
+   char data_[RotationCount + 1][StaticBufferSize + 1] {};
    size_t rotate_ = 0;
 
 public:

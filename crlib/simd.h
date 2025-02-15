@@ -25,6 +25,7 @@ namespace cr::simd {
 }
 
 #if defined (CR_HAS_SIMD_NEON)
+#  define SSE2NEON_SUPPRESS_WARNINGS
 #  include <crlib/simd/sse2neon.h>
 #endif
 

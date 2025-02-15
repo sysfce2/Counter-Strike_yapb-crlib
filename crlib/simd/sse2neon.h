@@ -51,6 +51,7 @@
 //   Cuda Chen <clh960524@gmail.com>
 //   Aymen Qader <aymen.qader@arm.com>
 //   Anthony Roberts <anthony.roberts@linaro.org>
+//   Sean Luchen <seanluchen@google.com>
 
 /* Tunable configurations */
 
@@ -110,6 +111,11 @@
 #warning "GCC versions earlier than 10 are not supported."
 #endif
 
+#if defined(__OPTIMIZE__) && !defined(SSE2NEON_SUPPRESS_WARNINGS)
+#warning \
+    "Report any potential compiler optimization issues when using SSE2NEON. See the 'Optimization' section at https://github.com/DLTcollab/sse2neon."
+#endif
+
 /* C language does not allow initializing a variable with a function call. */
 #ifdef __cplusplus
 #define _sse2neon_const static const
@@ -122,23 +128,21 @@
 #include <stdlib.h>
 #include <string.h>
 
-FORCE_INLINE double sse2neon_recast_u64_f64(uint64_t u64)
+FORCE_INLINE double sse2neon_recast_u64_f64(uint64_t val)
 {
-    double f64;
-    memcpy(&f64, &u64, sizeof(uint64_t));
-    return f64;
+    double tmp;
+    memcpy(&tmp, &val, sizeof(uint64_t));
+    return tmp;
 }
-FORCE_INLINE int64_t sse2neon_recast_f64_s64(double f64)
+FORCE_INLINE int64_t sse2neon_recast_f64_s64(double val)
 {
-    int64_t i64;
-    memcpy(&i64, &f64, sizeof(uint64_t));
-    return i64;
+    int64_t tmp;
+    memcpy(&tmp, &val, sizeof(uint64_t));
+    return tmp;
 }
 
-#if defined(_WIN32)
-/* Definitions for _mm_{malloc,free} are provided by <malloc.h>
- * from both MinGW-w64 and MSVC.
- */
+#if defined(_WIN32) && !defined(__MINGW32__)
+/* Definitions for _mm_{malloc,free} are provided by <malloc.h> from MSVC. */
 #define SSE2NEON_ALLOC_DEFINED
 #endif
 
@@ -328,6 +332,15 @@ FORCE_INLINE void _sse2neon_smp_mb(void)
  */
 #define _MM_SHUFFLE(fp3, fp2, fp1, fp0) \
     (((fp3) << 6) | ((fp2) << 4) | ((fp1) << 2) | ((fp0)))
+
+/**
+ * MACRO for shuffle parameter for _mm_shuffle_pd().
+ * Argument fp1 is a digit[01] that represents the fp from argument "b"
+ * of mm_shuffle_pd that will be placed in fp1 of result.
+ * fp0 is a digit[01] that represents the fp from argument "a" of mm_shuffle_pd
+ * that will be placed in fp0 of result.
+ */
+#define _MM_SHUFFLE2(fp1, fp0) (((fp1) << 1) | (fp0))
 
 #if __has_builtin(__builtin_shufflevector)
 #define _sse2neon_shuffle(type, a, b, ...) \
@@ -1782,7 +1795,11 @@ FORCE_INLINE __m128 _mm_div_ss(__m128 a, __m128 b)
 #if !defined(SSE2NEON_ALLOC_DEFINED)
 FORCE_INLINE void _mm_free(void *addr)
 {
+#if defined(_WIN32)
+    _aligned_free(addr);
+#else
     free(addr);
+#endif
 }
 #endif
 
@@ -1802,7 +1819,7 @@ FORCE_INLINE void _sse2neon_set_fpcr(uint64_t value)
 #if defined(_MSC_VER) && !defined(__clang__)
     _WriteStatusReg(ARM64_FPCR, value);
 #else
-    __asm__ __volatile__("msr FPCR, %0" ::"r"(value));  /* write */
+    __asm__ __volatile__("msr FPCR, %0" ::"r"(value)); /* write */
 #endif
 }
 
@@ -1960,6 +1977,9 @@ FORCE_INLINE __m128i _mm_loadu_si64(const void *p)
 #if !defined(SSE2NEON_ALLOC_DEFINED)
 FORCE_INLINE void *_mm_malloc(size_t size, size_t align)
 {
+#if defined(_WIN32)
+    return _aligned_malloc(size, align);
+#else
     void *ptr;
     if (align == 1)
         return malloc(size);
@@ -1968,6 +1988,7 @@ FORCE_INLINE void *_mm_malloc(size_t size, size_t align)
     if (!posix_memalign(&ptr, align, size))
         return ptr;
     return NULL;
+#endif
 }
 #endif
 
@@ -2386,7 +2407,7 @@ FORCE_INLINE __m64 _mm_sad_pu8(__m64 a, __m64 b)
     uint64x1_t t = vpaddl_u32(vpaddl_u16(
         vpaddl_u8(vabd_u8(vreinterpret_u8_m64(a), vreinterpret_u8_m64(b)))));
     return vreinterpret_m64_u16(
-        vset_lane_u16((int) vget_lane_u64(t, 0), vdup_n_u16(0), 0));
+        vset_lane_u16((uint16_t) vget_lane_u64(t, 0), vdup_n_u16(0), 0));
 }
 
 // Macro: Set the flush zero bits of the MXCSR control and status register to
@@ -2417,7 +2438,7 @@ FORCE_INLINE void _sse2neon_mm_set_flush_zero_mode(unsigned int flag)
 #if defined(__aarch64__) || defined(_M_ARM64)
     _sse2neon_set_fpcr(r.value);
 #else
-    __asm__ __volatile__("vmsr FPSCR, %0" ::"r"(r));        /* write */
+    __asm__ __volatile__("vmsr FPSCR, %0" ::"r"(r)); /* write */
 #endif
 }
 
@@ -4963,11 +4984,11 @@ FORCE_INLINE __m128i _mm_set_epi8(signed char b15,
                                   signed char b1,
                                   signed char b0)
 {
-    int8_t ALIGN_STRUCT(16)
-        data[16] = {(int8_t) b0,  (int8_t) b1,  (int8_t) b2,  (int8_t) b3,
-                    (int8_t) b4,  (int8_t) b5,  (int8_t) b6,  (int8_t) b7,
-                    (int8_t) b8,  (int8_t) b9,  (int8_t) b10, (int8_t) b11,
-                    (int8_t) b12, (int8_t) b13, (int8_t) b14, (int8_t) b15};
+    int8_t ALIGN_STRUCT(16) data[16] = {
+        (int8_t) b0,  (int8_t) b1,  (int8_t) b2,  (int8_t) b3,
+        (int8_t) b4,  (int8_t) b5,  (int8_t) b6,  (int8_t) b7,
+        (int8_t) b8,  (int8_t) b9,  (int8_t) b10, (int8_t) b11,
+        (int8_t) b12, (int8_t) b13, (int8_t) b14, (int8_t) b15};
     return (__m128i) vld1q_s8(data);
 }
 
@@ -5098,11 +5119,11 @@ FORCE_INLINE __m128i _mm_setr_epi8(signed char b0,
                                    signed char b14,
                                    signed char b15)
 {
-    int8_t ALIGN_STRUCT(16)
-        data[16] = {(int8_t) b0,  (int8_t) b1,  (int8_t) b2,  (int8_t) b3,
-                    (int8_t) b4,  (int8_t) b5,  (int8_t) b6,  (int8_t) b7,
-                    (int8_t) b8,  (int8_t) b9,  (int8_t) b10, (int8_t) b11,
-                    (int8_t) b12, (int8_t) b13, (int8_t) b14, (int8_t) b15};
+    int8_t ALIGN_STRUCT(16) data[16] = {
+        (int8_t) b0,  (int8_t) b1,  (int8_t) b2,  (int8_t) b3,
+        (int8_t) b4,  (int8_t) b5,  (int8_t) b6,  (int8_t) b7,
+        (int8_t) b8,  (int8_t) b9,  (int8_t) b10, (int8_t) b11,
+        (int8_t) b12, (int8_t) b13, (int8_t) b14, (int8_t) b15};
     return (__m128i) vld1q_s8(data);
 }
 
@@ -5291,7 +5312,7 @@ FORCE_INLINE __m128i _mm_slli_epi16(__m128i a, int imm)
     if (_sse2neon_unlikely(imm & ~15))
         return _mm_setzero_si128();
     return vreinterpretq_m128i_s16(
-        vshlq_s16(vreinterpretq_s16_m128i(a), vdupq_n_s16(imm)));
+        vshlq_s16(vreinterpretq_s16_m128i(a), vdupq_n_s16((int16_t) imm)));
 }
 
 // Shift packed 32-bit integers in a left by imm8 while shifting in zeros, and
@@ -5325,7 +5346,7 @@ FORCE_INLINE __m128i _mm_slli_epi64(__m128i a, int imm)
         if (_sse2neon_unlikely(imm == 0)) ret = vreinterpretq_s8_m128i(_a); \
         else if (_sse2neon_unlikely((imm) & ~15)) ret = vdupq_n_s8(0);      \
         else ret = vextq_s8(vdupq_n_s8(0), vreinterpretq_s8_m128i(_a),      \
-                            ((imm <= 0 || imm > 15) ? 0 : (16 - imm)));     \
+                            ((imm <= 0 || imm > 15) ? 0 : (16 - (imm))));   \
         _sse2neon_return(vreinterpretq_m128i_s8(ret));)
 
 // Compute the square root of packed double-precision (64-bit) floating-point
@@ -5370,7 +5391,7 @@ FORCE_INLINE __m128i _mm_sra_epi16(__m128i a, __m128i count)
     if (_sse2neon_unlikely(c & ~15))
         return _mm_cmplt_epi16(a, _mm_setzero_si128());
     return vreinterpretq_m128i_s16(
-        vshlq_s16((int16x8_t) a, vdupq_n_s16((int) -c)));
+        vshlq_s16((int16x8_t) a, vdupq_n_s16((int16_t) -c)));
 }
 
 // Shift packed 32-bit integers in a right by count while shifting in sign bits,
@@ -5390,7 +5411,7 @@ FORCE_INLINE __m128i _mm_sra_epi32(__m128i a, __m128i count)
 // https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm_srai_epi16
 FORCE_INLINE __m128i _mm_srai_epi16(__m128i a, int imm)
 {
-    const int count = (imm & ~15) ? 15 : imm;
+    const int16_t count = (imm & ~15) ? 15 : (int16_t) imm;
     return (__m128i) vshlq_s16((int16x8_t) a, vdupq_n_s16(-count));
 }
 
@@ -5452,13 +5473,13 @@ FORCE_INLINE __m128i _mm_srl_epi64(__m128i a, __m128i count)
 // Shift packed 16-bit integers in a right by imm8 while shifting in zeros, and
 // store the results in dst.
 // https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm_srli_epi16
-#define _mm_srli_epi16(a, imm)                                                \
-    _sse2neon_define0(                                                        \
-        __m128i, a, __m128i ret; if (_sse2neon_unlikely((imm) & ~15)) {       \
-            ret = _mm_setzero_si128();                                        \
-        } else {                                                              \
-            ret = vreinterpretq_m128i_u16(                                    \
-                vshlq_u16(vreinterpretq_u16_m128i(_a), vdupq_n_s16(-(imm)))); \
+#define _mm_srli_epi16(a, imm)                                                 \
+    _sse2neon_define0(                                                         \
+        __m128i, a, __m128i ret; if (_sse2neon_unlikely((imm) & ~15)) {        \
+            ret = _mm_setzero_si128();                                         \
+        } else {                                                               \
+            ret = vreinterpretq_m128i_u16(vshlq_u16(                           \
+                vreinterpretq_u16_m128i(_a), vdupq_n_s16((int16_t) - (imm)))); \
         } _sse2neon_return(ret);)
 
 // Shift packed 32-bit integers in a right by imm8 while shifting in zeros, and
@@ -6255,7 +6276,7 @@ FORCE_INLINE __m64 _mm_abs_pi8(__m64 a)
             uint8x8_t tmp_low;                                              \
             uint8x8_t tmp_high;                                             \
             if ((imm) >= 8) {                                               \
-                const int idx = (imm) -8;                                   \
+                const int idx = (imm) - 8;                                  \
                 tmp_low = vreinterpret_u8_m64(_a);                          \
                 tmp_high = vdup_n_u8(0);                                    \
                 ret = vreinterpret_m64_u8(vext_u8(tmp_low, tmp_high, idx)); \
@@ -6776,14 +6797,14 @@ FORCE_INLINE __m64 _mm_sign_pi8(__m64 _a, __m64 _b)
     _sse2neon_define2(                                                  \
         __m128i, a, b,                                                  \
         const uint16_t _mask[8] =                                       \
-            _sse2neon_init(((imm) & (1 << 0)) ? (uint16_t) -1 : 0x0,    \
-                           ((imm) & (1 << 1)) ? (uint16_t) -1 : 0x0,    \
-                           ((imm) & (1 << 2)) ? (uint16_t) -1 : 0x0,    \
-                           ((imm) & (1 << 3)) ? (uint16_t) -1 : 0x0,    \
-                           ((imm) & (1 << 4)) ? (uint16_t) -1 : 0x0,    \
-                           ((imm) & (1 << 5)) ? (uint16_t) -1 : 0x0,    \
-                           ((imm) & (1 << 6)) ? (uint16_t) -1 : 0x0,    \
-                           ((imm) & (1 << 7)) ? (uint16_t) -1 : 0x0);   \
+            _sse2neon_init(((imm) & (1 << 0)) ? (uint16_t) - 1 : 0x0,   \
+                           ((imm) & (1 << 1)) ? (uint16_t) - 1 : 0x0,   \
+                           ((imm) & (1 << 2)) ? (uint16_t) - 1 : 0x0,   \
+                           ((imm) & (1 << 3)) ? (uint16_t) - 1 : 0x0,   \
+                           ((imm) & (1 << 4)) ? (uint16_t) - 1 : 0x0,   \
+                           ((imm) & (1 << 5)) ? (uint16_t) - 1 : 0x0,   \
+                           ((imm) & (1 << 6)) ? (uint16_t) - 1 : 0x0,   \
+                           ((imm) & (1 << 7)) ? (uint16_t) - 1 : 0x0);  \
         uint16x8_t _mask_vec = vld1q_u16(_mask);                        \
         uint16x8_t __a = vreinterpretq_u16_m128i(_a);                   \
         uint16x8_t __b = vreinterpretq_u16_m128i(_b); _sse2neon_return( \
@@ -6808,11 +6829,11 @@ FORCE_INLINE __m64 _mm_sign_pi8(__m64 _a, __m64 _b)
 // https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm_blend_ps
 FORCE_INLINE __m128 _mm_blend_ps(__m128 _a, __m128 _b, const char imm8)
 {
-    const uint32_t ALIGN_STRUCT(16)
-        data[4] = {((imm8) & (1 << 0)) ? UINT32_MAX : 0,
-                   ((imm8) & (1 << 1)) ? UINT32_MAX : 0,
-                   ((imm8) & (1 << 2)) ? UINT32_MAX : 0,
-                   ((imm8) & (1 << 3)) ? UINT32_MAX : 0};
+    const uint32_t
+        ALIGN_STRUCT(16) data[4] = {((imm8) & (1 << 0)) ? UINT32_MAX : 0,
+                                    ((imm8) & (1 << 1)) ? UINT32_MAX : 0,
+                                    ((imm8) & (1 << 2)) ? UINT32_MAX : 0,
+                                    ((imm8) & (1 << 3)) ? UINT32_MAX : 0};
     uint32x4_t mask = vld1q_u32(data);
     float32x4_t a = vreinterpretq_f32_m128(_a);
     float32x4_t b = vreinterpretq_f32_m128(_b);
@@ -7744,9 +7765,9 @@ FORCE_INLINE int _mm_test_mix_ones_zeros(__m128i a, __m128i mask)
 // https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm_testc_si128
 FORCE_INLINE int _mm_testc_si128(__m128i a, __m128i b)
 {
-    int64x2_t s64 =
+    int64x2_t s64_vec =
         vbicq_s64(vreinterpretq_s64_m128i(b), vreinterpretq_s64_m128i(a));
-    return !(vgetq_lane_s64(s64, 0) | vgetq_lane_s64(s64, 1));
+    return !(vgetq_lane_s64(s64_vec, 0) | vgetq_lane_s64(s64_vec, 1));
 }
 
 // Compute the bitwise AND of 128 bits (representing integer data) in a and b,
@@ -7764,9 +7785,9 @@ FORCE_INLINE int _mm_testc_si128(__m128i a, __m128i b)
 // https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm_testz_si128
 FORCE_INLINE int _mm_testz_si128(__m128i a, __m128i b)
 {
-    int64x2_t s64 =
+    int64x2_t s64_vec =
         vandq_s64(vreinterpretq_s64_m128i(a), vreinterpretq_s64_m128i(b));
-    return !(vgetq_lane_s64(s64, 0) | vgetq_lane_s64(s64, 1));
+    return !(vgetq_lane_s64(s64_vec, 0) | vgetq_lane_s64(s64_vec, 1));
 }
 
 /* SSE4.2 */
@@ -7934,40 +7955,40 @@ static const uint8_t ALIGN_STRUCT(16) _sse2neon_cmpestr_mask8b[16] = {
                                       SSE2NEON_CAT(u, size)))                \
     } while (0)
 
-#define SSE2NEON_CMP_EQUAL_ANY_IMPL(type)                                     \
-    static int _sse2neon_cmp_##type##_equal_any(__m128i a, int la, __m128i b, \
-                                                int lb)                       \
-    {                                                                         \
-        __m128i mtx[16];                                                      \
-        PCMPSTR_EQ(a, b, mtx, SSE2NEON_CAT(SSE2NEON_SIZE_OF_, type),          \
-                   SSE2NEON_CAT(SSE2NEON_NUMBER_OF_LANES_, type));            \
-        return SSE2NEON_CAT(                                                  \
-            _sse2neon_aggregate_equal_any_,                                   \
-            SSE2NEON_CAT(                                                     \
-                SSE2NEON_CAT(SSE2NEON_SIZE_OF_, type),                        \
-                SSE2NEON_CAT(x, SSE2NEON_CAT(SSE2NEON_NUMBER_OF_LANES_,       \
-                                             type))))(la, lb, mtx);           \
+#define SSE2NEON_CMP_EQUAL_ANY_IMPL(type)                               \
+    static uint16_t _sse2neon_cmp_##type##_equal_any(__m128i a, int la, \
+                                                     __m128i b, int lb) \
+    {                                                                   \
+        __m128i mtx[16];                                                \
+        PCMPSTR_EQ(a, b, mtx, SSE2NEON_CAT(SSE2NEON_SIZE_OF_, type),    \
+                   SSE2NEON_CAT(SSE2NEON_NUMBER_OF_LANES_, type));      \
+        return SSE2NEON_CAT(                                            \
+            _sse2neon_aggregate_equal_any_,                             \
+            SSE2NEON_CAT(                                               \
+                SSE2NEON_CAT(SSE2NEON_SIZE_OF_, type),                  \
+                SSE2NEON_CAT(x, SSE2NEON_CAT(SSE2NEON_NUMBER_OF_LANES_, \
+                                             type))))(la, lb, mtx);     \
     }
 
-#define SSE2NEON_CMP_RANGES_IMPL(type, data_type, us, byte_or_word)            \
-    static int _sse2neon_cmp_##us##type##_ranges(__m128i a, int la, __m128i b, \
-                                                 int lb)                       \
-    {                                                                          \
-        __m128i mtx[16];                                                       \
-        PCMPSTR_RANGES(                                                        \
-            a, b, mtx, data_type, us, SSE2NEON_CAT(SSE2NEON_SIZE_OF_, type),   \
-            SSE2NEON_CAT(SSE2NEON_NUMBER_OF_LANES_, type), byte_or_word);      \
-        return SSE2NEON_CAT(                                                   \
-            _sse2neon_aggregate_ranges_,                                       \
-            SSE2NEON_CAT(                                                      \
-                SSE2NEON_CAT(SSE2NEON_SIZE_OF_, type),                         \
-                SSE2NEON_CAT(x, SSE2NEON_CAT(SSE2NEON_NUMBER_OF_LANES_,        \
-                                             type))))(la, lb, mtx);            \
+#define SSE2NEON_CMP_RANGES_IMPL(type, data_type, us, byte_or_word)          \
+    static uint16_t _sse2neon_cmp_##us##type##_ranges(__m128i a, int la,     \
+                                                      __m128i b, int lb)     \
+    {                                                                        \
+        __m128i mtx[16];                                                     \
+        PCMPSTR_RANGES(                                                      \
+            a, b, mtx, data_type, us, SSE2NEON_CAT(SSE2NEON_SIZE_OF_, type), \
+            SSE2NEON_CAT(SSE2NEON_NUMBER_OF_LANES_, type), byte_or_word);    \
+        return SSE2NEON_CAT(                                                 \
+            _sse2neon_aggregate_ranges_,                                     \
+            SSE2NEON_CAT(                                                    \
+                SSE2NEON_CAT(SSE2NEON_SIZE_OF_, type),                       \
+                SSE2NEON_CAT(x, SSE2NEON_CAT(SSE2NEON_NUMBER_OF_LANES_,      \
+                                             type))))(la, lb, mtx);          \
     }
 
 #define SSE2NEON_CMP_EQUAL_ORDERED_IMPL(type)                                  \
-    static int _sse2neon_cmp_##type##_equal_ordered(__m128i a, int la,         \
-                                                    __m128i b, int lb)         \
+    static uint16_t _sse2neon_cmp_##type##_equal_ordered(__m128i a, int la,    \
+                                                         __m128i b, int lb)    \
     {                                                                          \
         __m128i mtx[16];                                                       \
         PCMPSTR_EQ(a, b, mtx, SSE2NEON_CAT(SSE2NEON_SIZE_OF_, type),           \
@@ -7981,29 +8002,34 @@ static const uint8_t ALIGN_STRUCT(16) _sse2neon_cmpestr_mask8b[16] = {
             SSE2NEON_CAT(SSE2NEON_NUMBER_OF_LANES_, type), la, lb, mtx);       \
     }
 
-static int _sse2neon_aggregate_equal_any_8x16(int la, int lb, __m128i mtx[16])
+static uint16_t _sse2neon_aggregate_equal_any_8x16(int la,
+                                                   int lb,
+                                                   __m128i mtx[16])
 {
-    int res = 0;
+    uint16_t res = 0;
     int m = (1 << la) - 1;
     uint8x8_t vec_mask = vld1_u8(_sse2neon_cmpestr_mask8b);
-    uint8x8_t t_lo = vtst_u8(vdup_n_u8(m & 0xff), vec_mask);
-    uint8x8_t t_hi = vtst_u8(vdup_n_u8(m >> 8), vec_mask);
+    uint8x8_t t_lo = vtst_u8(vdup_n_u8((uint8_t) (m & 0xff)), vec_mask);
+    uint8x8_t t_hi = vtst_u8(vdup_n_u8((uint8_t) (m >> 8)), vec_mask);
     uint8x16_t vec = vcombine_u8(t_lo, t_hi);
     for (int j = 0; j < lb; j++) {
         mtx[j] = vreinterpretq_m128i_u8(
             vandq_u8(vec, vreinterpretq_u8_m128i(mtx[j])));
         mtx[j] = vreinterpretq_m128i_u8(
             vshrq_n_u8(vreinterpretq_u8_m128i(mtx[j]), 7));
-        int tmp = _sse2neon_vaddvq_u8(vreinterpretq_u8_m128i(mtx[j])) ? 1 : 0;
+        uint16_t tmp =
+            _sse2neon_vaddvq_u8(vreinterpretq_u8_m128i(mtx[j])) ? 1 : 0;
         res |= (tmp << j);
     }
     return res;
 }
 
-static int _sse2neon_aggregate_equal_any_16x8(int la, int lb, __m128i mtx[16])
+static uint16_t _sse2neon_aggregate_equal_any_16x8(int la,
+                                                   int lb,
+                                                   __m128i mtx[16])
 {
-    int res = 0;
-    int m = (1 << la) - 1;
+    uint16_t res = 0;
+    uint16_t m = (uint16_t) (1 << la) - 1;
     uint16x8_t vec =
         vtstq_u16(vdupq_n_u16(m), vld1q_u16(_sse2neon_cmpestr_mask16b));
     for (int j = 0; j < lb; j++) {
@@ -8011,7 +8037,8 @@ static int _sse2neon_aggregate_equal_any_16x8(int la, int lb, __m128i mtx[16])
             vandq_u16(vec, vreinterpretq_u16_m128i(mtx[j])));
         mtx[j] = vreinterpretq_m128i_u16(
             vshrq_n_u16(vreinterpretq_u16_m128i(mtx[j]), 15));
-        int tmp = _sse2neon_vaddvq_u16(vreinterpretq_u16_m128i(mtx[j])) ? 1 : 0;
+        uint16_t tmp =
+            _sse2neon_vaddvq_u16(vreinterpretq_u16_m128i(mtx[j])) ? 1 : 0;
         res |= (tmp << j);
     }
     return res;
@@ -8025,10 +8052,10 @@ static int _sse2neon_aggregate_equal_any_16x8(int la, int lb, __m128i mtx[16])
 
 SSE2NEON_GENERATE_CMP_EQUAL_ANY(SSE2NEON_CMP_EQUAL_ANY_)
 
-static int _sse2neon_aggregate_ranges_16x8(int la, int lb, __m128i mtx[16])
+static uint16_t _sse2neon_aggregate_ranges_16x8(int la, int lb, __m128i mtx[16])
 {
-    int res = 0;
-    int m = (1 << la) - 1;
+    uint16_t res = 0;
+    uint16_t m = (uint16_t) (1 << la) - 1;
     uint16x8_t vec =
         vtstq_u16(vdupq_n_u16(m), vld1q_u16(_sse2neon_cmpestr_mask16b));
     for (int j = 0; j < lb; j++) {
@@ -8041,23 +8068,23 @@ static int _sse2neon_aggregate_ranges_16x8(int la, int lb, __m128i mtx[16])
         uint32x4_t vec_res = vandq_u32(vreinterpretq_u32_m128i(mtx[j]),
                                        vreinterpretq_u32_m128i(tmp));
 #if defined(__aarch64__) || defined(_M_ARM64)
-        int t = vaddvq_u32(vec_res) ? 1 : 0;
+        uint16_t t = vaddvq_u32(vec_res) ? 1 : 0;
 #else
         uint64x2_t sumh = vpaddlq_u32(vec_res);
-        int t = vgetq_lane_u64(sumh, 0) + vgetq_lane_u64(sumh, 1);
+        uint16_t t = vgetq_lane_u64(sumh, 0) + vgetq_lane_u64(sumh, 1);
 #endif
         res |= (t << j);
     }
     return res;
 }
 
-static int _sse2neon_aggregate_ranges_8x16(int la, int lb, __m128i mtx[16])
+static uint16_t _sse2neon_aggregate_ranges_8x16(int la, int lb, __m128i mtx[16])
 {
-    int res = 0;
-    int m = (1 << la) - 1;
+    uint16_t res = 0;
+    uint16_t m = (uint16_t) ((1 << la) - 1);
     uint8x8_t vec_mask = vld1_u8(_sse2neon_cmpestr_mask8b);
-    uint8x8_t t_lo = vtst_u8(vdup_n_u8(m & 0xff), vec_mask);
-    uint8x8_t t_hi = vtst_u8(vdup_n_u8(m >> 8), vec_mask);
+    uint8x8_t t_lo = vtst_u8(vdup_n_u8((uint8_t) (m & 0xff)), vec_mask);
+    uint8x8_t t_hi = vtst_u8(vdup_n_u8((uint8_t) (m >> 8)), vec_mask);
     uint8x16_t vec = vcombine_u8(t_lo, t_hi);
     for (int j = 0; j < lb; j++) {
         mtx[j] = vreinterpretq_m128i_u8(
@@ -8068,7 +8095,7 @@ static int _sse2neon_aggregate_ranges_8x16(int la, int lb, __m128i mtx[16])
             vshrq_n_u16(vreinterpretq_u16_m128i(mtx[j]), 8));
         uint16x8_t vec_res = vandq_u16(vreinterpretq_u16_m128i(mtx[j]),
                                        vreinterpretq_u16_m128i(tmp));
-        int t = _sse2neon_vaddvq_u16(vec_res) ? 1 : 0;
+        uint16_t t = _sse2neon_vaddvq_u16(vec_res) ? 1 : 0;
         res |= (t << j);
     }
     return res;
@@ -8090,22 +8117,25 @@ SSE2NEON_GENERATE_CMP_RANGES(SSE2NEON_CMP_RANGES_)
 #undef SSE2NEON_CMP_RANGES_IS_BYTE
 #undef SSE2NEON_CMP_RANGES_IS_WORD
 
-static int _sse2neon_cmp_byte_equal_each(__m128i a, int la, __m128i b, int lb)
+static uint16_t _sse2neon_cmp_byte_equal_each(__m128i a,
+                                              int la,
+                                              __m128i b,
+                                              int lb)
 {
     uint8x16_t mtx =
         vceqq_u8(vreinterpretq_u8_m128i(a), vreinterpretq_u8_m128i(b));
-    int m0 = (la < lb) ? 0 : ((1 << la) - (1 << lb));
-    int m1 = 0x10000 - (1 << la);
-    int tb = 0x10000 - (1 << lb);
+    uint16_t m0 = (la < lb) ? 0 : (uint16_t) ((1 << la) - (1 << lb));
+    uint16_t m1 = (uint16_t) (0x10000 - (1 << la));
+    uint16_t tb = (uint16_t) (0x10000 - (1 << lb));
     uint8x8_t vec_mask, vec0_lo, vec0_hi, vec1_lo, vec1_hi;
     uint8x8_t tmp_lo, tmp_hi, res_lo, res_hi;
     vec_mask = vld1_u8(_sse2neon_cmpestr_mask8b);
-    vec0_lo = vtst_u8(vdup_n_u8(m0), vec_mask);
-    vec0_hi = vtst_u8(vdup_n_u8(m0 >> 8), vec_mask);
-    vec1_lo = vtst_u8(vdup_n_u8(m1), vec_mask);
-    vec1_hi = vtst_u8(vdup_n_u8(m1 >> 8), vec_mask);
-    tmp_lo = vtst_u8(vdup_n_u8(tb), vec_mask);
-    tmp_hi = vtst_u8(vdup_n_u8(tb >> 8), vec_mask);
+    vec0_lo = vtst_u8(vdup_n_u8((uint8_t) m0), vec_mask);
+    vec0_hi = vtst_u8(vdup_n_u8((uint8_t) (m0 >> 8)), vec_mask);
+    vec1_lo = vtst_u8(vdup_n_u8((uint8_t) m1), vec_mask);
+    vec1_hi = vtst_u8(vdup_n_u8((uint8_t) (m1 >> 8)), vec_mask);
+    tmp_lo = vtst_u8(vdup_n_u8((uint8_t) tb), vec_mask);
+    tmp_hi = vtst_u8(vdup_n_u8((uint8_t) (tb >> 8)), vec_mask);
 
     res_lo = vbsl_u8(vec0_lo, vdup_n_u8(0), vget_low_u8(mtx));
     res_hi = vbsl_u8(vec0_hi, vdup_n_u8(0), vget_high_u8(mtx));
@@ -8114,17 +8144,20 @@ static int _sse2neon_cmp_byte_equal_each(__m128i a, int la, __m128i b, int lb)
     res_lo = vand_u8(res_lo, vec_mask);
     res_hi = vand_u8(res_hi, vec_mask);
 
-    int res = _sse2neon_vaddv_u8(res_lo) + (_sse2neon_vaddv_u8(res_hi) << 8);
-    return res;
+    return _sse2neon_vaddv_u8(res_lo) +
+           (uint16_t) (_sse2neon_vaddv_u8(res_hi) << 8);
 }
 
-static int _sse2neon_cmp_word_equal_each(__m128i a, int la, __m128i b, int lb)
+static uint16_t _sse2neon_cmp_word_equal_each(__m128i a,
+                                              int la,
+                                              __m128i b,
+                                              int lb)
 {
     uint16x8_t mtx =
         vceqq_u16(vreinterpretq_u16_m128i(a), vreinterpretq_u16_m128i(b));
-    int m0 = (la < lb) ? 0 : ((1 << la) - (1 << lb));
-    int m1 = 0x100 - (1 << la);
-    int tb = 0x100 - (1 << lb);
+    uint16_t m0 = (uint16_t) ((la < lb) ? 0 : ((1 << la) - (1 << lb)));
+    uint16_t m1 = (uint16_t) (0x100 - (1 << la));
+    uint16_t tb = (uint16_t) (0x100 - (1 << lb));
     uint16x8_t vec_mask = vld1q_u16(_sse2neon_cmpestr_mask16b);
     uint16x8_t vec0 = vtstq_u16(vdupq_n_u16(m0), vec_mask);
     uint16x8_t vec1 = vtstq_u16(vdupq_n_u16(m1), vec_mask);
@@ -8139,18 +8172,22 @@ static int _sse2neon_cmp_word_equal_each(__m128i a, int la, __m128i b, int lb)
 #define SSE2NEON_AGGREGATE_EQUAL_ORDER_IS_UWORD 0
 
 #define SSE2NEON_AGGREGATE_EQUAL_ORDER_IMPL(size, number_of_lanes, data_type)  \
-    static int _sse2neon_aggregate_equal_ordered_##size##x##number_of_lanes(   \
-        int bound, int la, int lb, __m128i mtx[16])                            \
+    static uint16_t                                                            \
+        _sse2neon_aggregate_equal_ordered_##size##x##number_of_lanes(          \
+            int bound, int la, int lb, __m128i mtx[16])                        \
     {                                                                          \
-        int res = 0;                                                           \
-        int m1 = SSE2NEON_IIF(data_type)(0x10000, 0x100) - (1 << la);          \
+        uint16_t res = 0;                                                      \
+        uint16_t m1 =                                                          \
+            (uint16_t) (SSE2NEON_IIF(data_type)(0x10000, 0x100) - (1 << la));  \
         uint##size##x8_t vec_mask = SSE2NEON_IIF(data_type)(                   \
             vld1_u##size(_sse2neon_cmpestr_mask##size##b),                     \
             vld1q_u##size(_sse2neon_cmpestr_mask##size##b));                   \
         uint##size##x##number_of_lanes##_t vec1 = SSE2NEON_IIF(data_type)(     \
-            vcombine_u##size(vtst_u##size(vdup_n_u##size(m1), vec_mask),       \
-                             vtst_u##size(vdup_n_u##size(m1 >> 8), vec_mask)), \
-            vtstq_u##size(vdupq_n_u##size(m1), vec_mask));                     \
+            vcombine_u##size(                                                  \
+                vtst_u##size(vdup_n_u##size((uint##size##_t) m1), vec_mask),   \
+                vtst_u##size(vdup_n_u##size((uint##size##_t)(m1 >> 8)),        \
+                             vec_mask)),                                       \
+            vtstq_u##size(vdupq_n_u##size((uint##size##_t) m1), vec_mask));    \
         uint##size##x##number_of_lanes##_t vec_minusone = vdupq_n_u##size(-1); \
         uint##size##x##number_of_lanes##_t vec_zero = vdupq_n_u##size(0);      \
         for (int j = 0; j < lb; j++) {                                         \
@@ -8167,7 +8204,7 @@ static int _sse2neon_cmp_word_equal_each(__m128i a, int la, __m128i b, int lb)
             int val = 1;                                                       \
             for (int j = 0, k = i; j < bound - i && k < bound; j++, k++)       \
                 val &= ptr[k * bound + j];                                     \
-            res += val << i;                                                   \
+            res += (uint16_t) (val << i);                                      \
         }                                                                      \
         return res;                                                            \
     }
@@ -8214,14 +8251,17 @@ enum {
     SSE2NEON_CMPESTR_LIST
 #undef _
 };
-typedef int (*cmpestr_func_t)(__m128i a, int la, __m128i b, int lb);
+typedef uint16_t (*cmpestr_func_t)(__m128i a, int la, __m128i b, int lb);
 static cmpestr_func_t _sse2neon_cmpfunc_table[] = {
 #define _(name, func_suffix) _sse2neon_##func_suffix,
     SSE2NEON_CMPESTR_LIST
 #undef _
 };
 
-FORCE_INLINE int _sse2neon_sido_negative(int res, int lb, int imm8, int bound)
+FORCE_INLINE uint16_t _sse2neon_sido_negative(int res,
+                                              int lb,
+                                              int imm8,
+                                              int bound)
 {
     switch (imm8 & 0x30) {
     case _SIDD_NEGATIVE_POLARITY:
@@ -8234,7 +8274,7 @@ FORCE_INLINE int _sse2neon_sido_negative(int res, int lb, int imm8, int bound)
         break;
     }
 
-    return res & ((bound == 8) ? 0xFF : 0xFFFF);
+    return (uint16_t) (res & ((bound == 8) ? 0xFF : 0xFFFF));
 }
 
 FORCE_INLINE int _sse2neon_clz(unsigned int x)
@@ -8298,10 +8338,10 @@ FORCE_INLINE int _sse2neon_ctzll(unsigned long long x)
 // As the only difference of PCMPESTR* and PCMPISTR* is the way to calculate the
 // length of string, we use SSE2NEON_CMP{I,E}STRX_GET_LEN to get the length of
 // string a and b.
-#define SSE2NEON_COMP_AGG(a, b, la, lb, imm8, IE)                  \
-    SSE2NEON_CMPSTR_SET_UPPER(bound, imm8);                        \
-    SSE2NEON_##IE##_LEN_PAIR(a, b, la, lb);                        \
-    int r2 = (_sse2neon_cmpfunc_table[imm8 & 0x0f])(a, la, b, lb); \
+#define SSE2NEON_COMP_AGG(a, b, la, lb, imm8, IE)                       \
+    SSE2NEON_CMPSTR_SET_UPPER(bound, imm8);                             \
+    SSE2NEON_##IE##_LEN_PAIR(a, b, la, lb);                             \
+    uint16_t r2 = (_sse2neon_cmpfunc_table[imm8 & 0x0f])(a, la, b, lb); \
     r2 = _sse2neon_sido_negative(r2, lb, imm8, bound)
 
 #define SSE2NEON_CMPSTR_GENERATE_INDEX(r2, bound, imm8)          \
@@ -8318,8 +8358,8 @@ FORCE_INLINE int _sse2neon_ctzll(unsigned long long x)
             dst = vreinterpretq_m128i_u16(vbslq_u16(                           \
                 tmp, vdupq_n_u16(-1), vreinterpretq_u16_m128i(dst)));          \
         } else {                                                               \
-            uint8x16_t vec_r2 =                                                \
-                vcombine_u8(vdup_n_u8(r2), vdup_n_u8(r2 >> 8));                \
+            uint8x16_t vec_r2 = vcombine_u8(vdup_n_u8((uint8_t) r2),           \
+                                            vdup_n_u8((uint8_t) (r2 >> 8)));   \
             uint8x16_t tmp =                                                   \
                 vtstq_u8(vec_r2, vld1q_u8(_sse2neon_cmpestr_mask8b));          \
             dst = vreinterpretq_m128i_u8(                                      \
@@ -8330,8 +8370,8 @@ FORCE_INLINE int _sse2neon_ctzll(unsigned long long x)
             dst = vreinterpretq_m128i_u16(                                     \
                 vsetq_lane_u16(r2 & 0xffff, vreinterpretq_u16_m128i(dst), 0)); \
         } else {                                                               \
-            dst = vreinterpretq_m128i_u8(                                      \
-                vsetq_lane_u8(r2 & 0xff, vreinterpretq_u8_m128i(dst), 0));     \
+            dst = vreinterpretq_m128i_u8(vsetq_lane_u8(                        \
+                (uint8_t) (r2 & 0xff), vreinterpretq_u8_m128i(dst), 0));       \
         }                                                                      \
     }                                                                          \
     return dst
@@ -8555,8 +8595,8 @@ FORCE_INLINE uint32_t _mm_crc32_u16(uint32_t crc, uint16_t v)
     (defined(_M_ARM64) && !defined(__clang__))
     crc = __crc32ch(crc, v);
 #else
-    crc = _mm_crc32_u8(crc, v & 0xff);
-    crc = _mm_crc32_u8(crc, (v >> 8) & 0xff);
+    crc = _mm_crc32_u8(crc, (uint8_t) (v & 0xff));
+    crc = _mm_crc32_u8(crc, (uint8_t) ((v >> 8) & 0xff));
 #endif
     return crc;
 }
@@ -8574,8 +8614,8 @@ FORCE_INLINE uint32_t _mm_crc32_u32(uint32_t crc, uint32_t v)
     (defined(_M_ARM64) && !defined(__clang__))
     crc = __crc32cw(crc, v);
 #else
-    crc = _mm_crc32_u16(crc, v & 0xffff);
-    crc = _mm_crc32_u16(crc, (v >> 16) & 0xffff);
+    crc = _mm_crc32_u16(crc, (uint16_t) (v & 0xffff));
+    crc = _mm_crc32_u16(crc, (uint16_t) ((v >> 16) & 0xffff));
 #endif
     return crc;
 }
@@ -8592,8 +8632,8 @@ FORCE_INLINE uint64_t _mm_crc32_u64(uint64_t crc, uint64_t v)
 #elif (defined(_M_ARM64) && !defined(__clang__))
     crc = __crc32cd((uint32_t) crc, v);
 #else
-    crc = _mm_crc32_u32((uint32_t) (crc), v & 0xffffffff);
-    crc = _mm_crc32_u32((uint32_t) (crc), (v >> 32) & 0xffffffff);
+    crc = _mm_crc32_u32((uint32_t) (crc), (uint32_t) (v & 0xffffffff));
+    crc = _mm_crc32_u32((uint32_t) (crc), (uint32_t) ((v >> 32) & 0xffffffff));
 #endif
     return crc;
 }
@@ -9337,7 +9377,7 @@ FORCE_INLINE void _sse2neon_mm_set_denormals_zero_mode(unsigned int flag)
 #if defined(__aarch64__) || defined(_M_ARM64)
     _sse2neon_set_fpcr(r.value);
 #else
-    __asm__ __volatile__("vmsr FPSCR, %0" ::"r"(r));        /* write */
+    __asm__ __volatile__("vmsr FPSCR, %0" ::"r"(r)); /* write */
 #endif
 }
 
