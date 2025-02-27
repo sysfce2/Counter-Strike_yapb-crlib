@@ -10,7 +10,6 @@
 #if (defined(CR_LINUX) || defined (CR_OSX)) && !defined (CR_ARCH_ARM) && !defined (CR_ARCH_PPC)
 #  include <cpuid.h>
 #elif defined (CR_WINDOWS) && !defined(CR_CXX_MSVC)
-#  include <x86intrin.h>
 #  include <cpuid.h>
 #endif
 
@@ -44,8 +43,8 @@ private:
 
       uint32_t data[regs] {};
 
-#if defined (CR_WINDOWS)
-      __cpuidex (reinterpret_cast <int32_t *> (data), 1, 0);
+#if defined (CR_WINDOWS) && defined(CR_CXX_MSVC)
+   __cpuidex (reinterpret_cast <int32_t *> (data), 1, 0);
 #else
       __get_cpuid (0x1, &data[eax], &data[ebx], &data[ecx], &data[edx]);
 #endif
