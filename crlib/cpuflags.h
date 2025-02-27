@@ -9,6 +9,8 @@
 
 #if (defined(CR_LINUX) || defined (CR_OSX)) && !defined (CR_ARCH_ARM) && !defined (CR_ARCH_PPC)
 #include <cpuid.h>
+#elif defined (CR_WINDOWS) && !defined(CR_CXX_MSVC)
+#include <x86intrin.h>
 #endif
 
 CR_DECLARE_SCOPED_ENUM (CpuCap,
