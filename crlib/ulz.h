@@ -35,8 +35,8 @@ private:
 
 
 private:
-   SmallArray <int32_t> hashTable_;
-   SmallArray <int32_t> prevTable_;
+   SmallArray <int32_t> hashTable_ {};
+   SmallArray <int32_t> prevTable_ {};
 
 public:
    explicit ULZ () {
@@ -305,8 +305,5 @@ private:
       return val;
    }
 };
-
-// expose global ulz object
-CR_EXPOSE_GLOBAL_SINGLETON (ULZ, ulz);
 
 CR_NAMESPACE_END
