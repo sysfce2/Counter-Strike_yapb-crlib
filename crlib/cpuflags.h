@@ -8,9 +8,13 @@
 #pragma once
 
 #if (defined(CR_LINUX) || defined (CR_OSX)) && !defined (CR_ARCH_ARM) && !defined (CR_ARCH_PPC)
-#include <cpuid.h>
+#  include <cpuid.h>
 #elif defined (CR_WINDOWS) && !defined(CR_CXX_MSVC)
-#include <cpuid.h>
+#  if defined(__MINGW32__)
+#     include <intrin.h>
+#  else
+#     include <cpuid.h>
+#endif
 #endif
 
 CR_DECLARE_SCOPED_ENUM (CpuCap,
