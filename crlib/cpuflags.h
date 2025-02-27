@@ -54,7 +54,7 @@ private:
       sse42 = !!(data[ecx] & CpuCap::SSE42);
       avx = !!(data[ecx] & CpuCap::AVX);
 
-#if defined (CR_WINDOWS)
+#if defined (CR_WINDOWS) && defined(CR_CXX_MSVC)
       __cpuidex (reinterpret_cast <int32_t *> (data), 7, 0);
 #else
       __get_cpuid (0x7, &data[eax], &data[ebx], &data[ecx], &data[edx]);
