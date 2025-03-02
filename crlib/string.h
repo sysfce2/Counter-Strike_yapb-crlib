@@ -51,13 +51,26 @@ CR_EXPOSE_GLOBAL_SINGLETON (SNPrintfWrap, fmtwrap);
 // simple non-owning string class like std::string_view
 class StringRef {
 private:
-   static constexpr size_t len (const char *str) noexcept {
-      return !*str ? 0 : 1 + len (str + 1);
+   static constexpr size_t lenstr (const char *str) noexcept {
+      auto count = static_cast <size_t> (0);
+
+      for (; *str != kNullChar; ++str) {
+         ++count;
+      }
+      return count;
    }
 
 public:
-   static constexpr uint32_t fnv1a32 (const char *str, uint32_t hash = 0x811c9dc5) {
-      return !*str ? hash : fnv1a32 (str + 1, (hash ^ static_cast <uint8_t> (*str)) * 0x01000193);
+   static constexpr uint32_t fnv1a32 (const char *str) noexcept {
+      constexpr uint32_t prime = 0x1000193;
+      constexpr uint32_t basis = 0x811c9dc5;
+
+      auto hash = basis;
+
+      for (; *str != kNullChar; ++str) {
+         hash = (hash ^ static_cast <uint32_t> (static_cast <uint8_t> (*str))) * prime;
+      }
+      return hash;
    }
 
 public:
@@ -72,7 +85,7 @@ private:
 public:
    constexpr StringRef () noexcept = default;
 
-   constexpr StringRef (const char *chars) : chars_ (chars), length_ (chars ? len (chars) : 0)
+   constexpr StringRef (const char *chars) : chars_ (chars), length_ (chars ? StringRef::lenstr (chars) : 0)
    { }
 
    constexpr StringRef (const char *chars, size_t length) : chars_ (chars), length_ (length)
