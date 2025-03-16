@@ -13,7 +13,7 @@ CR_NAMESPACE_BEGIN
 #if defined(__linux__)
 #  define CR_LINUX
 #elif defined(__APPLE__)
-#  define CR_OSX
+#  define CR_MACOS
 #elif defined(_WIN32)
 #  define CR_WINDOWS
 #endif
@@ -22,7 +22,7 @@ CR_NAMESPACE_BEGIN
 #  define CR_ANDROID
 #endif
 
-#if !defined (CR_DEBUG) && (defined(DEBUG) || defined(_DEBUG))
+#if !defined(CR_DEBUG) && (defined(DEBUG) || defined(_DEBUG))
 #  define CR_DEBUG
 #endif
 
@@ -40,22 +40,12 @@ CR_NAMESPACE_BEGIN
 #endif
 
 // configure macroses
-#define CR_LINKAGE_C extern "C"
+#define CR_C_LINKAGE extern "C"
 
-#if defined(CR_WINDOWS)
-#  define CR_EXPORT CR_LINKAGE_C __declspec (dllexport)
-#  define CR_STDCALL __stdcall
-#elif defined(CR_LINUX) || defined(CR_OSX)
-#  define CR_EXPORT CR_LINKAGE_C __attribute__((visibility("default")))
-#  define CR_STDCALL
-#else
-#  error "Can't configure export macros. Compiler unrecognized."
-#endif
-
-#if defined(__x86_64) || defined(__x86_64__) || defined(__amd64__) || defined(__amd64) || defined (__aarch64__) || (defined(_MSC_VER) && defined(_M_X64)) || defined(__powerpc64__)
+#if defined(__x86_64) || defined(__x86_64__) || defined(__amd64__) || defined(__amd64) || defined(__aarch64__) || (defined(_MSC_VER) && defined(_M_X64)) || defined(__powerpc64__)
 #  define CR_ARCH_X64
 #elif defined(__i686) || defined(__i686__) || defined(__i386) || defined(__i386__) || defined(i386) || (defined(_MSC_VER) && defined(_M_IX86)) || defined(__powerpc__)
-#  define CR_ARCH_X86
+#  define CR_ARCH_X32
 #endif
 
 #if defined(__arm__)
@@ -64,7 +54,7 @@ CR_NAMESPACE_BEGIN
 #  define CR_ARCH_ARM64
 #endif
 
-#if defined (CR_ARCH_ARM32) || defined (CR_ARCH_ARM64)
+#if defined(CR_ARCH_ARM32) || defined(CR_ARCH_ARM64)
 #   define CR_ARCH_ARM
 #endif
 
@@ -74,31 +64,31 @@ CR_NAMESPACE_BEGIN
 #  define CR_ARCH_PPC32
 #endif
 
-#if defined (CR_ARCH_PPC32) || defined (CR_ARCH_PPC64)
+#if defined(CR_ARCH_PPC32) || defined(CR_ARCH_PPC64)
 #   define CR_ARCH_PPC
 #endif
 
 #if !defined(CR_DISABLE_SIMD)
-#  if !defined (CR_ARCH_ARM) && !defined (CR_ARCH_PPC)
+#  if !defined(CR_ARCH_ARM) && !defined(CR_ARCH_PPC)
 #     define CR_HAS_SIMD_SSE
-#  elif defined (__ARM_NEON)
+#  elif defined(__ARM_NEON)
 #     define CR_HAS_SIMD_NEON
 #  endif
 #endif
 
-#if defined (CR_CXX_MSVC)
+#if defined(CR_CXX_MSVC)
 #  define CR_FORCE_INLINE __forceinline
 #else
 #  define CR_FORCE_INLINE __attribute__((__always_inline__)) inline
 #endif
 
-#if defined (CR_HAS_SIMD_SSE) || defined (CR_HAS_SIMD_NEON)
+#if defined(CR_HAS_SIMD_SSE) || defined(CR_HAS_SIMD_NEON)
 #  define CR_HAS_SIMD
 #endif
 
 #if defined(CR_HAS_SIMD)
-#  if defined (CR_CXX_MSVC)
-#     define CR_SIMD_ALIGNED __declspec (align (16))
+#  if defined(CR_CXX_MSVC)
+#     define CR_SIMD_ALIGNED __declspec(align(16))
 #  else
 #     define CR_SIMD_ALIGNED __attribute__((aligned(16)))
 #  endif
@@ -108,38 +98,53 @@ CR_NAMESPACE_BEGIN
 #  define CR_ARCH_CPU_BIG_ENDIAN
 #endif
 
+// define export macros
+#if !defined(__GNUC__)
+#  define CR_FORCE_STACK_ALIGN
+#  define CR_EXPORT CR_C_LINKAGE __declspec(dllexport)
+#  define CR_STDCALL __stdcall
+#else
+#  if defined(__i386__)
+#     define CR_FORCE_STACK_ALIGN __attribute__((force_align_arg_pointer,noinline))
+#  else
+#     define CR_FORCE_STACK_ALIGN
+#endif
+#  define CR_EXPORT CR_C_LINKAGE CR_FORCE_STACK_ALIGN __attribute__((visibility("default"),used))
+#  define CR_STDCALL
+#endif
+
 // msvc provides us placement new by default
-#if defined (CR_CXX_MSVC)
+#if defined(CR_CXX_MSVC)
 #  define __PLACEMENT_NEW_INLINE
 #endif
 
-#if (defined (CR_CXX_MSVC) && !defined (CR_CXX_CLANG)) || defined (CR_ARCH_ARM) || defined (CR_ARCH_PPC)
+#if (defined(CR_CXX_MSVC) && !defined(CR_CXX_CLANG)) || defined(CR_ARCH_ARM) || defined(CR_ARCH_PPC)
 #  define CR_SIMD_TARGET(dest) CR_FORCE_INLINE
 #  define CR_SIMD_TARGET_AIL(dest) CR_FORCE_INLINE
 #  define CR_SIMD_TARGET_TIL(dest) inline
 #else
 #  define CR_SIMD_TARGET(dest) __attribute__((target(dest)))
-#  define CR_SIMD_TARGET_AIL(dest) __attribute__((__always_inline__, target(dest))) inline
+#  define CR_SIMD_TARGET_AIL(dest) __attribute__((__always_inline__,target(dest))) inline
 #  define CR_SIMD_TARGET_TIL(dest) __attribute__((target(dest))) inline
 #endif
 
 // no symbol versioning in native builds
-#if !defined (CR_NATIVE_BUILD)
+#if !defined(CR_NATIVE_BUILD)
 
 // set the minimal glibc as we can
-#if defined (CR_ARCH_ARM64) || defined (CR_ARCH_PPC64)
+#if defined(CR_ARCH_ARM64) || defined(CR_ARCH_PPC64)
 #  define GLIBC_VERSION_MIN "2.17"
-#elif defined (CR_ARCH_ARM32)
+#elif defined(CR_ARCH_ARM32)
 #  define GLIBC_VERSION_MIN "2.4"
-#elif defined (CR_ARCH_X64) && !defined (CR_ARCH_ARM)
+#elif defined(CR_ARCH_X64) && !defined(CR_ARCH_ARM)
 #  define GLIBC_VERSION_MIN "2.2.5"
 #else
 #  define GLIBC_VERSION_MIN "2.0"
 #endif
 
 // avoid linking to high GLIBC versions
-#if defined (CR_LINUX) && !defined (CR_ANDROID)
-#  if defined (__GLIBC__)
+#if defined(CR_LINUX) && !defined(CR_ANDROID)
+#  if defined(__GLIBC__)
    __asm__ (".symver powf, powf@GLIBC_" GLIBC_VERSION_MIN);
 #     if __GLIBC__ >= 2 && __GLIBC_MINOR__ < 34
          __asm__ (".symver dlsym, dlsym@GLIBC_" GLIBC_VERSION_MIN);
@@ -164,7 +169,7 @@ constexpr auto kLibrarySuffix = ".dll";
 #  define WINVER 0x0600
 #endif
 
-#if !defined (NOMINMAX)
+#if !defined(NOMINMAX)
 #  define NOMINMAX
 #endif
 
@@ -213,7 +218,7 @@ constexpr auto kLibrarySuffix = ".dll";
 #  include <io.h>
 #else
 constexpr auto kPathSeparator = "/";
-#  if defined (CR_OSX)
+#  if defined(CR_MACOS)
       constexpr auto kLibrarySuffix = ".dylib";
 #  else
       constexpr auto kLibrarySuffix = ".so";
@@ -230,11 +235,12 @@ constexpr auto kPathSeparator = "/";
 #include <locale.h>
 #include <string.h>
 #include <stdarg.h>
+#include <signal.h>
 
 #include <sys/types.h>
 #include <sys/stat.h>
 
-#if defined (CR_ANDROID)
+#if defined(CR_ANDROID)
 #  include <android/log.h>
 #endif
 
@@ -243,7 +249,7 @@ constexpr auto kPathSeparator = "/";
 CR_NAMESPACE_BEGIN
 
 // undef bzero under android
-#if defined (CR_ANDROID)
+#if defined(CR_ANDROID)
 #  undef bzero
 #endif
 
@@ -251,7 +257,7 @@ CR_NAMESPACE_BEGIN
 struct Platform : public Singleton <Platform> {
    bool win = false;
    bool nix = false;
-   bool osx = false;
+   bool macos = false;
    bool android = false;
    bool x64 = false;
    bool arm = false;
@@ -273,8 +279,8 @@ struct Platform : public Singleton <Platform> {
       nix = true;
 #endif
 
-#if defined(CR_OSX)
-      osx = true;
+#if defined(CR_MACOS)
+      macos = true;
 #endif
 
 #if defined(CR_ARCH_X64) || defined(CR_ARCH_ARM64)
@@ -382,7 +388,7 @@ struct Platform : public Singleton <Platform> {
    void abort (const char *msg = "OUT OF MEMORY!") noexcept {
       fprintf (stderr, "%s\n", msg);
 
-#if defined (CR_ANDROID)
+#if defined(CR_ANDROID)
       __android_log_write (ANDROID_LOG_ERROR, appName, msg);
 #endif
 
@@ -404,7 +410,7 @@ struct Platform : public Singleton <Platform> {
    }
 
    void loctime (tm *_tm, const time_t *_time) {
-#if defined (CR_WINDOWS)
+#if defined(CR_WINDOWS)
       localtime_s (_tm, _time);
 #else
       localtime_r (_time, _tm);
@@ -412,8 +418,8 @@ struct Platform : public Singleton <Platform> {
    }
 
    const char *env (const char *var) {
-      static char result[256];
-      bzero (result, sizeof (result));
+      static char result[384];
+      bzero (result, cr::bufsize (result));
 
 #if defined(CR_CXX_MSVC)
       char *buffer = nullptr;
@@ -434,7 +440,7 @@ struct Platform : public Singleton <Platform> {
    }
 
    [[nodiscard]] const char *tmpfname () noexcept {
-#if defined (CR_CXX_MSVC)
+#if defined(CR_CXX_MSVC)
       static char name[L_tmpnam_s];
       tmpnam_s (name);
 
@@ -454,7 +460,7 @@ struct Platform : public Singleton <Platform> {
    }
 
    int32_t hardwareConcurrency () {
-#if defined (CR_WINDOWS)
+#if defined(CR_WINDOWS)
       SYSTEM_INFO sysinfo;
       GetSystemInfo (&sysinfo);
 
@@ -465,7 +471,7 @@ struct Platform : public Singleton <Platform> {
    }
 
    bool fileExists (const char *path) {
-#if defined (CR_WINDOWS)
+#if defined(CR_WINDOWS)
       return _access (path, 0) == 0;
 #else
       return access (path, F_OK) == 0;
@@ -475,7 +481,7 @@ struct Platform : public Singleton <Platform> {
    FILE *openStdioFile (const char *path, const char *mode) {
       FILE *handle = nullptr;
 
-#if defined (CR_CXX_MSVC)
+#if defined(CR_CXX_MSVC)
       fopen_s (&handle, path, mode);
 #else
       handle = fopen (path, mode);

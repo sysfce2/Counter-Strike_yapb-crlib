@@ -10,7 +10,7 @@
 #include <crlib/basic.h>
 #include <crlib/string.h>
 
-#if defined (CR_LINUX) || defined (CR_OSX)
+#if defined(CR_LINUX) || defined(CR_MACOS)
 #  include <dlfcn.h>
 #  include <errno.h>
 #  include <fcntl.h>
@@ -23,7 +23,7 @@ CR_NAMESPACE_BEGIN
 // handling dynamic library loading
 class SharedLibrary final : public NonCopyable {
 public:
-#if defined (CR_WINDOWS)
+#if defined(CR_WINDOWS)
    using Handle = HMODULE;
    using Func = FARPROC;
 #else
@@ -56,12 +56,12 @@ public:
       }
       unloadable_ = unloadable;
 
-#if defined (CR_WINDOWS)
+#if defined(CR_WINDOWS)
       handle_ = LoadLibraryA (file.chars ());
 #else
       auto loadFlags = RTLD_NOW | RTLD_LOCAL;
 
-#if defined (CR_LINUX) && !defined (CR_ANDROID) && !defined (__SANITIZE_ADDRESS__) && defined (__GLIBC__)
+#if defined(CR_LINUX) && !defined(CR_ANDROID) && !defined(__SANITIZE_ADDRESS__) && defined(__GLIBC__)
       loadFlags |= RTLD_DEEPBIND;
 #endif
       handle_ = dlopen (file.chars (), loadFlags);
@@ -70,7 +70,7 @@ public:
    }
 
    static String path (void *address) {
-#if defined (CR_WINDOWS)
+#if defined(CR_WINDOWS)
       MEMORY_BASIC_INFORMATION mbi;
 
       if (!VirtualQuery (address, &mbi, sizeof (mbi))) {
@@ -99,7 +99,7 @@ public:
    bool locate (void *address) {
       unloadable_ = false;
 
-#if defined (CR_WINDOWS)
+#if defined(CR_WINDOWS)
       MEMORY_BASIC_INFORMATION mbi;
 
       if (!VirtualQuery (address, &mbi, sizeof (mbi))) {
@@ -126,7 +126,7 @@ public:
          return;
       }
 
-#if defined (CR_WINDOWS)
+#if defined(CR_WINDOWS)
       FreeLibrary (static_cast <HMODULE> (handle_));
 #else
       dlclose (handle_);
@@ -134,11 +134,11 @@ public:
       handle_ = nullptr;
    }
 
-   template <typename R> R resolve (const char *function) const {
+   template <typename R> R resolve (StringRef fn) const {
       if (!*this) {
          return nullptr;
       }
-      return SharedLibrary::getSymbol <R> (handle (), function);
+      return SharedLibrary::getSymbol <R> (handle (), fn);
    }
 
    Handle handle () const {
@@ -151,12 +151,12 @@ public:
    }
 
 public:
-  template <typename R> static inline R CR_STDCALL getSymbol (Handle module, const char *function) {
+  template <typename R> static inline R CR_STDCALL getSymbol (Handle module, StringRef fn) {
       return reinterpret_cast <R> (
-#if defined (CR_WINDOWS)
-         GetProcAddress (static_cast <HMODULE> (module), function)
+#if defined(CR_WINDOWS)
+         reinterpret_cast <PVOID> (GetProcAddress (static_cast <HMODULE> (module), fn.chars ()))
 #else
-         dlsym (module, function)
+         dlsym (module, fn.chars ())
 #endif
          );
    }

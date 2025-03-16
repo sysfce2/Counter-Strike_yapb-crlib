@@ -9,29 +9,29 @@
 
 #include <crlib/basic.h>
 
-#if defined (CR_HAS_SIMD_SSE)
+#if defined(CR_HAS_SIMD_SSE)
 #  include <smmintrin.h>
 # 
-#elif defined (CR_HAS_SIMD_NEON)
+#elif defined(CR_HAS_SIMD_NEON)
 #  include <arm_neon.h>
 #endif
 
 namespace cr::simd {
-#if defined (CR_HAS_SIMD_SSE)
+#if defined(CR_HAS_SIMD_SSE)
 #  include <crlib/simd/sse2.h>
-#elif defined (CR_HAS_SIMD_NEON)
+#elif defined(CR_HAS_SIMD_NEON)
 #  include <crlib/simd/neon.h>
 #endif
 }
 
-#if defined (CR_HAS_SIMD_NEON)
+#if defined(CR_HAS_SIMD_NEON)
 #  define SSE2NEON_SUPPRESS_WARNINGS
 #  include <crlib/simd/sse2neon.h>
 #endif
 
 CR_NAMESPACE_BEGIN
 
-#if defined (CR_HAS_SIMD)
+#if defined(CR_HAS_SIMD)
 
 // forward declaration of vector
 template <typename T> class Vec3D;
@@ -39,14 +39,14 @@ template <typename T> class Vec3D;
 // simple wrapper for vector
 class CR_SIMD_ALIGNED SimdVec3Wrap final {
 private:
-#if defined (CR_HAS_SIMD_SSE)
+#if defined(CR_HAS_SIMD_SSE)
    template <typename U> __m128 _simd_load_mask (const U *mask) const {
       return _mm_load_ps (reinterpret_cast <float *> (*const_cast <U **> (&mask)));
    };
 #endif
 
    template <int XmmMask> static CR_SIMD_TARGET_AIL ("sse4.1") __m128 _simd_dpps (__m128 v0, __m128 v1) {
-#if defined (CR_HAS_SIMD_SSE)
+#if defined(CR_HAS_SIMD_SSE)
       if (cpuflags.sse42) {
          return _mm_dp_ps (v0, v1, XmmMask);
       }
@@ -74,12 +74,12 @@ private:
    }
 
 public:
-#if defined (CR_CXX_MSVC)
+#if defined(CR_CXX_MSVC)
 #   pragma warning(push)
 #   pragma warning(disable: 4201)
 #endif
    union {
-#if defined (CR_HAS_SIMD_SSE)
+#if defined(CR_HAS_SIMD_SSE)
       __m128 m { _mm_setzero_ps () };
 #else
       float32x4_t m { vdupq_n_f32 (0) };
@@ -89,7 +89,7 @@ public:
       };
    };
 
-#if defined (CR_CXX_MSVC)
+#if defined(CR_CXX_MSVC)
 #   pragma warning(pop) 
 #endif
 
@@ -132,8 +132,8 @@ public:
       return _mm_cvtss_f32 (_mm_sqrt_ps (_simd_dpps <0x71> (m, m)));
    }
 
-#if defined (CR_HAS_SIMD_SSE)
-   // this function directly taken from rehlds project https://github.com/dreamstalker/rehlds
+#if defined(CR_HAS_SIMD_SSE)
+   // this function directly taken from rehlds project https://github.com/rehlds/rehlds
    template <typename T> CR_FORCE_INLINE void angleVectors (T *forward, T *right, T *upward) {
       constexpr CR_SIMD_ALIGNED float kDegToRad[] = {
          kDegreeToRadians, kDegreeToRadians,

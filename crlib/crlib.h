@@ -29,6 +29,7 @@
 #include <crlib/detour.h>
 #include <crlib/thread.h>
 #include <crlib/timers.h>
+#include <crlib/wavehelper.h>
 
 CR_NAMESPACE_BEGIN
 

@@ -382,7 +382,7 @@ namespace detail {
       FileEnumeratorEntry () = default;
       ~FileEnumeratorEntry () = default;
 
-#if defined (CR_WINDOWS)
+#if defined(CR_WINDOWS)
       bool next {};
       String path {};
       HANDLE handle {};
@@ -426,7 +426,7 @@ public:
       }
       entries_->path = pam.first;
 
-#if defined (CR_WINDOWS)
+#if defined(CR_WINDOWS)
       entries_->handle = FindFirstFileA (mask.chars (), &entries_->data);
       entries_->next = entries_->handle != INVALID_HANDLE_VALUE;
 #else
@@ -440,7 +440,7 @@ public:
    }
 
    void close () {
-#if defined (CR_WINDOWS)
+#if defined(CR_WINDOWS)
       if (entries_->handle != INVALID_HANDLE_VALUE) {
          FindClose (entries_->handle);
 
@@ -456,7 +456,7 @@ public:
    }
 
    bool next () {
-#if defined (CR_WINDOWS)
+#if defined(CR_WINDOWS)
       entries_->next = !!FindNextFileA (entries_->handle, &entries_->data);
       return entries_->next;
 #else
@@ -470,7 +470,7 @@ public:
    }
 
    bool stillValid () const {
-#if defined (CR_WINDOWS)
+#if defined(CR_WINDOWS)
       return entries_->next;
 #else
       return entries_->dir != nullptr && entries_->entry != nullptr;
@@ -480,7 +480,7 @@ public:
    String getMatch () const {
       StringRef match {};
 
-#if defined (CR_WINDOWS)
+#if defined(CR_WINDOWS)
       match = entries_->data.cFileName;
 #else
       match = entries_->entry->d_name;

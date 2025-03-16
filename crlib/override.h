@@ -37,6 +37,6 @@ void operator delete [] (void *ptr, size_t) noexcept {
    crmem::release (ptr);
 }
 
-CR_LINKAGE_C void __cxa_pure_virtual () {
+CR_C_LINKAGE void __cxa_pure_virtual () {
    cr::plat.abort ("pure virtual function call");
 }

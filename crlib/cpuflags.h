@@ -7,9 +7,9 @@
 
 #pragma once
 
-#if (defined(CR_LINUX) || defined (CR_OSX)) && !defined (CR_ARCH_ARM) && !defined (CR_ARCH_PPC)
+#if (defined(CR_LINUX) || defined(CR_MACOS)) && !defined(CR_ARCH_ARM) && !defined(CR_ARCH_PPC)
 #  include <cpuid.h>
-#elif defined (CR_WINDOWS) && !defined(CR_CXX_MSVC)
+#elif defined(CR_WINDOWS) && !defined(CR_CXX_MSVC)
 #  include <cpuid.h>
 #endif
 
@@ -38,12 +38,12 @@ public:
 
 private:
    void detect () {
-#if !defined (CR_ARCH_ARM) && !defined (CR_ARCH_PPC)
+#if !defined(CR_ARCH_ARM) && !defined(CR_ARCH_PPC)
       enum { eax, ebx, ecx, edx, regs };
 
       uint32_t data[regs] {};
 
-#if defined (CR_WINDOWS) && defined(CR_CXX_MSVC)
+#if defined(CR_WINDOWS) && defined(CR_CXX_MSVC)
    __cpuidex (reinterpret_cast <int32_t *> (data), 1, 0);
 #else
       __get_cpuid (0x1, &data[eax], &data[ebx], &data[ecx], &data[edx]);
@@ -54,7 +54,7 @@ private:
       sse42 = !!(data[ecx] & CpuCap::SSE42);
       avx = !!(data[ecx] & CpuCap::AVX);
 
-#if defined (CR_WINDOWS) && defined(CR_CXX_MSVC)
+#if defined(CR_WINDOWS) && defined(CR_CXX_MSVC)
       __cpuidex (reinterpret_cast <int32_t *> (data), 7, 0);
 #else
       __get_cpuid (0x7, &data[eax], &data[ebx], &data[ecx], &data[edx]);

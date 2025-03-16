@@ -29,7 +29,8 @@ public:
 public:
    template <typename T> static constexpr T *get (const size_t length = 1) noexcept {
       auto size = cr::max <size_t> (1u, length) * sizeof (T);
-#if defined (CR_CXX_GCC)
+
+#if defined(CR_CXX_GCC)
       if (size >= PTRDIFF_MAX) {
          plat.abort ();
       }
@@ -37,8 +38,8 @@ public:
       auto memory = reinterpret_cast <T *> (malloc (size));
 
       if (!memory) {
-         char errmsg[256] {};
-         snprintf (errmsg, cr::bufsize (errmsg), "Failed to allocate %zd megabytes of memory. Closing down.", size / 1024 / 1024);
+         char errmsg[384] {};
+         snprintf (errmsg, cr::bufsize (errmsg), "Failed to allocate %zd kbytes of memory. Closing down.", size / 1024);
 
          plat.abort (errmsg);
       }

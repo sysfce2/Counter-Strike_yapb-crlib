@@ -18,7 +18,7 @@
 #include <crlib/random.h>
 #include <crlib/thread.h>
 
-#if defined (CR_LINUX) || defined (CR_OSX)
+#if defined(CR_LINUX) || defined(CR_MACOS)
 #  include <netinet/in.h>
 #  include <sys/socket.h>
 #  include <sys/types.h>
@@ -28,7 +28,7 @@
 #  include <errno.h>
 #  include <netdb.h>
 #  include <fcntl.h>
-#elif defined (CR_WINDOWS)
+#elif defined(CR_WINDOWS)
 #  include <winsock2.h>
 #  include <ws2tcpip.h>
 #endif
@@ -159,10 +159,17 @@ namespace detail {
 
 class Socket final : public NonCopyable {
 private:
-   static constexpr int32_t kInvalidSocket = 0xffffff;
+#if defined(CR_WINDOWS)
+   using SocketType = SOCKET;
+#else
+   using SocketType = int32_t;
+#endif
 
 private:
-   int32_t socket_;
+   static constexpr SocketType kInvalidSocket = 0xffffffff;
+
+private:
+   SocketType socket_;
    uint32_t timeout_;
 
 public:
@@ -194,7 +201,7 @@ public:
       }
 
       auto getTimeouts = [&] () -> Twin <char *, int32_t> {
-#if defined (CR_WINDOWS)
+#if defined(CR_WINDOWS)
          DWORD tv = timeout_ * 1000;
 #else
          timeval tv { static_cast <time_t> (timeout_), 0 };
@@ -243,7 +250,7 @@ public:
 
 public:
    static int32_t CR_STDCALL sendto (int socket, const void *message, size_t length, int flags, const struct sockaddr *dest, int32_t destLength) {
-#if defined (CR_WINDOWS)
+#if defined(CR_WINDOWS)
       WSABUF buffer = { static_cast <ULONG> (length), const_cast <char *> (reinterpret_cast <const char *> (message)) };
       DWORD sendLength = 0;
 

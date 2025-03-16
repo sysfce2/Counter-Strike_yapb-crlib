@@ -14,24 +14,24 @@ CR_NAMESPACE_BEGIN
 // simple color holder
 class Color final {
 public:
-   int32_t red = 0, green = 0, blue = 0;
+   int32_t red {}, green {}, blue {};
 
 public:
-   Color (int32_t r, int32_t g, int32_t b) : red (r), green (g), blue (b) { }
+   constexpr Color (int32_t r, int32_t g, int32_t b) : red (r), green (g), blue (b) { }
 
-   explicit Color () = default;
+   explicit constexpr Color () = default;
    ~Color () = default;
 
 public:
-   void reset () {
+   constexpr void reset () {
       red = green = blue = 0;
    }
 
-   int32_t avg () const {
-      return sum () / (sizeof (Color) / sizeof (int32_t));
+   constexpr int32_t avg () const {
+      return sum () / 3;
    }
 
-   int32_t sum () const {
+   constexpr int32_t sum () const {
       return red + green + blue;
    }
 };

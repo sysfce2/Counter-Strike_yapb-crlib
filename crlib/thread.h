@@ -9,7 +9,7 @@
 
 #include <crlib/basic.h>
 
-#if !defined (CR_WINDOWS)
+#if !defined(CR_WINDOWS)
 #  include <sys/mman.h>
 #  include <pthread.h>
 #  include <errno.h>
@@ -49,8 +49,8 @@ public:
 // simple wrapper for critical sections
 class Mutex final : public NonCopyable {
 private:
-#if defined (CR_WINDOWS)
-#if defined (CR_HAS_WINXP_SUPPORT)
+#if defined(CR_WINDOWS)
+#if defined(CR_HAS_WINXP_SUPPORT)
    CRITICAL_SECTION cs_;
 #else
    SRWLOCK cs_ = SRWLOCK_INIT;
@@ -61,8 +61,8 @@ private:
 
 public:
    Mutex () {
-#if defined (CR_WINDOWS)
-#if defined (CR_HAS_WINXP_SUPPORT)
+#if defined(CR_WINDOWS)
+#if defined(CR_HAS_WINXP_SUPPORT)
       InitializeCriticalSectionAndSpinCount (&cs_, 1);
 #endif
 #else
@@ -70,8 +70,8 @@ public:
 #endif
    }
    ~Mutex () {
-#if defined (CR_WINDOWS)
-#if defined (CR_HAS_WINXP_SUPPORT)
+#if defined(CR_WINDOWS)
+#if defined(CR_HAS_WINXP_SUPPORT)
       DeleteCriticalSection (&cs_);
 #endif
 #else
@@ -80,8 +80,8 @@ public:
    }
 
    void lock () {
-#if defined (CR_WINDOWS)
-#if defined (CR_HAS_WINXP_SUPPORT)
+#if defined(CR_WINDOWS)
+#if defined(CR_HAS_WINXP_SUPPORT)
       EnterCriticalSection (&cs_);
 #else
       AcquireSRWLockExclusive (&cs_);
@@ -92,8 +92,8 @@ public:
    }
 
    void unlock () {
-#if defined (CR_WINDOWS)
-#if defined (CR_HAS_WINXP_SUPPORT)
+#if defined(CR_WINDOWS)
+#if defined(CR_HAS_WINXP_SUPPORT)
       LeaveCriticalSection (&cs_);
 #else
       ReleaseSRWLockExclusive (&cs_);
@@ -104,8 +104,8 @@ public:
    }
 
    bool tryLock () {
-#if defined (CR_WINDOWS)
-#if defined (CR_HAS_WINXP_SUPPORT)
+#if defined(CR_WINDOWS)
+#if defined(CR_HAS_WINXP_SUPPORT)
       return !!TryEnterCriticalSection (&cs_);
 #else
       return !!TryAcquireSRWLockExclusive (&cs_);
@@ -116,7 +116,7 @@ public:
    }
 
    decltype (auto) raw () {
-#if defined (CR_WINDOWS)
+#if defined(CR_WINDOWS)
       return &cs_;
 #else
       return &mutex_;
@@ -129,8 +129,8 @@ class Signal final : public NonCopyable {
 private:
    Mutex cs_;
 
-#if defined (CR_WINDOWS)
-#if defined (CR_HAS_WINXP_SUPPORT)
+#if defined(CR_WINDOWS)
+#if defined(CR_HAS_WINXP_SUPPORT)
    HANDLE event_;
 #else
    CONDITION_VARIABLE cv_;
@@ -141,8 +141,8 @@ private:
 
 public:
    Signal () {
-#if defined (CR_WINDOWS)
-#if defined (CR_HAS_WINXP_SUPPORT)
+#if defined(CR_WINDOWS)
+#if defined(CR_HAS_WINXP_SUPPORT)
       event_ = CreateEvent (nullptr, FALSE, FALSE, nullptr);
 #else
       InitializeConditionVariable (&cv_);
@@ -153,8 +153,8 @@ public:
    }
 
    ~Signal () {
-#if defined (CR_WINDOWS)
-#if defined (CR_HAS_WINXP_SUPPORT)
+#if defined(CR_WINDOWS)
+#if defined(CR_HAS_WINXP_SUPPORT)
       CloseHandle (event_);
 #endif
 #else
@@ -171,8 +171,8 @@ public:
    }
 
    void notify () {
-#if defined (CR_WINDOWS)
-#if defined (CR_HAS_WINXP_SUPPORT)
+#if defined(CR_WINDOWS)
+#if defined(CR_HAS_WINXP_SUPPORT)
       SetEvent (event_);
 #else
       WakeConditionVariable (&cv_);
@@ -182,9 +182,9 @@ public:
 #endif
    }
 
-#if (defined (CR_WINDOWS) && !defined (CR_HAS_WINXP_SUPPORT)) || defined (CR_LINUX) || defined (CR_OSX)
+#if (defined(CR_WINDOWS) && !defined(CR_HAS_WINXP_SUPPORT)) || defined(CR_LINUX) || defined(CR_MACOS)
    void broadcast () {
-#if defined (CR_WINDOWS)
+#if defined(CR_WINDOWS)
       WakeAllConditionVariable (&cv_);
 #else
       pthread_cond_broadcast (&cv_);
@@ -194,8 +194,8 @@ public:
 #endif
 
    template <typename T> bool wait (T timeout) {
-#if defined (CR_WINDOWS)
-#if defined (CR_HAS_WINXP_SUPPORT)
+#if defined(CR_WINDOWS)
+#if defined(CR_HAS_WINXP_SUPPORT)
       ResetEvent (cs_.raw ());
 
       unlock ();
@@ -205,7 +205,7 @@ public:
       auto result = SleepConditionVariableSRW (&cv_, cs_.raw (), timeout, 0);
 #endif
 
-#if defined (CR_HAS_WINXP_SUPPORT)
+#if defined(CR_HAS_WINXP_SUPPORT)
       if (result == WAIT_TIMEOUT) {
          return false;
       }
@@ -217,7 +217,7 @@ public:
       return result != FALSE;
 #endif
 #else
-#if defined (CR_LINUX)
+#if defined(CR_LINUX)
       struct timespec ts;
 
       if (clock_gettime (CLOCK_REALTIME, &ts) == -1) {
@@ -252,7 +252,7 @@ public:
    }
 
    bool wait () {
-#if defined (CR_WINDOWS)
+#if defined(CR_WINDOWS)
       return wait (INFINITE);
 #else
       auto result = pthread_cond_wait (&cv_, cs_.raw ());
@@ -268,14 +268,13 @@ public:
 using MutexScopedLock = ScopedLock <Mutex>;
 using SignalScopedLock = ScopedLock <Signal>;
 
-
 // basic thread class
 class Thread final : public NonCopyable {
 public:
    using Func = Lambda <void ()>;
 
 private:
-#if defined (CR_WINDOWS)
+#if defined(CR_WINDOWS)
    HANDLE thread_ {};
 #else
    bool initialized_ {};
@@ -284,7 +283,7 @@ private:
    UniquePtr <Func> invokable_;
 
 private:
-#if defined (CR_WINDOWS)
+#if defined(CR_WINDOWS)
    static unsigned int __stdcall worker (void *pthis) {
 #else
    static void *worker (void *pthis) {
@@ -292,7 +291,7 @@ private:
       assert (pthis);
       (*reinterpret_cast <Thread *> (pthis)->invokable_) ();
 
-#if defined (CR_WINDOWS)
+#if defined(CR_WINDOWS)
       return 0;
 #else
       return nullptr;
@@ -316,7 +315,7 @@ public:
 
    Thread (Thread &&rhs) noexcept {
       thread_ = rhs.thread_;
-#if defined (CR_WINDOWS)
+#if defined(CR_WINDOWS)
       rhs.thread_ = nullptr;
 #else
       initialized_ = rhs.initialized_;
@@ -331,7 +330,7 @@ public:
       if (!ok ()) {
          return;
       }
-#if defined (CR_WINDOWS)
+#if defined(CR_WINDOWS)
       CloseHandle (thread_);
       thread_ = nullptr;
 #else
@@ -352,7 +351,7 @@ public:
       if (!ok ()) {
          return;
       }
-#if defined (CR_WINDOWS)
+#if defined(CR_WINDOWS)
       WaitForSingleObjectEx (thread_, INFINITE, FALSE);
 #else
       pthread_join (thread_, nullptr);
@@ -410,8 +409,9 @@ public:
       {
          SignalScopedLock lock (signal_);
          running_ = false;
+         jobs_.clear ();
 
-#if !defined (THREAD_SIGNAL_HAS_BROADCAST)
+#if !defined(THREAD_SIGNAL_HAS_BROADCAST)
          signal_.notify ();
 #else
          signal_.broadcast ();
@@ -427,8 +427,6 @@ public:
    void startup (size_t workers) {
       {
          SignalScopedLock lock (signal_);
-
-         jobs_.clear ();
          running_ = true;
       }
       
@@ -436,7 +434,7 @@ public:
          threads_.emplace ([this] () {
             for (;;) {
                
-               Func job;
+               Func job {};
                {
                   SignalScopedLock lock (signal_);
 
@@ -445,7 +443,7 @@ public:
                   }
 
                   if (!running_ && jobs_.empty ()) {
-#if !defined (THREAD_SIGNAL_HAS_BROADCAST)
+#if !defined(THREAD_SIGNAL_HAS_BROADCAST)
                      signal_.notify ();
 #endif
                      return;

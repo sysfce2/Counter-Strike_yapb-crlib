@@ -9,7 +9,7 @@
 
 #include <crlib/basic.h>
 
-#if !defined (CR_WINDOWS)
+#if !defined(CR_WINDOWS)
 #  include <sys/mman.h>
 #  include <pthread.h>
 #endif
@@ -24,14 +24,14 @@ private:
    enum : uint32_t {
       PtrSize = sizeof (void *),
 
-#if defined (CR_ARCH_X64)
+#if defined(CR_ARCH_X64)
       Offset = 2
 #else
       Offset = 1
 #endif
    };
 
-#if defined (CR_ARCH_X64)
+#if defined(CR_ARCH_X64)
    using uintptr = uint64_t;
 #else
    using uintptr = uint32_t;
@@ -52,7 +52,7 @@ private:
    { 0xb8, 0x00, 0x00, 0x00, 0x00, 0xff, 0xe0 };
 #endif
 
-#if !defined (CR_WINDOWS)
+#if !defined(CR_WINDOWS)
    unsigned long pageSize_ { 0 };
    uintptr pageStart_ { 0 };
 #endif
@@ -64,7 +64,7 @@ private:
       overwritten_ = overwritten;
 
       MutexScopedLock lock (cs_);
-#if defined (CR_WINDOWS)
+#if defined(CR_WINDOWS)
       unsigned long oldProtect {};
 
       if (VirtualProtect (original_, to.length (), PAGE_EXECUTE_READWRITE, &oldProtect)) {
@@ -121,7 +121,7 @@ public:
    void initialize (StringRef module, StringRef name, T *address) {
       savedBytes_.resize (jmpBuffer_.length ());
 
-#if !defined (CR_WINDOWS)
+#if !defined(CR_WINDOWS)
       (void) module;
       (void) name;
 
@@ -155,7 +155,7 @@ public:
       }
       detour_ = detour;
 
-#if !defined (CR_WINDOWS)
+#if !defined(CR_WINDOWS)
       pageStart_ = reinterpret_cast <uintptr> (original_) & -pageSize_;
 #endif
 

@@ -103,7 +103,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#if defined( __GNUC__ ) || defined (__clang__)
+#if defined( __GNUC__ ) || defined(__clang__)
 #  define SSE_INLINE  static inline __attribute__((always_inline))
 #  define SSE_ALIGN __attribute__((aligned(16)))
 #elif defined( _MSC_VER ) || defined( __ICL )
