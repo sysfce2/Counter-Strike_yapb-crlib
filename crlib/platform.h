@@ -99,7 +99,7 @@ CR_NAMESPACE_BEGIN
 #endif
 
 // define export macros
-#if !defined(__GNUC__)
+#if !defined(__GNUC__) || defined(CR_WINDOWS)
 #  define CR_FORCE_STACK_ALIGN
 #  define CR_EXPORT CR_C_LINKAGE __declspec(dllexport)
 #  define CR_STDCALL __stdcall
