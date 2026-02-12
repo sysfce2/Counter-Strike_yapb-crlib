@@ -85,17 +85,13 @@ private:
 public:
    constexpr StringRef () noexcept = default;
 
-   constexpr StringRef (const char *chars) : chars_ (chars), length_ (chars ? StringRef::lenstr (chars) : 0)
-   { }
+   constexpr StringRef (const char *chars) : chars_ (chars), length_ (chars ? StringRef::lenstr (chars) : 0) {}
 
-   constexpr StringRef (const char *chars, size_t length) : chars_ (chars), length_ (length)
-   { }
+   constexpr StringRef (const char *chars, size_t length) : chars_ (chars), length_ (length) {}
 
-   constexpr StringRef (nullptr_t) : chars_ (""), length_ (0)
-   { }
+   constexpr StringRef (nullptr_t) : chars_ (""), length_ (0) {}
 
-   constexpr StringRef (nullptr_t, size_t) : chars_ (""), length_ (0)
-   { }
+   constexpr StringRef (nullptr_t, size_t) : chars_ (""), length_ (0) {}
 
 public:
    StringRef (const String &str);
@@ -256,7 +252,7 @@ public:
       }
       return InvalidIndex;
    }
-   
+
    constexpr size_t findFirstNotOf (StringRef pattern, size_t start = 0) const {
       bool different = true;
 
@@ -276,7 +272,7 @@ public:
       }
       return InvalidIndex;
    }
-   
+
    constexpr size_t findLastNotOf (StringRef pattern) const {
       bool different = true;
 
@@ -295,7 +291,7 @@ public:
       }
       return InvalidIndex;
    }
-   
+
    constexpr size_t countChar (char ch) const {
       size_t count = 0;
 
@@ -306,7 +302,7 @@ public:
       }
       return count;
    }
- 
+
    constexpr size_t countStr (StringRef pattern) const {
       if (pattern.length () > length_) {
          return 0;
@@ -401,7 +397,7 @@ public:
       assign (str, length);
    }
 
-   String (const String &str)  {
+   String (const String &str) {
       assign (str.chars ());
    }
 
@@ -417,8 +413,7 @@ public:
       rhs.reset ();
    }
 
-   String (UniquePtr <char[]> &&rhs, size_t length) noexcept : chars_ (cr::move (rhs)), length_ (length)
-   {}
+   String (UniquePtr <char[]> &&rhs, size_t length) noexcept : chars_ (cr::move (rhs)), length_ (length) {}
 
 public:
    void resize (const size_t amount) noexcept {
@@ -843,8 +838,7 @@ public:
 };
 
 // constructor from string to string_ref
-inline StringRef::StringRef (const String &str) : chars_ (str.chars ()), length_ (str.length ())
-{ }
+inline StringRef::StringRef (const String &str) : chars_ (str.chars ()), length_ (str.length ()) {}
 
 // wrapping String for snprintf
 inline const char *SNPrintfWrap::cast (const String &value) {
@@ -857,11 +851,11 @@ inline const char *SNPrintfWrap::cast (const StringRef &value) {
 }
 
 // simple rotation-string pool for holding temporary data passed to different modules and for formatting
-class StringBuffer final : public Singleton <StringBuffer> {
+class Strings final : public Singleton <Strings> {
 public:
    enum : size_t {
-      StaticBufferSize = static_cast <size_t> (1024),
-      RotationCount = static_cast <size_t> (16)
+      StaticBufferSize = static_cast <size_t> (2048),
+      RotationCount = static_cast <size_t> (8)
    };
 
 private:
@@ -869,8 +863,8 @@ private:
    size_t rotate_ = 0;
 
 public:
-   StringBuffer () = default;
-   ~StringBuffer () = default;
+   Strings () = default;
+   ~Strings () = default;
 
 public:
    char *chars () noexcept {
@@ -918,27 +912,59 @@ public:
 #endif
    }
 
-   template <typename U> U *copy (U *dst, const U *src, size_t len) noexcept {
-#if defined(CR_CXX_MSVC)
-      strncpy_s (dst, len, src, len - 1);
+   template <typename U> U *copy (U *dst, const U *src, size_t dstCapacity) noexcept {
+      if (dstCapacity == 0) {
+         return dst;
+      }
+
+      if (!src) {
+         dst[0] = '\0';
+         return dst;
+      }
+      size_t srcLen = 0;
+
+      while (srcLen < dstCapacity - 1 && src[srcLen] != '\0') {
+         ++srcLen;
+      }
+
+      for (size_t i = 0; i < srcLen; ++i) {
+         dst[i] = src[i];
+      }
+      dst[srcLen] = '\0';
+
       return dst;
-#else
-      return strncpy (dst, src, len);
-#endif
    }
 
-   template <typename U> U *concat (U *dst, const U *src, size_t len) noexcept {
-#if defined(CR_CXX_MSVC)
-      strncat_s (dst, len, src, len - 1);
+   template <typename U> U *concat (U *dst, const U *src, size_t dstCapacity) noexcept {
+      if (dstCapacity == 0) {
+         return dst;
+      }
+
+      size_t dstLen = 0;
+
+      while (dstLen < dstCapacity - 1 && dst[dstLen] != '\0') {
+         ++dstLen;
+      }
+      dst[dstCapacity - 1] = '\0';
+
+      if (dstLen >= dstCapacity - 1) {
+         return dst;
+      }
+      size_t spaceLeft = dstCapacity - dstLen - 1;
+      size_t i = 0;
+
+      while (i < spaceLeft && src[i] != '\0') {
+         dst[dstLen + i] = src[i];
+         ++i;
+      }
+      dst[dstLen + i] = '\0';
+
       return dst;
-#else
-      return strncat (dst, src, len);
-#endif
    }
 };
 
 // expose global string pool
-CR_EXPOSE_GLOBAL_SINGLETON (StringBuffer, strings);
+CR_EXPOSE_GLOBAL_SINGLETON (Strings, strings);
 
 // some limited utf8 stuff
 class Utf8Tools : public Singleton <Utf8Tools> {
@@ -954,8 +980,7 @@ private:
       long lmask, lval;
 
       constexpr Utf8Table (int32_t cmask, int32_t cval, int32_t shift, long lmask, long lval) :
-         cmask (cmask), cval (cval), shift (shift), lmask (lmask), lval (lval) {
-      }
+         cmask (cmask), cval (cval), shift (shift), lmask (lmask), lval (lval) {}
    };
 
    struct Utf8CaseTable {
@@ -963,7 +988,7 @@ private:
    };
 
 private:
-  static constexpr Utf8CaseTable upperTable_[Utf8MaxChars] = {
+   static constexpr Utf8CaseTable upperTable_[Utf8MaxChars] = {
       { 0x0061, 0x0041 }, { 0x0062, 0x0042 }, { 0x0063, 0x0043 }, { 0x0064, 0x0044 }, { 0x0065, 0x0045 }, { 0x0066, 0x0046 }, { 0x0067, 0x0047 }, { 0x0068, 0x0048 },
       { 0x0069, 0x0049 }, { 0x006a, 0x004a }, { 0x006b, 0x004b }, { 0x006c, 0x004c }, { 0x006d, 0x004d }, { 0x006e, 0x004e }, { 0x006f, 0x004f }, { 0x0070, 0x0050 },
       { 0x0071, 0x0051 }, { 0x0072, 0x0052 }, { 0x0073, 0x0053 }, { 0x0074, 0x0054 }, { 0x0075, 0x0055 }, { 0x0076, 0x0056 }, { 0x0077, 0x0057 }, { 0x0078, 0x0058 },
@@ -1052,7 +1077,7 @@ private:
       { 0xff41, 0xff21 }, { 0xff42, 0xff22 }, { 0xff43, 0xff23 }, { 0xff44, 0xff24 }, { 0xff45, 0xff25 }, { 0xff46, 0xff26 }, { 0xff47, 0xff27 }, { 0xff48, 0xff28 },
       { 0xff49, 0xff29 }, { 0xff4a, 0xff2a }, { 0xff4b, 0xff2b }, { 0xff4c, 0xff2c }, { 0xff4d, 0xff2d }, { 0xff4e, 0xff2e }, { 0xff4f, 0xff2f }, { 0xff50, 0xff30 },
       { 0xff51, 0xff31 }, { 0xff52, 0xff32 }, { 0xff53, 0xff33 }, { 0xff54, 0xff34 }, { 0xff55, 0xff35 }, { 0xff56, 0xff36 }, { 0xff57, 0xff37 }, { 0xff58, 0xff38 },
-      { 0xff59, 0xff39 }, { 0xff5a, 0xff3a } 
+      { 0xff59, 0xff39 }, { 0xff5a, 0xff3a }
    };
 
 private:

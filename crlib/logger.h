@@ -62,7 +62,7 @@ private:
       plat.loctime (&timeinfo, &ticks);
 
       auto timebuf = strings.chars ();
-      strftime (timebuf, StringBuffer::StaticBufferSize, "%Y-%m-%d %H:%M:%S", &timeinfo);
+      strftime (timebuf, Strings::StaticBufferSize, "%Y-%m-%d %H:%M:%S", &timeinfo);
 
       LogFile lf (filename_);
       lf.print (strings.format ("%s (%s): %s\n", timebuf, level, msg));
