@@ -76,4 +76,7 @@ template <bool B> using bool_constant = integral_constant <bool, B>;
 using true_type = bool_constant <true>;
 using false_type = bool_constant <false>;
 
+template <bool B, typename T, typename F> struct conditional { using type = T; };
+template <typename T, typename F> struct conditional <false, T, F> { using type = F; };
+
 CR_NAMESPACE_END
