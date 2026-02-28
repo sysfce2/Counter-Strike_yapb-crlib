@@ -447,6 +447,14 @@ public:
       }
    }
 
+   void zap () noexcept {
+      clear ();
+
+      contents_.clear ();
+      contents_.resize (kInitialSize);
+      contents_.shrink ();
+   }
+
    constexpr size_t length () const noexcept {
       return length_;
    }
