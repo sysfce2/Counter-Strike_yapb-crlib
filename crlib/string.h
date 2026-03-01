@@ -539,21 +539,25 @@ public:
       if (str.empty ()) {
          return false;
       }
+      const auto strLen = str.length ();
 
       if (index >= length_) {
-         append (str.chars (), str.length ());
+         append (str.chars (), strLen);
       }
       else {
-         resize (length_ + str.length ());
+         resize (strLen);
 
-         for (size_t i = length_; i > index; --i) {
-            at (i + str.length () - 1) = at (i - 1);
-         }
+         const size_t moveSize = length_ - index;
 
-         for (size_t i = 0; i < str.length (); ++i) {
-            at (i + index) = str[i];
+         if (moveSize > 0) {
+            memmove (chars_.get () + index + strLen,
+               chars_.get () + index,
+               moveSize);
          }
-         length_ += str.length ();
+         memcpy (chars_.get () + index, str.chars (), strLen);
+
+         length_ += strLen;
+         chars_[length_] = kNullChar;
       }
       return true;
    }
@@ -562,11 +566,18 @@ public:
       if (index + count > length_) {
          return false;
       }
-      length_ -= count;
+      const size_t newLength = length_ - count;
+      const size_t moveSize = newLength - index;
 
-      for (size_t i = index; i < length_; ++i) {
-         at (i) = at (i + count);
+      if (moveSize > 0) {
+         memmove (chars_.get () + index,
+            chars_.get () + index + count,
+            moveSize);
       }
+
+      length_ = newLength;
+      chars_[length_] = kNullChar;
+
       return true;
    }
 

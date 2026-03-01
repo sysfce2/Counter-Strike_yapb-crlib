@@ -231,6 +231,7 @@ constexpr auto kLibrarySuffix = ".dll";
 
 #  include <windows.h>
 #  include <direct.h>
+#  include <process.h>
 #  include <io.h>
 #else
 constexpr auto kPathSeparator = "/";
@@ -525,6 +526,14 @@ struct Platform : public Singleton <Platform> {
       handle = fopen (path, mode);
 #endif
       return handle;
+   }
+
+   [[nodiscard]] int pid () noexcept {
+#if defined(CR_WINDOWS)
+      return _getpid ();
+#else
+      return getpid ();
+#endif
    }
 };
 

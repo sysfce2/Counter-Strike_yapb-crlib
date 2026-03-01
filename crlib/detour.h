@@ -9,7 +9,7 @@
 
 #include <crlib/basic.h>
 
-#if defined(CR_PSVITA) || defined(CR_ARCH_ARM) || defined(CR_ARCH_PPC)
+#if defined(CR_PSVITA) || defined(CR_ARCH_ARM) || defined(CR_ARCH_PPC) || defined(CR_ARCH_RISCV)
 
 CR_NAMESPACE_BEGIN
 

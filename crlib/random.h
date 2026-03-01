@@ -13,58 +13,100 @@
 CR_NAMESPACE_BEGIN
 
 namespace detail {
-   class SplitMix32 final {
-      uint32_t state_ = 0;
+   class SplitMix64 final {
+      uint64_t state_;
    public:
-      explicit SplitMix32 (uint32_t seed) noexcept : state_ (seed) {}
-      uint32_t next () noexcept {
-         uint32_t z = (state_ += 0x9e3779b9u);
-         z = (z ^ (z >> 16)) * 0x85ebca6bu;
-         z = (z ^ (z >> 13)) * 0xc2b2ae35u;
-         return z ^ (z >> 16);
+      explicit SplitMix64 (uint64_t seed) noexcept : state_ (seed ^ 0x9e3779b97f4a7c15ULL) {}
+
+   public:
+      uint64_t next () noexcept {
+         uint64_t z = (state_ += 0x9e3779b97f4a7c15ULL);
+
+         z = (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9ULL;
+         z = (z ^ (z >> 27)) * 0x94d049bb133111ebULL;
+
+         return z ^ (z >> 31);
       }
    };
 }
 
+// xoshiro random number generator
 class RWrand final : public Singleton <RWrand> {
-   uint32_t s0_ = 0, s1_ = 0, s2_ = 0;
+   uint64_t s0_ = 0, s1_ = 0, s2_ = 0, s3_ = 0;
 
-    [[nodiscard]] static uint32_t rotl (uint32_t x, int k) noexcept {
-        return (x << (k & 31)) | (x >> ((32 - k) & 31));
-    }
+   [[nodiscard]] static uint64_t rotl (uint64_t x, int k) noexcept {
+      return (x << k) | (x >> (64 - k));
+   }
+
+   [[nodiscard]] uint64_t next64 () noexcept {
+      const uint64_t result = rotl (s1_ * 5, 7) * 9;
+
+      const uint64_t t = s1_ << 17;
+
+      s2_ ^= s0_;
+      s3_ ^= s1_;
+      s1_ ^= s2_;
+      s0_ ^= s3_;
+
+      s2_ ^= t;
+      s3_ = rotl (s3_, 45);
+
+      return result;
+   }
 
    [[nodiscard]] uint32_t next32 () noexcept {
-      const auto s0 = s0_, s1 = s1_, s2 = s2_;
+      return static_cast <uint32_t> (next64 ());
+   }
 
-      s0_ = rotl (s0 + s1 + s2, 16);
-      s1_ = s0;
-      s2_ = s1;
+   [[nodiscard]] uint64_t getSeed (uint64_t value = 0) {
+      uint64_t seed = static_cast <uint64_t> (time (nullptr));
 
-      return s0_;
+      seed ^= static_cast <uintptr_t> (plat.pid ());
+      seed ^= static_cast <uint64_t> (clock ());
+      seed ^= 0xdeadbeefULL;
+
+      if (value > 0) {
+         seed ^= value;
+      }
+      return seed;
    }
 
 public:
-   RWrand () noexcept {
-      const uint32_t seed = static_cast <uint32_t> (time (nullptr));
-      detail::SplitMix32 smix (seed);
+   RWrand () noexcept { seed (); }
+
+   void seed () noexcept {
+      const uint64_t seed = getSeed ();
+      detail::SplitMix64 smix (seed);
 
       s0_ = smix.next ();
       s1_ = smix.next ();
       s2_ = smix.next ();
+      s3_ = smix.next ();
+   }
+
+   void seed (uint64_t value) noexcept {
+      const uint64_t seed = getSeed (value);
+      detail::SplitMix64 smix (seed);
+
+      s0_ = smix.next ();
+      s1_ = smix.next ();
+      s2_ = smix.next ();
+      s3_ = smix.next ();
    }
 
    [[nodiscard]] int32_t get (int32_t low, int32_t high) noexcept {
-      if (low == high) {
+      if (low >= high) {
          return low;
       }
-      const auto range = static_cast <uint32_t> (high - low) + 1u;
-      return low + static_cast <int32_t> (next32 () % range);
+      const uint32_t range = static_cast <uint32_t> (high - low) + 1u;
+      const uint64_t m = static_cast <uint64_t> (next32 ()) * range;
+
+      return low + static_cast <int32_t> (m >> 32);
    }
 
    [[nodiscard]] float get (float low, float high) noexcept {
       constexpr float scale = 1.0f / 4294967296.0f;
-
-      return low + (high - low) * (next32 () * scale);
+      return low + (high - low) * (static_cast <float> (next32 ()) * scale);
    }
 
    [[nodiscard]] int32_t operator () (int32_t low, int32_t high) noexcept {
@@ -80,7 +122,7 @@ public:
    }
 };
 
-// expose global random generator
+// expose global
 CR_EXPOSE_GLOBAL_SINGLETON (RWrand, rg);
 
 CR_NAMESPACE_END
