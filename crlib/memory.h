@@ -27,8 +27,8 @@ public:
    ~Memory () = default;
 
 public:
-   template <typename T> static constexpr T *get (const size_t length = 1) noexcept {
-      auto size = cr::max <size_t> (1u, length) * sizeof (T);
+   template <typename T> static T *get (const size_t length = 1) noexcept {
+       auto size = cr::max <size_t> (size_t (1), length) * sizeof (T);
 
 #if defined(CR_CXX_GCC)
       if (size >= PTRDIFF_MAX) {
@@ -46,32 +46,50 @@ public:
       return memory;
    }
 
-   template <typename T> static constexpr void release (T *memory) noexcept {
-      free (memory);
-      memory = nullptr;
-   }
+   template <typename T> static T *release (T *memory) noexcept {
+       free (memory);
+       return nullptr;
+    }
 
 public:
-   template <typename T, typename ...Args> static constexpr T *construct (T *memory, Args &&...args) noexcept {
+   template <typename T, typename ...Args> static T *construct (T *memory, Args &&...args) noexcept {
       new (memory) T (cr::forward <Args> (args)...);
       return memory;
    }
 
-   template <typename T> static constexpr void destruct (T *memory) {
-      memory->~T ();
-   }
+   template <typename T> static void destruct (T *memory) {
+       memory->~T ();
+    }
 
-   template <typename T, typename ...Args> static constexpr T *getAndConstruct (Args &&...args) noexcept {
+   template <typename T, typename ...Args> static T *constructArray (T *memory, size_t length, Args &&...args) noexcept {
+       for (size_t i = 0; i < length; ++i) {
+          new (&memory[i]) T (cr::forward <Args> (args)...);
+       }
+       return memory;
+    }
+
+   template <typename T> static void destructArray (T *memory, size_t length) noexcept {
+       for (size_t i = 0; i < length; ++i) {
+          memory[i].~T ();
+       }
+    }
+
+   template <typename T, typename ...Args> static T *getAndConstruct (Args &&...args) noexcept {
       auto memory = get <T> ();
       construct <T> (memory, cr::forward <Args> (args)...);
 
       return memory;
    }
 
-   template <typename T> static constexpr void transfer (T *dest, T *src, size_t length) noexcept {
-      for (size_t i = 0; i < length; ++i) {
-         construct <T> (&dest[i], cr::move (src[i]));
-         destruct <T> (&src[i]);
+   template <typename T> static void transfer (T *dest, T *src, size_t length) noexcept {
+      if constexpr (std::is_trivially_copyable_v <T>) {
+         memcpy (dest, src, length * sizeof (T));
+      }
+      else {
+         for (size_t i = 0; i < length; ++i) {
+            construct <T> (&dest[i], cr::move (src[i]));
+            destruct <T> (&src[i]);
+         }
       }
    }
 };

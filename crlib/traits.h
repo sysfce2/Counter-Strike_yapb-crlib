@@ -53,6 +53,48 @@ template <typename T> struct decay {
 };
 
 
+template <typename T> struct remove_reference {
+   using type = T;
+};
+
+template <typename T> struct remove_reference <T &> {
+   using type = T;
+};
+
+template <typename T> struct remove_reference <T &&> {
+   using type = T;
+};
+
+template <typename T> using remove_reference_t = typename remove_reference <T>::type;
+
+template <typename T> struct remove_cv {
+   using type = T;
+};
+
+template <typename T> struct remove_cv <const T> {
+   using type = T;
+};
+
+template <typename T> struct remove_cv <volatile T> {
+   using type = T;
+};
+
+template <typename T> struct remove_cv <const volatile T> {
+   using type = T;
+};
+
+template <typename T> using remove_cv_t = typename remove_cv<T>::type;
+
+template <typename T> struct remove_const {
+   using type = T;
+};
+
+template <typename T> struct remove_const <const T> {
+   using type = T;
+};
+
+template <typename T> using remove_const_t = typename remove_const<T>::type;
+
 template <bool B, class T = void> struct enable_if {};
 template <typename T > struct enable_if <true, T> { typedef T type; };
 
@@ -78,5 +120,8 @@ using false_type = bool_constant <false>;
 
 template <bool B, typename T, typename F> struct conditional { using type = T; };
 template <typename T, typename F> struct conditional <false, T, F> { using type = F; };
+
+template <typename T> struct is_trivially_copyable : bool_constant <__is_trivially_copyable(T)> {};
+template <typename T> inline constexpr bool is_trivially_copyable_v = is_trivially_copyable<T>::value;
 
 CR_NAMESPACE_END

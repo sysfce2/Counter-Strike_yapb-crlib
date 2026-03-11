@@ -394,15 +394,6 @@ struct Platform : public Singleton <Platform> {
       return true;
    }
 
-   bool hasModule (const char *mod) {
-#if defined(CR_WINDOWS)
-      return GetModuleHandleA (mod) != nullptr;
-#else
-      (void) (mod);
-      return true;
-#endif
-   }
-
    float seconds () {
 #if defined(CR_WINDOWS)
       LARGE_INTEGER count {}, freq {};

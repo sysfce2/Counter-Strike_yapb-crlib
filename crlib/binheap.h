@@ -7,144 +7,200 @@
 
 #pragma once
 
-#include <crlib/array.h>
+#include <crlib/basic.h>
+#include <crlib/memory.h>
+#include <crlib/movable.h>
 
 CR_NAMESPACE_BEGIN
 
-// simple priority queue
 template <typename T> class BinaryHeap final : public NonCopyable {
 private:
-   Array <T> contents_;
+   T *data_ = nullptr;
+   size_t size_ = 0;
+   size_t capacity_ = 0;
 
 public:
    explicit BinaryHeap () = default;
 
-   BinaryHeap (BinaryHeap &&rhs) noexcept : contents_ (cr::move (rhs.contents_))
-   { }
+   BinaryHeap (BinaryHeap &&rhs) noexcept {
+      data_ = rhs.data_;
+      size_ = rhs.size_;
+      capacity_ = rhs.capacity_;
+      rhs.data_ = nullptr;
+      rhs.size_ = 0;
+      rhs.capacity_ = 0;
+   }
 
-   ~BinaryHeap () = default;
+   ~BinaryHeap () {
+      if (data_) {
+         for (size_t i = 0; i < size_; ++i) {
+            Memory::destruct (&data_[i]);
+         }
+         Memory::release (data_);
+      }
+   }
 
 public:
-   template <typename U> bool push (U &&item) {
-      if (!contents_.push (cr::move (item))) {
+   bool push (const T &item) {
+      if (!ensure (size_ + 1)) {
          return false;
       }
-      const size_t length = contents_.length ();
+      Memory::construct (&data_[size_], item);
+      ++size_;
+      if (size_ > 1) {
+         percolateUp (size_ - 1);
+      }
+      return true;
+   }
 
-      if (length > 1) {
-         percolateUp (length - 1);
+   bool push (T &&item) {
+      if (!ensure (size_ + 1)) {
+         return false;
+      }
+      Memory::construct (&data_[size_], cr::move (item));
+      ++size_;
+      if (size_ > 1) {
+         percolateUp (size_ - 1);
       }
       return true;
    }
 
    template <typename ...Args> bool emplace (Args &&...args) {
-      if (!contents_.emplace (cr::forward <Args> (args)...)) {
+      if (!ensure (size_ + 1)) {
          return false;
       }
-      const size_t length = contents_.length ();
-
-      if (length > 1) {
-         percolateUp (length - 1);
+      Memory::construct (&data_[size_], cr::forward <Args> (args)...);
+      ++size_;
+      if (size_ > 1) {
+         percolateUp (size_ - 1);
       }
       return true;
    }
 
    const T &top () const {
-      return contents_[0];
+      return data_[0];
    }
 
    T pop () {
-      if (contents_.length () == 1) {
-         return contents_.pop ();
-      }
-      auto key (cr::move (contents_[0]));
+      auto key = cr::move (data_[0]);
 
-      contents_[0] = cr::move (contents_.last ());
-      contents_.discard ();
+      if (size_ == 1) {
+         Memory::destruct (&data_[0]);
+         --size_;
+         return key;
+      }
+
+      cr::swap (data_[0], data_[size_ - 1]);
+      Memory::destruct (&data_[size_ - 1]);
+      --size_;
 
       percolateDown (0);
       return key;
    }
 
+   void pop (T &out) {
+      out = cr::move (data_[0]);
+
+      if (size_ == 1) {
+         Memory::destruct (&data_[0]);
+         --size_;
+         return;
+      }
+
+      Memory::destruct (&data_[0]);
+      --size_;
+      data_[0] = cr::move (data_[size_]);
+      Memory::destruct (&data_[size_]);
+
+      percolateDown (0);
+   }
+
 public:
    size_t length () const {
-      return contents_.length ();
+      return size_;
    }
 
    bool empty () const {
-      return !contents_.length ();
+      return size_ == 0;
    }
 
    void clear () {
-      contents_.clear ();
-   }
-
-private:
-   void percolateUp (size_t index) {
-      while (index != 0) {
-         const size_t parentIndex = parent (index);
-
-         if (contents_[parentIndex] > contents_[index]) {
-            cr::swap (contents_[index], contents_[parentIndex]);
-            index = parentIndex;
-         }
-         else {
-            break;
-         }
+      for (size_t i = 0; i < size_; ++i) {
+         Memory::destruct (&data_[i]);
       }
+      size_ = 0;
    }
 
-   void percolateDown (size_t index) {
-      while (hasLeft (index)) {
-         size_t bestIndex = left (index);
-
-         if (hasRight (index)) {
-            const size_t rightIndex = right (index);
-
-            if (contents_[rightIndex] < contents_[bestIndex]) {
-               bestIndex = rightIndex;
-            }
-         }
-
-         if (contents_[index] > contents_[bestIndex]) {
-            cr::swap (contents_[index], contents_[bestIndex]);
-
-            index = bestIndex;
-            bestIndex = left (index);
-         }
-         else {
-            break;
-         }
-      }
+   void swap (BinaryHeap &other) noexcept {
+      cr::swap (data_, other.data_);
+      cr::swap (size_, other.size_);
+      cr::swap (capacity_, other.capacity_);
    }
 
-private:
    BinaryHeap &operator = (BinaryHeap &&rhs) noexcept {
       if (this != &rhs) {
-         contents_ = cr::move (rhs.contents_);
+         this->~BinaryHeap ();
+         data_ = rhs.data_;
+         size_ = rhs.size_;
+         capacity_ = rhs.capacity_;
+         rhs.data_ = nullptr;
+         rhs.size_ = 0;
+         rhs.capacity_ = 0;
       }
       return *this;
    }
 
 private:
-   static constexpr size_t parent (size_t index) {
-      return (index - 1) / 2;
+   bool ensure (size_t needed) {
+      if (needed <= capacity_) {
+         return true;
+      }
+      size_t newCap = capacity_ == 0 ? 8 : capacity_ * 2;
+      while (newCap < needed) {
+         newCap *= 2;
+      }
+      T *newData = static_cast <T *> (Memory::get <T> (newCap));
+      if (!newData) {
+         return false;
+      }
+      for (size_t i = 0; i < size_; ++i) {
+         Memory::construct (&newData[i], cr::move (data_[i]));
+         Memory::destruct (&data_[i]);
+      }
+      Memory::release (data_);
+      data_ = newData;
+      capacity_ = newCap;
+      return true;
    }
 
-   static constexpr size_t left (size_t index) {
-      return (index * 2) + 1;
+   void percolateUp (size_t index) {
+      while (index > 0) {
+         size_t parent = (index - 1) / 2;
+         if (!(data_[parent] > data_[index])) {
+            break;
+         }
+         cr::swap (data_[parent], data_[index]);
+         index = parent;
+      }
    }
 
-   static constexpr size_t right (size_t index) {
-      return (index * 2) + 2;
-   }
-
-   bool hasLeft (size_t index) const {
-      return left (index) < contents_.length ();
-   }
-
-   bool hasRight (size_t index) const {
-      return right (index) < contents_.length ();
+   void percolateDown (size_t index) {
+      while (true) {
+         size_t left = index * 2 + 1;
+         if (left >= size_) {
+            break;
+         }
+         size_t best = left;
+         size_t right = left + 1;
+         if (right < size_ && data_[right] < data_[best]) {
+            best = right;
+         }
+         if (!(data_[index] > data_[best])) {
+            break;
+         }
+         cr::swap (data_[index], data_[best]);
+         index = best;
+      }
    }
 };
 

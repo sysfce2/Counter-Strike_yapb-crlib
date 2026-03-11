@@ -7,29 +7,19 @@
 
 #pragma once
 
+#include <crlib/traits.h>
+
 CR_NAMESPACE_BEGIN
 
-namespace detail {
-   template <typename T> struct ClearRef {
-      using Type = T;
-   };
-   template <typename T> struct ClearRef <T &> {
-      using Type = T;
-   };
-   template <typename T> struct ClearRef <T &&> {
-      using Type = T;
-   };
+template <typename T> remove_reference_t <T> constexpr &&move (T &&type) noexcept {
+   return static_cast <remove_reference_t <T> &&> (type);
 }
 
-template <typename T> typename detail::ClearRef <T>::Type constexpr &&move (T &&type) noexcept {
-   return static_cast <typename detail::ClearRef <T>::Type &&> (type);
-}
-
-template <typename T> constexpr T &&forward (typename detail::ClearRef <T>::Type &type) noexcept {
+template <typename T> constexpr T &&forward (remove_reference_t <T> &type) noexcept {
    return static_cast <T &&> (type);
 }
 
-template <typename T> constexpr T &&forward (typename detail::ClearRef <T>::Type &&type) noexcept {
+template <typename T> constexpr T &&forward (remove_reference_t <T> &&type) noexcept {
    return static_cast <T &&> (type);
 }
 

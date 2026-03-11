@@ -41,6 +41,28 @@ template <typename T> constexpr T clamp (const T &x, const T &a, const T &b) {
    return min (max (x, a), b);
 }
 
+constexpr size_t bit_ceil (size_t n) noexcept {
+   if (n == 0) {
+      return 1;
+   }
+   n--;
+
+   n |= n >> 1;
+   n |= n >> 2;
+   n |= n >> 4;
+   n |= n >> 8;
+   n |= n >> 16;
+
+   if constexpr (sizeof (size_t) > 4) {
+      n |= n >> 32;
+   }
+
+   if (n == SIZE_MAX) {
+      return n;
+   }
+   return n + 1;
+}
+
 // simple non-copying base class
 class NonCopyable {
 protected:

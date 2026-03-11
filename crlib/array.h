@@ -11,6 +11,7 @@
 #include <crlib/memory.h>
 #include <crlib/movable.h>
 #include <crlib/random.h>
+#include <crlib/traits.h>
 
 #include <initializer_list>
 
@@ -86,27 +87,60 @@ private:
 
 public:
    bool reserve (const size_t amount) {
-      if (length_ + amount < capacity_) {
+      constexpr size_t kMaxSize = SIZE_MAX;
+
+      if (capacity_ - length_ >= amount) {
          return true;
       }
-      auto capacity = capacity_ ? capacity_ : 12;
+
+      if (amount > kMaxSize - length_) {
+         return false;
+      }
+      const size_t required = length_ + amount;
+      size_t newCapacity {};
 
       if constexpr (R == ReservePolicy::Multiple) {
-         while (length_ + amount > capacity) {
-            capacity *= 2;
+         newCapacity = cr::bit_ceil (required);
+
+         if (newCapacity < 12) {
+            newCapacity = 12;
+         }
+
+         if (newCapacity < capacity_) {
+            newCapacity = capacity_;
          }
       }
       else {
-         capacity = amount + capacity_ + 1;
+         size_t growth = (capacity_ >> 1);
+
+         if (growth < 4) {
+            growth = 4;
+         }
+
+         if (growth > kMaxSize - capacity_) {
+            newCapacity = kMaxSize;
+         }
+         else {
+            newCapacity = capacity_ + growth;
+         }
+
+         if (newCapacity < required) {
+            newCapacity = required;
+         }
       }
-      auto data = Memory::get <T> (capacity);
+      auto newContents = Memory::get<T> (newCapacity);
+
+      if (!newContents) {
+         return false;
+      }
 
       if (contents_) {
-         Memory::transfer (data, contents_, length_);
+         Memory::transfer (newContents, contents_, length_);
          Memory::release (contents_);
       }
-      contents_ = data;
-      capacity_ = capacity;
+
+      contents_ = newContents;
+      capacity_ = newCapacity;
 
       return true;
    }
@@ -164,8 +198,11 @@ public:
    }
 
    template <typename U> bool insert (size_t index, U *objects, size_t count = 1) {
-      if (!objects || !count) {
+      if (!objects) {
          return false;
+      }
+      if (!count) {
+         return true;
       }
       const size_t capacity = (length_ > index ? length_ : index) + count;
 
@@ -183,9 +220,19 @@ public:
          size_t i = 0;
 
          for (i = length_; i > index; --i) {
-            contents_[i + count - 1] = cr::move (contents_[i - 1]);
+            const size_t dst = i + count - 1;
+
+            if (dst >= length_) {
+               Memory::construct (&contents_[dst], cr::move (contents_[i - 1]));
+            }
+            else {
+               contents_[dst] = cr::move (contents_[i - 1]);
+            }
          }
          for (i = 0; i < count; ++i) {
+            if (i + index < length_) {
+               Memory::destruct (&contents_[i + index]);
+            }
             Memory::construct (&contents_[i + index], cr::forward <U> (objects[i]));
          }
          length_ += count;
@@ -197,20 +244,30 @@ public:
       if (&rhs == this) {
          return false;
       }
+      if (rhs.empty ()) {
+         return true;
+      }
       return insert (at, &rhs.contents_[0], rhs.length_);
    }
 
    bool erase (const size_t index, const size_t count) {
-      if (index + count > capacity_) {
+      if (index >= length_ || count > length_ - index) {
          return false;
       }
-      for (size_t i = index; i < index + count; ++i) {
-         Memory::destruct (&contents_[i]);
-      }
-      length_ -= count;
 
-      for (size_t i = index; i < length_; ++i) {
-         contents_[i] = cr::move (contents_[i + count]);
+      if constexpr (cr::is_trivially_copyable_v <T>) {
+         length_ -= count;
+         memmove (&contents_[index], &contents_[index + count], (length_ - index) * sizeof (T));
+      }
+      else {
+         for (size_t i = index; i < index + count; ++i) {
+            Memory::destruct (&contents_[i]);
+         }
+         length_ -= count;
+
+         for (size_t i = index; i < length_; ++i) {
+            contents_[i] = cr::move (contents_[i + count]);
+         }
       }
       return true;
    }

@@ -18,6 +18,9 @@
 
 CR_NAMESPACE_BEGIN
 
+class StringRef;
+class String;
+
 // helper for null-termination
 static const char kNullChar = '\0';
 
@@ -47,6 +50,203 @@ public:
 // expose global format wrap
 CR_EXPOSE_GLOBAL_SINGLETON (SNPrintfWrap, fmtwrap);
 
+namespace detail {
+   static constexpr size_t kInvalidIndex = static_cast <size_t> (-1);
+
+   constexpr size_t find_char_impl (const char *src, size_t src_len, char pattern, size_t start) noexcept {
+      if (start >= src_len) {
+         return kInvalidIndex;
+      }
+      auto ptr = static_cast <const char *> (memchr (src + start, static_cast <unsigned char> (pattern), src_len - start));
+      return ptr ? static_cast <size_t> (ptr - src) : kInvalidIndex;
+   }
+
+   constexpr size_t find_str_impl (const char *src, size_t src_len, const char *pat, size_t pat_len, size_t start) noexcept {
+      if (pat_len > src_len || start > src_len) {
+         return kInvalidIndex;
+      }
+
+      if (!pat_len) {
+         return start;
+      }
+
+      const auto s = reinterpret_cast <const uint8_t *> (src);
+      const auto p = reinterpret_cast <const uint8_t *> (pat);
+      const auto first = p[0];
+
+      if (pat_len == 1) {
+         return find_char_impl (src, src_len, static_cast <char> (first), start);
+      }
+
+      const auto last = p[pat_len - 1];
+      const auto remaining = pat_len - 2;
+
+      auto i = start;
+      const auto maxStart = src_len - pat_len;
+
+      while (i <= maxStart) {
+         const void *ptr = memchr (s + i, first, maxStart - i + 1);
+
+         if (!ptr) {
+            return kInvalidIndex;
+         }
+         i = static_cast <const uint8_t *> (ptr) - s;
+
+         if (s[i + pat_len - 1] != last) {
+            ++i;
+            continue;
+         }
+         if (remaining > 0 && memcmp (s + i + 1, p + 1, remaining) != 0) {
+            ++i;
+            continue;
+         }
+         return i;
+      }
+      return kInvalidIndex;
+   }
+
+   constexpr size_t rfind_char_impl (const char *src, size_t src_len, char pattern) noexcept {
+      for (size_t i = src_len; i-- > 0;) {
+         if (src[i] == pattern) {
+            return i;
+         }
+      }
+      return kInvalidIndex;
+   }
+
+   constexpr size_t rfind_str_impl (const char *src, size_t src_len, const char *pat, size_t pat_len) noexcept {
+      if (!pat_len) {
+         return src_len;
+      }
+
+      if (pat_len > src_len) {
+         return kInvalidIndex;
+      }
+
+      const auto s = reinterpret_cast <const uint8_t *> (src);
+      const auto p = reinterpret_cast <const uint8_t *> (pat);
+      const auto first = p[0];
+
+      if (pat_len == 1) {
+         return rfind_char_impl (src, src_len, static_cast <char> (first));
+      }
+
+      const auto last = p[pat_len - 1];
+      const auto remaining = pat_len - 2;
+
+      auto i = src_len - pat_len;
+
+      while (true) {
+         while (i != kInvalidIndex && s[i] != first) {
+            --i;
+         }
+
+         if (i == kInvalidIndex || s[i + pat_len - 1] != last) {
+            if (i == kInvalidIndex) {
+               break;
+            }
+            --i;
+            continue;
+         }
+
+         if (remaining > 0 && memcmp (s + i + 1, p + 1, remaining) != 0) {
+            --i;
+            continue;
+         }
+
+         return i;
+      }
+      return kInvalidIndex;
+   }
+
+   constexpr size_t find_first_of_impl (const char *src, size_t src_len, const char *pat, size_t pat_len, size_t start) noexcept {
+      for (size_t i = start; i < src_len; ++i) {
+         for (size_t j = 0; j < pat_len; ++j) {
+            if (src[i] == pat[j]) {
+               return i;
+            }
+         }
+      }
+      return kInvalidIndex;
+   }
+
+   constexpr size_t find_last_of_impl (const char *src, size_t src_len, const char *pat, size_t pat_len) noexcept {
+      for (size_t i = src_len; i-- > 0;) {
+         for (size_t j = 0; j < pat_len; ++j) {
+            if (src[i] == pat[j]) {
+               return i;
+            }
+         }
+      }
+      return kInvalidIndex;
+   }
+
+   constexpr size_t find_first_not_of_impl (const char *src, size_t src_len, const char *pat, size_t pat_len, size_t start) noexcept {
+      for (size_t i = start; i < src_len; ++i) {
+         bool different = true;
+
+         for (size_t j = 0; j < pat_len; ++j) {
+            if (src[i] == pat[j]) {
+               different = false;
+               break;
+            }
+         }
+
+         if (different) {
+            return i;
+         }
+      }
+      return kInvalidIndex;
+   }
+
+   constexpr size_t find_last_not_of_impl (const char *src, size_t src_len, const char *pat, size_t pat_len) noexcept {
+      for (size_t i = src_len; i-- > 0;) {
+         bool different = true;
+
+         for (size_t j = 0; j < pat_len; ++j) {
+            if (src[i] == pat[j]) {
+               different = false;
+               break;
+            }
+         }
+         if (different) {
+            return i;
+         }
+      }
+      return kInvalidIndex;
+   }
+
+   constexpr bool starts_with_impl (const char *src, size_t src_len, const char *pat, size_t pat_len) noexcept {
+      return pat_len <= src_len && strncmp (src, pat, pat_len) == 0;
+   }
+
+   constexpr bool ends_with_impl (const char *src, size_t src_len, const char *pat, size_t pat_len) noexcept {
+      return pat_len <= src_len && strncmp (src + src_len - pat_len, pat, pat_len) == 0;
+   }
+
+   constexpr size_t count_char_impl (const char *src, size_t src_len, char ch) noexcept {
+      size_t count = 0;
+      for (size_t i = 0; i < src_len; ++i) {
+         if (src[i] == ch) {
+            ++count;
+         }
+      }
+      return count;
+   }
+
+   constexpr size_t count_str_impl (const char *src, size_t src_len, const char *pat, size_t pat_len) noexcept {
+      if (pat_len > src_len) {
+         return 0;
+      }
+      size_t count = 0;
+      for (size_t i = 0; i <= src_len - pat_len; ++i) {
+         if (memcmp (src + i, pat, pat_len) == 0) {
+            ++count;
+         }
+      }
+      return count;
+   }
+} 
 
 // simple non-owning string class like std::string_view
 class StringRef {
@@ -156,11 +356,11 @@ public:
    }
 
    bool startsWith (StringRef prefix) const {
-      return prefix.length () <= length_ && strncmp (chars (), prefix.chars (), prefix.length ()) == 0;
+      return detail::starts_with_impl (chars_, length_, prefix.chars (), prefix.length ());
    }
 
    bool endsWith (StringRef suffix) const {
-      return suffix.length () <= length_ && strncmp (chars () + length_ - suffix.length (), suffix.chars (), suffix.length ()) == 0;
+      return detail::ends_with_impl (chars_, length_, suffix.chars (), suffix.length ());
    }
 
    constexpr bool contains (StringRef rhs) const {
@@ -168,153 +368,43 @@ public:
    }
 
    constexpr size_t find (char pattern, size_t start = 0) const {
-      for (size_t i = start; i < length_; ++i) {
-         if (chars_[i] == pattern) {
-            return i;
-         }
-      }
-      return InvalidIndex;
+      return detail::find_char_impl (chars_, length_, pattern, start);
    }
 
-   constexpr size_t find (StringRef pattern, size_t start = 0) const {
-      if (pattern.length () > length_ || start > length_) {
-         return InvalidIndex;
-      }
-
-      for (size_t i = start; i <= length_ - pattern.length (); ++i) {
-         size_t index = 0;
-
-         for (; index < pattern.length () && chars_[index]; ++index) {
-            if (chars_[i + index] != pattern[index]) {
-               break;
-            }
-         }
-
-         if (!pattern[index]) {
-            return i;
-         }
-      }
-      return InvalidIndex;
+   constexpr size_t find (StringRef pattern, size_t start = 0) const noexcept {
+      return detail::find_str_impl (chars_, length_, pattern.chars (), pattern.length (), start);
    }
 
    constexpr size_t rfind (char pattern) const {
-      for (size_t i = length_; i != 0; i--) {
-         if (chars_[i] == pattern) {
-            return i;
-         }
-      }
-      return InvalidIndex;
+      return detail::rfind_char_impl (chars_, length_, pattern);
    }
 
    constexpr size_t rfind (StringRef pattern) const {
-      if (pattern.empty ()) {
-         return length_;
-      }
-
-      if (pattern.length () > length_) {
-         return InvalidIndex;
-      }
-
-      for (size_t i = length_ - pattern.length (); i != InvalidIndex; --i) {
-         bool match = true;
-
-         for (size_t j = 0; j < pattern.length (); ++j) {
-            if (chars_[i + j] != pattern[j]) {
-               match = false;
-               break;
-            }
-         }
-         if (match) {
-            return i;
-         }
-      }
-      return InvalidIndex;
+      return detail::rfind_str_impl (chars_, length_, pattern.chars (), pattern.length ());
    }
 
    constexpr size_t findFirstOf (StringRef pattern, size_t start = 0) const {
-      for (size_t i = start; i < length_; ++i) {
-         for (size_t j = 0; j < pattern.length (); ++j) {
-            if (chars_[i] == pattern[j]) {
-               return i;
-            }
-         }
-      }
-      return InvalidIndex;
+      return detail::find_first_of_impl (chars_, length_, pattern.chars (), pattern.length (), start);
    }
 
    constexpr size_t findLastOf (StringRef pattern) const {
-      for (size_t i = length_ - 1; i > 0; i--) {
-         for (size_t j = 0; j < pattern.length (); ++j) {
-            if (chars_[i] == pattern[j]) {
-               return i;
-            }
-         }
-      }
-      return InvalidIndex;
+      return detail::find_last_of_impl (chars_, length_, pattern.chars (), pattern.length ());
    }
 
    constexpr size_t findFirstNotOf (StringRef pattern, size_t start = 0) const {
-      bool different = true;
-
-      for (size_t i = start; i < length_; ++i) {
-         different = true;
-
-         for (size_t j = 0; j < pattern.length (); ++j) {
-            if (chars_[i] == pattern[j]) {
-               different = false;
-               break;
-            }
-         }
-
-         if (different) {
-            return i;
-         }
-      }
-      return InvalidIndex;
+      return detail::find_first_not_of_impl (chars_, length_, pattern.chars (), pattern.length (), start);
    }
 
    constexpr size_t findLastNotOf (StringRef pattern) const {
-      bool different = true;
-
-      for (size_t i = length_ - 1; i > 0; i--) {
-         different = true;
-
-         for (size_t j = 0; j < pattern.length (); ++j) {
-            if (chars_[i] == pattern[j]) {
-               different = false;
-               break;
-            }
-         }
-         if (different) {
-            return i;
-         }
-      }
-      return InvalidIndex;
+      return detail::find_last_not_of_impl (chars_, length_, pattern.chars (), pattern.length ());
    }
 
    constexpr size_t countChar (char ch) const {
-      size_t count = 0;
-
-      for (size_t i = 0, e = length (); i != e; ++i) {
-         if (chars_[i] == ch) {
-            ++count;
-         }
-      }
-      return count;
+      return detail::count_char_impl (chars_, length_, ch);
    }
 
    constexpr size_t countStr (StringRef pattern) const {
-      if (pattern.length () > length_) {
-         return 0;
-      }
-      size_t count = 0;
-
-      for (size_t i = 0, e = length_ - pattern.length () + 1; i != e; ++i) {
-         if (substr (i, pattern.length ()) == pattern) {
-            ++count;
-         }
-      }
-      return count;
+      return detail::count_str_impl (chars_, length_, pattern.chars (), pattern.length ());
    }
 
    constexpr StringRef substr (size_t start, size_t count = InvalidIndex) const {
@@ -332,9 +422,10 @@ public:
 
       while ((pos = find (delim, pos)) != InvalidIndex) {
          tokens.push (substr (prev, pos - prev));
-         prev = ++pos;
+         pos += delim.length ();
+         prev = pos;
       }
-      tokens.push (substr (prev, pos - prev));
+      tokens.push (substr (prev));
 
       return tokens;
    }
@@ -380,7 +471,7 @@ private:
       return capacity + (length < 4 ? 8 : length);
    }
 
-   size_t calcLength (const char *str, const size_t length) {
+   size_t lenstr (const char *str, const size_t length) {
       return length > 0 ? length : (str ? strlen (str) : 0);
    }
 
@@ -436,7 +527,7 @@ public:
    }
 
    String &assign (const char *str, size_t length = 0) {
-      length = calcLength (str, length);
+      length = lenstr (str, length);
 
       resize (length);
 
@@ -461,7 +552,7 @@ public:
    }
 
    String &append (const char *str, size_t length = 0) {
-      length = calcLength (str, length);
+      length = lenstr (str, length);
 
       resize (length);
       memcpy (chars_.get () + length_, str, length);
@@ -503,11 +594,11 @@ public:
 
 public:
    const char &at (size_t index) const {
-      return chars ()[index];
+      return chars_.get ()[index];
    }
 
    char &at (size_t index) {
-      return const_cast <char *> (chars ())[index];
+      return chars_.get ()[index];
    }
 
    const char *chars () const {
@@ -531,7 +622,7 @@ public:
    }
 
    StringRef str () const {
-      return { chars_.get (), length_ };
+      return { chars (), length_ };
    }
 
 public:
@@ -646,59 +737,71 @@ public:
 
 public:
    uint32_t hash () const {
-      return str ().hash ();
+      return StringRef::fnv1a32 (chars ());
    }
 
    bool contains (StringRef rhs) const {
-      return str ().contains (rhs);
+      return find (rhs) != InvalidIndex;
    }
 
    bool startsWith (StringRef prefix) const {
-      return str ().startsWith (prefix);
+      const char *const ptr = chars_.get ();
+      return detail::starts_with_impl (ptr, length_, prefix.chars (), prefix.length ());
    }
 
    bool endsWith (StringRef suffix) const {
-      return str ().endsWith (suffix);
+      const char *const ptr = chars_.get ();
+      return detail::ends_with_impl (ptr, length_, suffix.chars (), suffix.length ());
    }
 
    size_t find (char pattern, size_t start = 0) const {
-      return str ().find (pattern, start);
+      const char *const ptr = chars_.get ();
+      return detail::find_char_impl (ptr, length_, pattern, start);
    }
 
    size_t find (StringRef pattern, size_t start = 0) const {
-      return str ().find (pattern, start);
+      const char *const ptr = chars_.get ();
+      return detail::find_str_impl (ptr, length_, pattern.chars (), pattern.length (), start);
    }
 
    size_t rfind (char pattern) const {
-      return str ().rfind (pattern);
+      const char *const ptr = chars_.get ();
+      return detail::rfind_char_impl (ptr, length_, pattern);
    }
 
    size_t rfind (StringRef pattern) const {
-      return str ().rfind (pattern);
+      const char *const ptr = chars_.get ();
+      return detail::rfind_str_impl (ptr, length_, pattern.chars (), pattern.length ());
    }
 
    size_t findFirstOf (StringRef pattern, size_t start = 0) const {
-      return str ().findFirstOf (pattern, start);
+      const char *const ptr = chars_.get ();
+      return detail::find_first_of_impl (ptr, length_, pattern.chars (), pattern.length (), start);
    }
 
    size_t findLastOf (StringRef pattern) const {
-      return str ().findLastOf (pattern);
+      const char *const ptr = chars_.get ();
+      return detail::find_last_of_impl (ptr, length_, pattern.chars (), pattern.length ());
    }
 
    size_t findFirstNotOf (StringRef pattern, size_t start = 0) const {
-      return str ().findFirstNotOf (pattern, start);
+      const char *const ptr = chars_.get ();
+      return detail::find_first_not_of_impl (ptr, length_, pattern.chars (), pattern.length (), start);
    }
 
    size_t findLastNotOf (StringRef pattern) const {
-      return str ().findLastNotOf (pattern);
+      const char *const ptr = chars_.get ();
+      return detail::find_last_not_of_impl (ptr, length_, pattern.chars (), pattern.length ());
    }
 
    size_t countChar (char ch) const {
-      return str ().countChar (ch);
+      const char *const ptr = chars_.get ();
+      return detail::count_char_impl (ptr, length_, ch);
    }
 
    size_t countStr (StringRef pattern) const {
-      return str ().countStr (pattern);
+      const char *const ptr = chars_.get ();
+      return detail::count_str_impl (ptr, length_, pattern.chars (), pattern.length ());
    }
 
    String substr (size_t start, size_t count = InvalidIndex) const {
@@ -991,7 +1094,8 @@ private:
       long lmask, lval;
 
       constexpr Utf8Table (int32_t cmask, int32_t cval, int32_t shift, long lmask, long lval) :
-         cmask (cmask), cval (cval), shift (shift), lmask (lmask), lval (lval) {}
+         cmask (cmask), cval (cval), shift (shift), lmask (lmask), lval (lval) {
+      }
    };
 
    struct Utf8CaseTable {

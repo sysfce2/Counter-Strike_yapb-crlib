@@ -151,11 +151,8 @@ private:
       return length_ >= size_t (contents_.length () * kLoadFactor);
    }
 
-   void rehash () noexcept {
+   void rehashTo (size_t newSize) noexcept {
       auto oldContents = cr::move (contents_);
-
-      size_t newSize = oldContents.empty () ? kInitialSize :
-         nextPowerOfTwo (oldContents.length () * 2);
 
       if (newSize > kMaxSize) {
          newSize = kMaxSize;
@@ -191,22 +188,18 @@ private:
       }
    }
 
+   void rehash () noexcept {
+      size_t newSize = contents_.empty () ? kInitialSize :
+         nextPowerOfTwo (contents_.length () * 2);
+
+      rehashTo (newSize);
+   }
+
    static size_t nextPowerOfTwo (size_t n) noexcept {
       if (n <= 2) {
          return 2;
       }
-      n--;
-
-      n |= n >> 1;
-      n |= n >> 2;
-      n |= n >> 4;
-      n |= n >> 8;
-      n |= n >> 16;
-
-      if constexpr (sizeof (size_t) > 4) {
-         n |= n >> 32;
-      }
-      return n + 1;
+      return cr::bit_ceil (n);
    }
 
 public:
@@ -215,7 +208,8 @@ public:
    }
 
    HashMap (HashMap &&rhs) noexcept
-      : contents_ (cr::move (rhs.contents_)), length_ (rhs.length_), hash_ (cr::move (rhs.hash_)) {
+      : hash_ (cr::move (rhs.hash_)), length_ (rhs.length_), contents_ (cr::move (rhs.contents_)) {
+      rhs.length_ = 0;
    }
 
    HashMap (std::initializer_list <Twin <K, V>> list) {
@@ -234,6 +228,7 @@ public:
          contents_ = cr::move (rhs.contents_);
          length_ = rhs.length_;
          hash_ = cr::move (rhs.hash_);
+         rhs.length_ = 0;
       }
       return *this;
    }
@@ -471,7 +466,7 @@ public:
       n = nextPowerOfTwo (n);
 
       if (n > contents_.length ()) {
-         rehash ();
+         rehashTo (n);
       }
    }
 };

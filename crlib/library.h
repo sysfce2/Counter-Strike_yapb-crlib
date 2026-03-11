@@ -41,9 +41,12 @@ private:
    bool unloadable_ = true;
 
 public:
-   explicit SharedLibrary () = default;
+    explicit SharedLibrary () = default;
 
-   SharedLibrary (StringRef file) {
+    SharedLibrary (const SharedLibrary &) = delete;
+    SharedLibrary &operator= (const SharedLibrary &) = delete;
+
+    SharedLibrary (StringRef file) {
       if (file.empty ()) {
          return;
       }
@@ -52,6 +55,13 @@ public:
 
    ~SharedLibrary () {
       unload ();
+   }
+
+   SharedLibrary (SharedLibrary &&rhs) noexcept {
+      handle_ = rhs.handle_;
+      unloadable_ = rhs.unloadable_;
+      rhs.handle_ = nullptr;
+      rhs.unloadable_ = true;
    }
 
 public:
@@ -155,6 +165,21 @@ public:
       return handle_ != nullptr;
    }
 
+   bool valid () const {
+      return operator bool ();
+   }
+
+   SharedLibrary &operator= (SharedLibrary &&rhs) noexcept {
+      if (this != &rhs) {
+         unload ();
+         handle_ = rhs.handle_;
+         unloadable_ = rhs.unloadable_;
+         rhs.handle_ = nullptr;
+         rhs.unloadable_ = true;
+      }
+      return *this;
+   }
+
 public:
   template <typename R> static inline R CR_STDCALL getSymbol (Handle module, StringRef fn) {
       return reinterpret_cast <R> (
@@ -164,6 +189,18 @@ public:
          dlsym (module, fn.chars ())
 #endif
          );
+   }
+
+   static bool hasModule (const char *mod) {
+#if defined(CR_WINDOWS)
+      return GetModuleHandleA (mod) != nullptr;
+#else
+      void *handle = dlopen (mod, RTLD_NOW | RTLD_NOLOAD | RTLD_LAZY);
+      if (handle) {
+         dlclose (handle);
+      }
+      return handle != nullptr;
+#endif
    }
 };
 

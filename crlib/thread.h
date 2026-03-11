@@ -195,7 +195,7 @@ public:
    template <typename T> bool wait (T timeout) {
 #if defined(CR_WINDOWS)
 #if defined(CR_HAS_WINXP_SUPPORT)
-      ResetEvent (cs_.raw ());
+      ResetEvent (event_);
 
       unlock ();
       auto result = WaitForSingleObject (event_, timeout);
@@ -283,12 +283,12 @@ private:
 
 private:
 #if defined(CR_WINDOWS)
-   static unsigned int __stdcall worker (void *pthis) {
+   static unsigned int __stdcall worker (void *pinvokable) {
 #else
-   static void *worker (void *pthis) {
+   static void *worker (void *pinvokable) {
 #endif
-      assert (pthis);
-      (*reinterpret_cast <Thread *> (pthis)->invokable_) ();
+      assert (pinvokable);
+      (*reinterpret_cast <Func *> (pinvokable)) ();
 
 #if defined(CR_WINDOWS)
       return 0;
@@ -302,9 +302,9 @@ public:
       invokable_ = makeUnique <Func> (cr::move (callback));
 
 #if defined(CR_WINDOWS)
-      thread_ = reinterpret_cast <HANDLE> (_beginthreadex (nullptr, 0, worker, this, 0, nullptr));
+      thread_ = reinterpret_cast <HANDLE> (_beginthreadex (nullptr, 0, worker, invokable_.get (), 0, nullptr));
 #else
-      initialized_ = (pthread_create (&thread_, nullptr, worker, this) == 0);
+      initialized_ = (pthread_create (&thread_, nullptr, worker, invokable_.get ()) == 0);
 #endif
 
       if (!ok ()) {

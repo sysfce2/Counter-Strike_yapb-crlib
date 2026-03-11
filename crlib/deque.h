@@ -101,15 +101,15 @@ private:
    void reset () {
       contents_ = nullptr;
       capacity_ = 0;
-
-      clear ();
+      index_.first = 0;
+      index_.second = 0;
    }
 
 public:
    explicit Deque () : capacity_ (0), contents_ (nullptr)
    { }
 
-   Deque (Deque &&rhs) : contents_ (rhs.contents_), capacity_ (rhs.capacity_) {
+   Deque (Deque &&rhs) : capacity_ (rhs.capacity_), contents_ (rhs.contents_) {
       index_.first = rhs.index_.first;
       index_.second = rhs.index_.second;
 
@@ -203,6 +203,19 @@ public:
    }
 
    void clear () {
+      if (index_.first <= index_.second) {
+         for (size_t i = index_.first; i < index_.second; ++i) {
+            Memory::destruct (&contents_[i]);
+         }
+      }
+      else {
+         for (size_t i = index_.first; i < capacity_; ++i) {
+            Memory::destruct (&contents_[i]);
+         }
+         for (size_t i = 0; i < index_.second; ++i) {
+            Memory::destruct (&contents_[i]);
+         }
+      }
       index_.first = 0;
       index_.second = 0;
    }

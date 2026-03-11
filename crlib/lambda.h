@@ -59,6 +59,7 @@ private:
 
 private:
    LambdaWrapper *lambda_ {};
+   bool owns_ {};
 
    union {
       double alignment_;
@@ -66,81 +67,88 @@ private:
    } storage_ {};
 
 private:
-   constexpr decltype (auto) small () {
-      return &storage_;
+   constexpr void *small () {
+      return storage_.alias_;
    }
 
    constexpr bool isSmall () const {
-      return &storage_ == reinterpret_cast <void *> (lambda_);
+      return lambda_ == reinterpret_cast <LambdaWrapper *> (storage_.alias_);
    }
 
 public:
-   constexpr void destroy () noexcept {
+   void destroy () noexcept {
       if (!lambda_) {
          return;
       }
 
-      if (isSmall ()) {
-         Memory::destruct (lambda_);
+      if (owns_) {
+         lambda_->~LambdaWrapper ();
       }
       else {
          Memory::release (lambda_);
       }
+      lambda_ = nullptr;
+      owns_ = false;
    }
 
-   constexpr void apply (const Lambda &rhs) noexcept {
+   void moveApply (Lambda &&rhs) noexcept {
       if (!rhs) {
          lambda_ = nullptr;
+         owns_ = false;
       }
-      else if (rhs.isSmall ()) {
-         lambda_ = rhs.lambda_->clone (small ());
-      }
-      else {
-         lambda_ = rhs.lambda_->clone (nullptr);
-      }
-   }
-
-   constexpr void move (Lambda &&rhs) noexcept {
-      if (!rhs) {
-         lambda_ = nullptr;
-      }
-      else if (rhs.isSmall ()) {
+      else if (rhs.owns_) {
          lambda_ = rhs.lambda_->move (small ());
-         rhs.destroy ();
+         owns_ = true;
          rhs.lambda_ = nullptr;
+         rhs.owns_ = false;
       }
       else {
          lambda_ = rhs.lambda_;
+         owns_ = false;
          rhs.lambda_ = nullptr;
+         rhs.owns_ = false;
       }
    }
 
-   template <typename U> constexpr void apply (U &&fn) {
+   template <typename U> void assign (U &&fn) {
+      destroy ();
       using Type = LambdaFunctor <typename cr::decay <U>::type>;
 
       if constexpr (sizeof (Type) > sizeof (storage_)) {
          lambda_ = Memory::getAndConstruct <Type> (cr::forward <U> (fn));
+         owns_ = false;
       }
       else {
          lambda_ = Memory::construct (reinterpret_cast <Type *> (small ()), cr::forward <U> (fn));
+         owns_ = true;
       }
    }
 
 public:
-   constexpr Lambda () : lambda_ { nullptr } {}
-   constexpr Lambda (nullptr_t) : lambda_ { nullptr } {}
+   Lambda () : lambda_ { nullptr }, owns_ { false } {}
+   Lambda (nullptr_t) : lambda_ { nullptr }, owns_ { false } {}
 
 public:
-   constexpr Lambda (const Lambda &rhs) {
-      apply (rhs);
+   Lambda (const Lambda &rhs) : lambda_ { nullptr }, owns_ { false } {
+      if (!rhs) {
+         return;
+      }
+      if (rhs.owns_) {
+         lambda_ = rhs.lambda_->clone (small ());
+         owns_ = true;
+      }
+      else {
+         lambda_ = rhs.lambda_->clone (nullptr);
+         owns_ = false;
+      }
    }
 
-   constexpr Lambda (Lambda &&rhs) noexcept {
-      move (cr::forward <Lambda> (rhs));
+   Lambda (Lambda &&rhs) noexcept : lambda_ { nullptr }, owns_ { false } {
+      moveApply (cr::forward <Lambda> (rhs));
    }
 
-   template <typename U> constexpr Lambda (U &&obj) {
-      apply (cr::forward <U> (obj));
+   template <typename U> Lambda (U &&obj) : lambda_ { nullptr }, owns_ { false } {
+      assign (cr::forward <U> (obj));
    }
 
    ~Lambda () {
@@ -148,37 +156,52 @@ public:
    }
 
 public:
-   explicit constexpr operator bool () const {
+   explicit operator bool () const {
       return !!lambda_;
    }
 
-   constexpr decltype (auto) operator () (Args... args) const {
+   decltype (auto) operator () (Args... args) const {
       assert (lambda_);
       return lambda_->invoke (cr::forward <Args> (args)...);
    }
 
 public:
-   constexpr Lambda &operator = (nullptr_t) {
+   Lambda &operator = (nullptr_t) {
       destroy ();
-      lambda_ = nullptr;
       return *this;
    }
 
-   constexpr Lambda &operator = (const Lambda &rhs) {
+   Lambda &operator = (const Lambda &rhs) noexcept {
+      if (this == &rhs) {
+         return *this;
+      }
       destroy ();
-      apply (rhs);
+      if (!rhs) {
+         return *this;
+      }
+      if (rhs.owns_) {
+         lambda_ = rhs.lambda_->clone (small ());
+         owns_ = true;
+      }
+      else {
+         lambda_ = rhs.lambda_->clone (nullptr);
+         owns_ = false;
+      }
       return *this;
    }
 
-   constexpr Lambda &operator = (Lambda &&rhs) noexcept {
+   Lambda &operator = (Lambda &&rhs) noexcept {
+      if (this == &rhs) {
+         return *this;
+      }
       destroy ();
-      move (cr::move (rhs));
+      moveApply (cr::move (rhs));
       return *this;
    }
 
-   template <typename U> constexpr Lambda &operator = (U &&rhs) {
+   template <typename U, typename = cr::enable_if_t<!cr::is_same <cr::remove_cv_t <cr::remove_reference_t <U>>, Lambda>::value>> Lambda &operator = (U &&rhs) noexcept {
       destroy ();
-      apply (rhs);
+      assign (cr::forward <U> (rhs));
       return *this;
    }
 };

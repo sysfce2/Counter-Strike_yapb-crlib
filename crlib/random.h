@@ -58,7 +58,7 @@ class RWrand final : public Singleton <RWrand> {
       return static_cast <uint32_t> (next64 ());
    }
 
-   [[nodiscard]] uint64_t getSeed (uint64_t value = 0) {
+   [[nodiscard]] uint64_t getSeed (uint64_t value = 0) noexcept {
       uint64_t seed = static_cast <uint64_t> (time (nullptr));
 
       seed ^= static_cast <uintptr_t> (plat.pid ());
@@ -85,8 +85,7 @@ public:
    }
 
    void seed (uint64_t value) noexcept {
-      const uint64_t seed = getSeed (value);
-      detail::SplitMix64 smix (seed);
+      detail::SplitMix64 smix (value);
 
       s0_ = smix.next ();
       s1_ = smix.next ();
@@ -98,7 +97,7 @@ public:
       if (low >= high) {
          return low;
       }
-      const uint32_t range = static_cast <uint32_t> (high - low) + 1u;
+      const uint32_t range = static_cast <uint32_t> (high) - static_cast <uint32_t> (low) + 1u;
       const uint64_t m = static_cast <uint64_t> (next32 ()) * range;
 
       return low + static_cast <int32_t> (m >> 32);
