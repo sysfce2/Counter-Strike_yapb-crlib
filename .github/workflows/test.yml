@@ -1,0 +1,132 @@
+name: Tests
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  test-native:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            arch: x86_64
+            name: Linux x86_64
+          - os: ubuntu-latest
+            arch: i386
+            name: Linux x86_32
+          - os: windows-latest
+            arch: x64
+            name: Windows x64
+          - os: windows-latest
+            arch: x86
+            name: Windows x86
+          - os: macos-latest
+            arch: x86_64
+            name: macOS x86_64
+
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-pip ninja-build
+          pip3 install meson
+
+      - name: Install 32-bit toolchain (Linux i386)
+        if: runner.os == 'Linux' && matrix.arch == 'i386'
+        run: |
+          sudo apt-get install -y gcc-multilib g++-multilib
+
+      - name: Install dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install meson ninja
+
+      - name: Install dependencies (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          pip install meson
+
+      - name: Setup MSVC (Windows)
+        if: runner.os == 'Windows'
+        uses: TheMrMilchmann/setup-msvc-dev@v4
+        with:
+          arch: ${{ matrix.arch }}
+
+      - name: Configure (Linux x86_64)
+        if: runner.os == 'Linux' && matrix.arch == 'x86_64'
+        run: meson setup builddir
+
+      - name: Configure (Linux i386)
+        if: runner.os == 'Linux' && matrix.arch == 'i386'
+        run: |
+          cat > cross_i386.txt << 'EOF'
+          [binaries]
+          c = 'gcc'
+          cpp = 'g++'
+
+          [built-in options]
+          c_args = ['-m32']
+          c_link_args = ['-m32']
+          cpp_args = ['-m32']
+          cpp_link_args = ['-m32']
+
+          [host_machine]
+          system = 'linux'
+          cpu_family = 'x86'
+          cpu = 'i686'
+          endian = 'little'
+          EOF
+          meson setup builddir --cross-file cross_i386.txt
+
+      - name: Configure (Windows/macOS)
+        if: runner.os != 'Linux'
+        run: meson setup builddir
+
+      - name: Build
+        run: meson compile -C builddir
+
+      - name: Test
+        run: meson test -C builddir --verbose
+
+  test-cross:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: aarch64
+            distro: ubuntu_latest
+            name: Linux aarch64
+          - arch: riscv64
+            distro: ubuntu_latest
+            name: Linux riscv64
+
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Test on ${{ matrix.arch }}
+        uses: uraimo/run-on-arch-action@v2
+        with:
+          arch: ${{ matrix.arch }}
+          distro: ${{ matrix.distro }}
+          githubToken: ${{ github.token }}
+          install: |
+            apt-get update
+            apt-get install -y python3-pip ninja-build g++
+            pip3 install meson --break-system-packages || pip3 install meson
+          run: |
+            meson setup builddir
+            meson compile -C builddir
+            meson test -C builddir --verbose

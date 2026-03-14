@@ -1,9 +1,4 @@
-//
-// crlib, simple class library for private needs.
-// Copyright © RWSH Solutions LLC <lab@rwsh.ru>.
-//
-// SPDX-License-Identifier: MIT
-//
+// SPDX-License-Identifier: Unlicense
 
 #pragma once
 
@@ -76,7 +71,7 @@ public:
 #else
       auto loadFlags = RTLD_NOW | RTLD_LOCAL;
 
-#if defined(CR_LINUX) && !defined(CR_ANDROID) && !defined(__SANITIZE_ADDRESS__) && defined(__GLIBC__)
+#if defined(CR_POSIX) && !defined(CR_ANDROID) && !defined(__SANITIZE_ADDRESS__) && defined(__GLIBC__)
       loadFlags |= RTLD_DEEPBIND;
 #endif
       handle_ = dlopen (file.chars (), loadFlags);

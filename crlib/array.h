@@ -1,9 +1,4 @@
-//
-// crlib, simple class library for private needs.
-// Copyright © RWSH Solutions LLC <lab@rwsh.ru>.
-//
-// SPDX-License-Identifier: MIT
-//
+// SPDX-License-Identifier: Unlicense
 
 #pragma once
 
@@ -70,13 +65,13 @@ public:
 private:
    void destructElements () noexcept {
       for (size_t i = 0; i < length_; ++i) {
-         Memory::destruct (&contents_[i]);
+         mem::destruct (&contents_[i]);
       }
    }
 
    void destroy () {
       destructElements ();
-      Memory::release (contents_);
+      mem::release (contents_);
    }
 
    void reset () {
@@ -128,15 +123,15 @@ public:
             newCapacity = required;
          }
       }
-      auto newContents = Memory::get<T> (newCapacity);
+      auto newContents = mem::allocate<T> (newCapacity);
 
       if (!newContents) {
          return false;
       }
 
       if (contents_) {
-         Memory::transfer (newContents, contents_, length_);
-         Memory::release (contents_);
+         mem::transfer (newContents, contents_, length_);
+         mem::release (contents_);
       }
 
       contents_ = newContents;
@@ -185,7 +180,7 @@ public:
             return false;
          }
       }
-      Memory::construct (&contents_[index], cr::forward <U> (object));
+      mem::construct (&contents_[index], cr::forward <U> (object));
 
       if (index >= length_) {
          length_ = index + 1;
@@ -212,7 +207,7 @@ public:
 
       if (index >= length_) {
          for (size_t i = 0; i < count; ++i) {
-            Memory::construct (&contents_[i + index], cr::forward <U> (objects[i]));
+            mem::construct (&contents_[i + index], cr::forward <U> (objects[i]));
          }
          length_ = capacity;
       }
@@ -223,7 +218,7 @@ public:
             const size_t dst = i + count - 1;
 
             if (dst >= length_) {
-               Memory::construct (&contents_[dst], cr::move (contents_[i - 1]));
+               mem::construct (&contents_[dst], cr::move (contents_[i - 1]));
             }
             else {
                contents_[dst] = cr::move (contents_[i - 1]);
@@ -231,9 +226,9 @@ public:
          }
          for (i = 0; i < count; ++i) {
             if (i + index < length_) {
-               Memory::destruct (&contents_[i + index]);
+               mem::destruct (&contents_[i + index]);
             }
-            Memory::construct (&contents_[i + index], cr::forward <U> (objects[i]));
+            mem::construct (&contents_[i + index], cr::forward <U> (objects[i]));
          }
          length_ += count;
       }
@@ -261,12 +256,13 @@ public:
       }
       else {
          for (size_t i = index; i < index + count; ++i) {
-            Memory::destruct (&contents_[i]);
+            mem::destruct (&contents_[i]);
          }
          length_ -= count;
 
          for (size_t i = index; i < length_; ++i) {
-            contents_[i] = cr::move (contents_[i + count]);
+            mem::construct (&contents_[i], cr::move (contents_[i + count]));
+            mem::destruct (&contents_[i + count]);
          }
       }
       return true;
@@ -285,10 +281,15 @@ public:
    }
 
    template <typename U> bool push (U &&object) {
+      if (length_ < capacity_) {
+         mem::construct (&contents_[length_], cr::forward <U> (object));
+         ++length_;
+         return true;
+      }
       if (!reserve (1)) {
          return false;
       }
-      Memory::construct (&contents_[length_], cr::forward <U> (object));
+      mem::construct (&contents_[length_], cr::forward <U> (object));
       ++length_;
 
       return true;
@@ -298,7 +299,7 @@ public:
       if (!reserve (1)) {
          return false;
       }
-      Memory::construct (&contents_[length_], cr::forward <Args> (args)...);
+      mem::construct (&contents_[length_], cr::forward <Args> (args)...);
       ++length_;
 
       return true;
@@ -371,10 +372,10 @@ public:
       if (length_ == capacity_ || !length_) {
          return false;
       }
-      auto data = Memory::get <T> (length_);
+      auto data = mem::allocate <T> (length_);
 
-      Memory::transfer (data, contents_, length_);
-      Memory::release (contents_);
+      mem::transfer (data, contents_, length_);
+      mem::release (contents_);
 
       contents_ = data;
       capacity_ = length_;

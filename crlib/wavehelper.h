@@ -1,9 +1,4 @@
-//
-// crlib, simple class library for private needs.
-// Copyright © RWSH Solutions LLC <lab@rwsh.ru>.
-//
-// SPDX-License-Identifier: MIT
-//
+// SPDX-License-Identifier: Unlicense
 
 #pragma once
 

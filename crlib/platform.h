@@ -1,9 +1,4 @@
-//
-// crlib, simple class library for private needs.
-// Copyright © RWSH Solutions LLC <lab@rwsh.ru>.
-//
-// SPDX-License-Identifier: MIT
-//
+// SPDX-License-Identifier: Unlicense
 
 #pragma once
 
@@ -12,10 +7,34 @@ CR_NAMESPACE_BEGIN
 // detects the build platform
 #if defined(__linux__)
 #  define CR_LINUX
+#elif defined(__FreeBSD__) || defined(__FreeBSD_kernel__)
+#  define CR_FREEBSD
+#elif defined(__GNU__) || defined(__gnu_hurd__)
+#  define CR_HURD
+#elif defined(__OpenBSD__)
+#  define CR_OPENBSD
+#elif defined(__NetBSD__)
+#  define CR_NETBSD
+#elif defined(__DragonFly__)
+#  define CR_DRAGONFLY
 #elif defined(__APPLE__)
 #  define CR_MACOS
 #elif defined(_WIN32)
 #  define CR_WINDOWS
+#elif defined(__HAIKU__)
+#  define CR_HAIKU
+#elif defined(__sun) && defined(__SVR4)
+#  define CR_SOLARIS
+#endif
+
+// bsd family umbrella
+#if defined(CR_FREEBSD) || defined(CR_OPENBSD) || defined(CR_NETBSD) || defined(CR_DRAGONFLY)
+#  define CR_BSD
+#endif
+
+// posix umbrella for all unix-like platforms
+#if defined(CR_LINUX) || defined(CR_BSD) || defined(CR_MACOS) || defined(CR_HURD) || defined(CR_HAIKU) || defined(CR_SOLARIS)
+#  define CR_POSIX
 #endif
 
 #if defined(__EMSCRIPTEN__)
@@ -89,6 +108,8 @@ CR_NAMESPACE_BEGIN
 #     define CR_HAS_SIMD_SSE
 #  elif defined(__ARM_NEON)
 #     define CR_HAS_SIMD_NEON
+#  elif defined(__riscv_vector)
+#     define CR_HAS_SIMD_RVV
 #  endif
 #endif
 
@@ -98,7 +119,7 @@ CR_NAMESPACE_BEGIN
 #  define CR_FORCE_INLINE __attribute__((__always_inline__)) inline
 #endif
 
-#if defined(CR_HAS_SIMD_SSE) || defined(CR_HAS_SIMD_NEON)
+#if defined(CR_HAS_SIMD_SSE) || defined(CR_HAS_SIMD_NEON) || defined(CR_HAS_SIMD_RVV)
 #  define CR_HAS_SIMD
 #endif
 
@@ -159,14 +180,14 @@ CR_NAMESPACE_BEGIN
 #endif
 
 // avoid linking to high GLIBC versions
-#if defined(CR_LINUX) && !defined(CR_ANDROID)
+#if defined(CR_POSIX) && !defined(CR_ARCH_NON_X86)
 #  if defined(__GLIBC__)
    __asm__ (".symver powf, powf@GLIBC_" GLIBC_VERSION_MIN);
 #     if __GLIBC__ >= 2 && __GLIBC_MINOR__ < 34
-         __asm__ (".symver dlsym, dlsym@GLIBC_" GLIBC_VERSION_MIN);
-         __asm__ (".symver dladdr, dladdr@GLIBC_" GLIBC_VERSION_MIN);
-         __asm__ (".symver dlclose, dlclose@GLIBC_" GLIBC_VERSION_MIN);
-         __asm__ (".symver dlopen, dlopen@GLIBC_" GLIBC_VERSION_MIN);
+         __asm__ (".symver dlsym,dlsym@GLIBC_" GLIBC_VERSION_MIN);
+         __asm__ (".symver dladdr,dladdr@GLIBC_" GLIBC_VERSION_MIN);
+         __asm__ (".symver dlclose,dlclose@GLIBC_" GLIBC_VERSION_MIN);
+         __asm__ (".symver dlopen,dlopen@GLIBC_" GLIBC_VERSION_MIN);
 #     endif
 #  endif
 #endif
@@ -281,7 +302,10 @@ CR_NAMESPACE_BEGIN
 struct Platform : public Singleton <Platform> {
    bool win = false;
    bool nix = false;
+   bool linux_ = false;
    bool macos = false;
+   bool bsd = false;
+   bool hurd = false;
    bool android = false;
    bool x64 = false;
    bool arm = false;
@@ -302,12 +326,24 @@ struct Platform : public Singleton <Platform> {
       android = true;
 #endif
 
-#if defined(CR_LINUX)
+#if defined(CR_POSIX)
       nix = true;
+#endif
+
+#if defined(CR_LINUX)
+      linux_ = true;
 #endif
 
 #if defined(CR_MACOS)
       macos = true;
+#endif
+
+#if defined(CR_BSD)
+      bsd = true;
+#endif
+
+#if defined(CR_HURD)
+      hurd = true;
 #endif
 
 #if defined(CR_ARCH_X64) || defined(CR_ARCH_ARM64)
@@ -331,7 +367,7 @@ struct Platform : public Singleton <Platform> {
 #endif
 
 #if defined(CR_EMSCRIPTEN)
-   	  emscripten = true;
+      emscripten = true;
 #endif
 
 #if !defined(CR_DISABLE_SIMD)
@@ -394,7 +430,7 @@ struct Platform : public Singleton <Platform> {
       return true;
    }
 
-   float seconds () {
+   [[nodiscard]] float seconds () {
 #if defined(CR_WINDOWS)
       LARGE_INTEGER count {}, freq {};
 
@@ -447,7 +483,7 @@ struct Platform : public Singleton <Platform> {
 #endif
    }
 
-   const char *env (const char *var) {
+   [[nodiscard]] const char *env (const char *var) {
       static char result[384];
       bzero (result, cr::bufsize (result));
 
@@ -484,12 +520,15 @@ struct Platform : public Singleton <Platform> {
       static char name[PATH_MAX] {};
 
       strncpy (name, templ, cr::bufsize (name));
-      mkstemp (name);
+
+      if (auto fd = mkstemp (name); fd != -1) {
+         close (fd);
+      }
 #endif
       return name;
    }
 
-   int32_t hardwareConcurrency () {
+   [[nodiscard]] int32_t hardwareConcurrency () {
 #if defined(CR_WINDOWS)
       SYSTEM_INFO sysinfo;
       GetSystemInfo (&sysinfo);
@@ -500,7 +539,7 @@ struct Platform : public Singleton <Platform> {
 #endif
    }
 
-   bool fileExists (const char *path) {
+   [[nodiscard]] bool fileExists (const char *path) {
 #if defined(CR_WINDOWS)
       return _access (path, 0) == 0;
 #else
@@ -508,7 +547,7 @@ struct Platform : public Singleton <Platform> {
 #endif
    }
 
-   FILE *openStdioFile (const char *path, const char *mode) {
+   [[nodiscard]] FILE *openStdioFile (const char *path, const char *mode) {
       FILE *handle = nullptr;
 
 #if defined(CR_CXX_MSVC)

@@ -1,9 +1,4 @@
-//
-// crlib, simple class library for private needs.
-// Copyright © RWSH Solutions LLC <lab@rwsh.ru>.
-//
-// SPDX-License-Identifier: MIT
-//
+// SPDX-License-Identifier: Unlicense
 
 #pragma once
 
@@ -128,19 +123,22 @@ namespace detail {
          if (uri.empty ()) {
             return result;
          }
-         size_t protocol = uri.find ("://");
+         const size_t protocol = uri.find ("://");
 
-         if (protocol != String::InvalidIndex) {
-            result.protocol = uri.substr (0, protocol);
+         if (protocol == String::InvalidIndex) {
+            return result;
+         }
+         result.protocol = uri.substr (0, protocol);
 
-            size_t hostIndex = uri.find ("/", protocol + 3);
+         const size_t hostStart = protocol + 3;
+         const size_t pathSlash = uri.find ("/", hostStart);
 
-            if (hostIndex != String::InvalidIndex) {
-               result.path = uri.substr (hostIndex + 1);
-               result.host = uri.substr (protocol + 3, hostIndex - protocol - 3);
-
-               return result;
-            }
+         if (pathSlash != String::InvalidIndex) {
+            result.host = uri.substr (hostStart, pathSlash - hostStart);
+            result.path = uri.substr (pathSlash + 1);
+         }
+         else {
+            result.host = uri.substr (hostStart);
          }
          return result;
       }
@@ -156,6 +154,12 @@ namespace detail {
          }
 #endif
       }
+
+      static void stop () {
+#if defined(CR_WINDOWS)
+         WSACleanup ();
+#endif
+      }
    };
 }
 
@@ -168,7 +172,11 @@ private:
 #endif
 
 private:
-   static constexpr SocketType kInvalidSocket = 0xffffffff;
+#if defined(CR_WINDOWS)
+   static constexpr SocketType kInvalidSocket = INVALID_SOCKET;
+#else
+   static constexpr SocketType kInvalidSocket = -1;
+#endif
 
 private:
    SocketType socket_;
@@ -202,18 +210,15 @@ public:
          return false;
       }
 
-      auto getTimeouts = [&] () -> Twin <char *, int32_t> {
+      // set timeouts
 #if defined(CR_WINDOWS)
-         DWORD tv = timeout_ * 1000;
+      DWORD tv = timeout_ * 1000;
 #else
-         timeval tv { static_cast <time_t> (timeout_), 0 };
+      timeval tv { static_cast <time_t> (timeout_), 0 };
 #endif
-         return { reinterpret_cast <char *> (&tv), static_cast <int32_t> (sizeof (tv)) };
-      };
-      auto timeouts = getTimeouts ();
 
-      setsockopt (socket_, SOL_SOCKET, SO_RCVTIMEO, timeouts.first, timeouts.second);
-      setsockopt (socket_, SOL_SOCKET, SO_SNDTIMEO, timeouts.first, timeouts.second);
+      setsockopt (socket_, SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast <char *> (&tv), static_cast <int32_t> (sizeof (tv)));
+      setsockopt (socket_, SOL_SOCKET, SO_SNDTIMEO, reinterpret_cast <char *> (&tv), static_cast <int32_t> (sizeof (tv)));
 
       if (::connect (socket_, result->ai_addr, static_cast <int32_t> (result->ai_addrlen)) == -1) {
          disconnect ();
@@ -231,14 +236,15 @@ public:
    }
 
    void disconnect () {
-#if defined(CR_WINDOWS)
-      if (socket_ != kInvalidSocket) {
-         closesocket (socket_);
+      if (socket_ == kInvalidSocket) {
+         return;
       }
+#if defined(CR_WINDOWS)
+      closesocket (socket_);
 #else
-      if (socket_ != kInvalidSocket)
-         close (socket_);
+      close (socket_);
 #endif
+      socket_ = kInvalidSocket;
    }
 
 public:
@@ -289,26 +295,35 @@ private:
    int32_t chunkSize_ = 4096;
 
    bool initialized_ {};
-   bool hasConnection = {};
+   bool hasConnection_ {};
+   Mutex connectionMutex_;
 
 public:
    HttpClient () = default;
-   ~HttpClient () = default;
+   ~HttpClient () {
+      detail::SocketInit::stop ();
+   }
 
 private:
+   bool isHttps (StringRef protocol) {
+      return protocol == "https" || protocol == "HTTPS";
+   }
+
+   bool checkConnection () {
+      MutexScopedLock lock (connectionMutex_);
+      return hasConnection_;
+   }
+
    HttpClientResult parseResponseHeader (Socket *socket, uint8_t *buffer) {
-      bool isFinished = false;
       int32_t pos = 0, symbols = 0, errors = 0;
 
-      // parse response header
-      while (!isFinished && pos < chunkSize_) {
+      // parse response header byte-by-byte until we see a blank line (\r\n\r\n)
+      while (pos < chunkSize_) {
          if (socket->recv (&buffer[pos], 1) < 1) {
             if (++errors > MaxReceiveErrors) {
-               isFinished = true;
+               break;
             }
-            else {
-               continue;
-            }
+            continue;
          }
 
          switch (buffer[pos]) {
@@ -316,7 +331,10 @@ private:
             break;
 
          case '\n':
-            isFinished = (symbols == 0);
+            if (symbols == 0) {
+               ++pos;
+               goto done;
+            }
             symbols = 0;
             break;
 
@@ -326,11 +344,12 @@ private:
          }
          ++pos;
       }
-      String response { reinterpret_cast <const char *> (buffer), static_cast <size_t> (chunkSize_) };
-      const size_t responseCodeStart = response.find ("HTTP/1.1");
+   done:
+      String response { reinterpret_cast <const char *> (buffer), static_cast <size_t> (pos) };
+      const size_t responseCodeStart = response.find ("HTTP/1.");
 
       if (responseCodeStart != String::InvalidIndex) {
-         String respCode = response.substr (responseCodeStart + cr::bufsize ("HTTP 1/1 "), 3);
+         String respCode = response.substr (responseCodeStart + cr::bufsize ("HTTP/1.1 "), 3);
          respCode.trim ();
 
          return static_cast <HttpClientResult> (respCode.as <int> ());
@@ -338,35 +357,61 @@ private:
       return HttpClientResult::NotFound;
    }
 
+   String buildRequest (StringRef method, const detail::HttpUri &uri, size_t contentLength = 0, StringRef contentType = "", StringRef extraHeaders = "") {
+      String request;
+
+      request.appendf ("%s /%s HTTP/1.1\r\n", method.chars (), uri.path);
+      request.appendf ("Host: %s\r\n", uri.host);
+      request.appendf ("User-Agent: %s\r\n", userAgent_);
+      request.append ("Accept: */*\r\n");
+      request.append ("Connection: close\r\n");
+
+      if (contentLength > 0) {
+         request.appendf ("Content-Length: %zu\r\n", contentLength);
+      }
+      if (!contentType.empty ()) {
+         request.appendf ("Content-Type: %s\r\n", contentType.chars ());
+      }
+      if (!extraHeaders.empty ()) {
+         request.append (extraHeaders);
+      }
+      request.append ("\r\n");
+
+      return request;
+   }
+
 public:
    void startup (StringRef hostCheck = "", StringRef errMessageIfHostDown = "", uint32_t timeout = DefaultSocketTimeout) {
       detail::SocketInit::start ();
 
       initialized_ = true;
-      hasConnection = false;
 
-      // dummy check to connect some host on startup in a separate, to check if network is available
-      if (!hostCheck.empty ()) {
-         static Thread hostCheckThread { [=] () {
-            auto socket = cr::makeUnique <Socket> ();
-            socket->setTimeout (timeout); // set some magic timeout
-
-            if (!socket->connect (hostCheck)) {
-               hasConnection = false;
-
-               // notify user
-               if (!errMessageIfHostDown.empty ()) {
-                  logger.message (errMessageIfHostDown.chars ());
-               }
-            }
-            else {
-               hasConnection = true;
-            }
-         } };
+      if (hostCheck.empty ()) {
+         MutexScopedLock lock (connectionMutex_);
+         hasConnection_ = true;
+         return;
       }
-      else {
-         hasConnection = true;
+      {
+         MutexScopedLock lock (connectionMutex_);
+         hasConnection_ = false;
       }
+      String hostCopy { hostCheck };
+      String errCopy { errMessageIfHostDown };
+
+      Thread hostCheckThread { [this, hostCopy, errCopy, timeout] () {
+         auto socket = cr::makeUnique <Socket> ();
+         socket->setTimeout (timeout);
+
+         const bool connected = socket->connect (hostCopy);
+
+         MutexScopedLock lock (connectionMutex_);
+         hasConnection_ = connected;
+
+         if (!connected && !errCopy.empty ()) {
+            logger.message (errCopy.chars ());
+         }
+      } };
+      hostCheckThread.detach ();
    }
 
    // simple blocked download
@@ -375,8 +420,7 @@ public:
          plat.abort ("Sockets not initialized.");
       }
 
-      // check if have network connection
-      if (!hasConnection) {
+      if (!checkConnection ()) {
          statusCode_ = HttpClientResult::NetworkUnavilable;
          return false;
       }
@@ -386,32 +430,23 @@ public:
          return false;
       }
       auto uri = detail::HttpUri::parse (url);
-      auto socket = cr::makeUnique <Socket> ();
 
-      // no https...
-      if (uri.protocol == "https") {
+      if (isHttps (uri.protocol)) {
          statusCode_ = HttpClientResult::HttpOnly;
          return false;
       }
+      auto socket = cr::makeUnique <Socket> ();
       socket->setTimeout (timeout);
 
-      // unable to connect...
       if (!socket->connect (uri.host)) {
          statusCode_ = HttpClientResult::ConnectError;
          return false;
       }
 
-      String request;
-      request.appendf ("GET /%s HTTP/1.1\r\n", uri.path);
-      request.append ("Accept: */*\r\n");
-      request.append ("Connection: close\r\n");
-      request.append ("Keep-Alive: 115\r\n");
-      request.appendf ("User-Agent: %s\r\n", userAgent_);
-      request.appendf ("Host: %s\r\n\r\n", uri.host);
+      String request = buildRequest ("GET", uri);
 
       if (socket->send (request.chars (), static_cast <int32_t> (request.length ())) < 1) {
          statusCode_ = HttpClientResult::SocketError;
-
          return false;
       }
       SmallArray <uint8_t> buffer (chunkSize_);
@@ -451,8 +486,7 @@ public:
          plat.abort ("Sockets not initialized.");
       }
 
-      // check if have network connection
-      if (!hasConnection) {
+      if (!checkConnection ()) {
          statusCode_ = HttpClientResult::NetworkUnavilable;
          return false;
       }
@@ -462,22 +496,19 @@ public:
          return false;
       }
       auto uri = detail::HttpUri::parse (url);
-      auto socket = cr::makeUnique <Socket> ();
 
-      // no https...
-      if (uri.protocol == "https") {
+      if (isHttps (uri.protocol)) {
          statusCode_ = HttpClientResult::HttpOnly;
          return false;
       }
+      auto socket = cr::makeUnique <Socket> ();
       socket->setTimeout (timeout);
 
-      // unable to connect...
       if (!socket->connect (uri.host)) {
          statusCode_ = HttpClientResult::ConnectError;
          return false;
       }
 
-      // receive the file
       File file (localPath, "rb");
 
       if (!file) {
@@ -485,37 +516,31 @@ public:
          return false;
       }
       String boundaryName = localPath;
-      size_t boundarySlash = localPath.findLastOf ("\\/");
+      const size_t boundarySlash = localPath.findLastOf ("\\/");
 
       if (boundarySlash != String::InvalidIndex) {
          boundaryName = localPath.substr (boundarySlash + 1);
       }
       StringRef boundaryLine = strings.format ("---crlib_upload_boundary_%d%d%d%d", rg (0, 9), rg (0, 9), rg (0, 9), rg (0, 9));
 
-      String request, start, end;
+      String start, end;
       start.appendf ("--%s\r\n", boundaryLine);
       start.appendf ("Content-Disposition: form-data; name='file'; filename='%s'\r\n", boundaryName);
       start.append ("Content-Type: application/octet-stream\r\n\r\n");
 
       end.appendf ("\r\n--%s--\r\n\r\n", boundaryLine);
 
-      request.appendf ("POST /%s HTTP/1.1\r\n", uri.path);
-      request.appendf ("Host: %s\r\n", uri.host);
-      request.appendf ("User-Agent: %s\r\n", userAgent_);
-      request.appendf ("Content-Type: multipart/form-data; boundary=%s\r\n", boundaryLine);
-      request.appendf ("Content-Length: %d\r\n\r\n", file.length () + start.length () + end.length ());
+      const auto contentLength = static_cast <size_t> (file.length ()) + start.length () + end.length ();
+      StringRef contentType = strings.format ("multipart/form-data; boundary=%s", boundaryLine);
+      String request = buildRequest ("POST", uri, contentLength, contentType);
 
-      // send the main request
       if (socket->send (request.chars (), static_cast <int32_t> (request.length ())) < 1) {
          statusCode_ = HttpClientResult::SocketError;
-
          return false;
       }
 
-      // send boundary start
       if (socket->send (start.chars (), static_cast <int32_t> (start.length ())) < 1) {
          statusCode_ = HttpClientResult::SocketError;
-
          return false;
       }
       SmallArray <uint8_t> buffer (chunkSize_);
@@ -532,7 +557,6 @@ public:
          }
       }
 
-      // send boundary end
       if (socket->send (end.chars (), static_cast <int32_t> (end.length ())) < 1) {
          statusCode_ = HttpClientResult::SocketError;
          return false;

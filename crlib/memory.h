@@ -1,9 +1,4 @@
-//
-// crlib, simple class library for private needs.
-// Copyright © RWSH Solutions LLC <lab@rwsh.ru>.
-//
-// SPDX-License-Identifier: MIT
-//
+// SPDX-License-Identifier: Unlicense
 
 #pragma once
 
@@ -11,7 +6,7 @@
 #include <crlib/movable.h>
 #include <crlib/platform.h>
 
-// provide placment new to avoid stdc++ <new> header
+// provide placement new to avoid stdc++ <new> header
 #if !defined(CR_COMPAT_STL)
 inline void *operator new (const size_t, void *ptr) noexcept {
    return ptr;
@@ -21,68 +16,62 @@ inline void *operator new (const size_t, void *ptr) noexcept {
 CR_NAMESPACE_BEGIN
 
 // internal memory manager
-class Memory final {
-public:
-   constexpr Memory () = default;
-   ~Memory () = default;
+namespace mem {
 
-public:
-   template <typename T> static T *get (const size_t length = 1) noexcept {
-       auto size = cr::max <size_t> (size_t (1), length) * sizeof (T);
-
-#if defined(CR_CXX_GCC)
-      if (size >= PTRDIFF_MAX) {
-         plat.abort ();
-      }
-#endif
+   // allocates raw memory for length objects of type T
+   template <typename T> CR_FORCE_INLINE T *allocate (const size_t length = 1) noexcept {
+      auto size = length * sizeof (T);
       auto memory = reinterpret_cast <T *> (malloc (size));
 
       if (!memory) {
          char errmsg[384] {};
-         snprintf (errmsg, cr::bufsize (errmsg), "Failed to allocate %zd kbytes of memory. Closing down.", size / 1024);
+         snprintf (errmsg, sizeof (errmsg), "Failed to allocate %zd kbytes of memory. Closing down.", size / 1024);
 
          plat.abort (errmsg);
       }
       return memory;
    }
 
-   template <typename T> static T *release (T *memory) noexcept {
-       free (memory);
-       return nullptr;
-    }
+   // releases memory and returns nullptr
+   template <typename T> CR_FORCE_INLINE T *release (T *memory) noexcept {
+      free (memory);
+      return nullptr;
+   }
 
-public:
-   template <typename T, typename ...Args> static T *construct (T *memory, Args &&...args) noexcept {
+   // in-place constructs a single object with forwarded arguments
+   template <typename T, typename ...Args> CR_FORCE_INLINE T *construct (T *memory, Args &&...args) noexcept {
       new (memory) T (cr::forward <Args> (args)...);
       return memory;
    }
 
-   template <typename T> static void destruct (T *memory) {
-       memory->~T ();
-    }
+   // calls destructor on a single object
+   template <typename T> CR_FORCE_INLINE void destruct (T *memory) noexcept {
+      memory->~T ();
+   }
 
-   template <typename T, typename ...Args> static T *constructArray (T *memory, size_t length, Args &&...args) noexcept {
-       for (size_t i = 0; i < length; ++i) {
-          new (&memory[i]) T (cr::forward <Args> (args)...);
-       }
-       return memory;
-    }
-
-   template <typename T> static void destructArray (T *memory, size_t length) noexcept {
-       for (size_t i = 0; i < length; ++i) {
-          memory[i].~T ();
-       }
-    }
-
-   template <typename T, typename ...Args> static T *getAndConstruct (Args &&...args) noexcept {
-      auto memory = get <T> ();
-      construct <T> (memory, cr::forward <Args> (args)...);
-
+   // in-place constructs an array of objects with forwarded arguments
+   template <typename T, typename ...Args> CR_FORCE_INLINE T *constructArray (T *memory, size_t length, Args &&...args) noexcept {
+      for (size_t i = 0; i < length; ++i) {
+         new (&memory[i]) T (cr::forward <Args> (args)...);
+      }
       return memory;
    }
 
-   template <typename T> static void transfer (T *dest, T *src, size_t length) noexcept {
-      if constexpr (std::is_trivially_copyable_v <T>) {
+   // calls destructors on an array of objects
+   template <typename T> CR_FORCE_INLINE void destructArray (T *memory, size_t length) noexcept {
+      for (size_t i = 0; i < length; ++i) {
+         memory[i].~T ();
+      }
+   }
+
+   // allocates and constructs a single object
+   template <typename T, typename ...Args> CR_FORCE_INLINE T *allocateAndConstruct (Args &&...args) noexcept {
+      return construct <T> (allocate <T> (), cr::forward <Args> (args)...);
+   }
+
+   // moves elements from src to dest, destroying src elements
+   template <typename T> CR_FORCE_INLINE void transfer (T *dest, T *src, size_t length) noexcept {
+      if constexpr (cr::is_trivially_copyable_v <T>) {
          memcpy (dest, src, length * sizeof (T));
       }
       else {
@@ -92,6 +81,6 @@ public:
          }
       }
    }
-};
+}
 
 CR_NAMESPACE_END

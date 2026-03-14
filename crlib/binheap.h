@@ -1,9 +1,4 @@
-//
-// crlib, simple class library for private needs.
-// Copyright © RWSH Solutions LLC <lab@rwsh.ru>.
-//
-// SPDX-License-Identifier: MIT
-//
+// SPDX-License-Identifier: Unlicense
 
 #pragma once
 
@@ -22,22 +17,15 @@ private:
 public:
    explicit BinaryHeap () = default;
 
-   BinaryHeap (BinaryHeap &&rhs) noexcept {
-      data_ = rhs.data_;
-      size_ = rhs.size_;
-      capacity_ = rhs.capacity_;
+   BinaryHeap (BinaryHeap &&rhs) noexcept
+      : data_ (rhs.data_), size_ (rhs.size_), capacity_ (rhs.capacity_) {
       rhs.data_ = nullptr;
       rhs.size_ = 0;
       rhs.capacity_ = 0;
    }
 
    ~BinaryHeap () {
-      if (data_) {
-         for (size_t i = 0; i < size_; ++i) {
-            Memory::destruct (&data_[i]);
-         }
-         Memory::release (data_);
-      }
+      destroy ();
    }
 
 public:
@@ -45,11 +33,9 @@ public:
       if (!ensure (size_ + 1)) {
          return false;
       }
-      Memory::construct (&data_[size_], item);
+      mem::construct (&data_[size_], item);
+      siftUp (size_);
       ++size_;
-      if (size_ > 1) {
-         percolateUp (size_ - 1);
-      }
       return true;
    }
 
@@ -57,11 +43,9 @@ public:
       if (!ensure (size_ + 1)) {
          return false;
       }
-      Memory::construct (&data_[size_], cr::move (item));
+      mem::construct (&data_[size_], cr::move (item));
+      siftUp (size_);
       ++size_;
-      if (size_ > 1) {
-         percolateUp (size_ - 1);
-      }
       return true;
    }
 
@@ -69,11 +53,9 @@ public:
       if (!ensure (size_ + 1)) {
          return false;
       }
-      Memory::construct (&data_[size_], cr::forward <Args> (args)...);
+      mem::construct (&data_[size_], cr::forward <Args> (args)...);
+      siftUp (size_);
       ++size_;
-      if (size_ > 1) {
-         percolateUp (size_ - 1);
-      }
       return true;
    }
 
@@ -82,37 +64,22 @@ public:
    }
 
    T pop () {
-      auto key = cr::move (data_[0]);
-
-      if (size_ == 1) {
-         Memory::destruct (&data_[0]);
-         --size_;
-         return key;
-      }
-
-      cr::swap (data_[0], data_[size_ - 1]);
-      Memory::destruct (&data_[size_ - 1]);
+      auto result = cr::move (data_[0]);
       --size_;
 
-      percolateDown (0);
-      return key;
+      if (size_ > 0) {
+         siftDown (0, cr::move (data_[size_]));
+      }
+      return result;
    }
 
    void pop (T &out) {
       out = cr::move (data_[0]);
-
-      if (size_ == 1) {
-         Memory::destruct (&data_[0]);
-         --size_;
-         return;
-      }
-
-      Memory::destruct (&data_[0]);
       --size_;
-      data_[0] = cr::move (data_[size_]);
-      Memory::destruct (&data_[size_]);
 
-      percolateDown (0);
+      if (size_ > 0) {
+         siftDown (0, cr::move (data_[size_]));
+      }
    }
 
 public:
@@ -126,7 +93,7 @@ public:
 
    void clear () {
       for (size_t i = 0; i < size_; ++i) {
-         Memory::destruct (&data_[i]);
+         mem::destruct (&data_[i]);
       }
       size_ = 0;
    }
@@ -139,7 +106,7 @@ public:
 
    BinaryHeap &operator = (BinaryHeap &&rhs) noexcept {
       if (this != &rhs) {
-         this->~BinaryHeap ();
+         destroy ();
          data_ = rhs.data_;
          size_ = rhs.size_;
          capacity_ = rhs.capacity_;
@@ -151,56 +118,79 @@ public:
    }
 
 private:
+   void destroy () {
+      if (data_) {
+         for (size_t i = 0; i < size_; ++i) {
+            mem::destruct (&data_[i]);
+         }
+         mem::release (data_);
+         data_ = nullptr;
+      }
+   }
+
    bool ensure (size_t needed) {
       if (needed <= capacity_) {
          return true;
       }
       size_t newCap = capacity_ == 0 ? 8 : capacity_ * 2;
+
       while (newCap < needed) {
          newCap *= 2;
       }
-      T *newData = static_cast <T *> (Memory::get <T> (newCap));
+      auto newData = mem::allocate <T> (newCap);
+
       if (!newData) {
          return false;
       }
       for (size_t i = 0; i < size_; ++i) {
-         Memory::construct (&newData[i], cr::move (data_[i]));
-         Memory::destruct (&data_[i]);
+         mem::construct (&newData[i], cr::move (data_[i]));
+         mem::destruct (&data_[i]);
       }
-      Memory::release (data_);
+      mem::release (data_);
       data_ = newData;
       capacity_ = newCap;
       return true;
    }
 
-   void percolateUp (size_t index) {
+   void siftUp (size_t index) {
+      if (index == 0) {
+         return;
+      }
+      T *const data = data_;
+      T value = cr::move (data[index]);
+
       while (index > 0) {
          size_t parent = (index - 1) / 2;
-         if (!(data_[parent] > data_[index])) {
+
+         if (!(value < data[parent])) {
             break;
          }
-         cr::swap (data_[parent], data_[index]);
+         data[index] = cr::move (data[parent]);
          index = parent;
       }
+      data[index] = cr::move (value);
    }
 
-   void percolateDown (size_t index) {
-      while (true) {
-         size_t left = index * 2 + 1;
-         if (left >= size_) {
-            break;
-         }
+   void siftDown (size_t hole, T &&value) {
+      T *const data = data_;
+      const size_t size = size_;
+      const size_t half = size / 2;
+
+      while (hole < half) {
+         size_t left = hole * 2 + 1;
          size_t best = left;
          size_t right = left + 1;
-         if (right < size_ && data_[right] < data_[best]) {
+
+         if (right < size && data[right] < data[left]) {
             best = right;
          }
-         if (!(data_[index] > data_[best])) {
+         if (!(data[best] < value)) {
             break;
          }
-         cr::swap (data_[index], data_[best]);
-         index = best;
+         data[hole] = cr::move (data[best]);
+         hole = best;
       }
+      data[hole] = cr::move (value);
    }
 };
 

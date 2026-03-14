@@ -1,9 +1,4 @@
-//
-// crlib, simple class library for private needs.
-// Copyright © RWSH Solutions LLC <lab@rwsh.ru>.
-//
-// SPDX-License-Identifier: MIT
-//
+// SPDX-License-Identifier: Unlicense
 
 #pragma once
 
@@ -14,194 +9,191 @@ CR_NAMESPACE_BEGIN
 template <typename> class Lambda;
 template <typename R, typename ...Args> class Lambda <R (Args...)> final {
 private:
-   static constexpr uint32_t kSmallBufferSize = sizeof (void *) * 3;
+   static constexpr size_t kSmallBufferSize = sizeof (void *) * 3;
 
-private:
-   class LambdaWrapper : public NonCopyable {
+   // type-erased callable interface
+   class Holder {
    public:
-      explicit LambdaWrapper () = default;
-      virtual ~LambdaWrapper () = default;
+      Holder () = default;
+      virtual ~Holder () = default;
+
+      Holder (const Holder &) = delete;
+      Holder &operator = (const Holder &) = delete;
 
    public:
       virtual R invoke (Args &&... args) const = 0;
-      virtual LambdaWrapper *clone (void *obj) const = 0;
-      virtual LambdaWrapper *move (void *obj) = 0;
+      virtual Holder *cloneInto (void *buf) const = 0;
+      virtual Holder *moveInto (void *buf) = 0;
    };
 
-   template <typename T> class LambdaFunctor final : public LambdaWrapper {
+   template <typename T> class CallableHolder final : public Holder {
    private:
       T callee_;
 
    public:
-      constexpr LambdaFunctor (const LambdaFunctor &rhs) : callee_ { rhs.callee_ } {}
-      constexpr LambdaFunctor (LambdaFunctor &&rhs) noexcept : callee_ { cr::move (rhs.callee_) } {}
-      constexpr LambdaFunctor (const T &callee) : callee_ { callee } {}
-      constexpr LambdaFunctor (T &&callee) : callee_ { cr::move (callee) } {}
-
-      virtual ~LambdaFunctor () = default;
+      CallableHolder (const T &callee) : callee_ (callee) {}
+      CallableHolder (T &&callee) : callee_ (cr::move (callee)) {}
+      CallableHolder (const CallableHolder &rhs) : callee_ (rhs.callee_) {}
+      CallableHolder (CallableHolder &&rhs) noexcept : callee_ (cr::move (rhs.callee_)) {}
 
    public:
-      virtual R invoke (Args &&... args) const override {
+      R invoke (Args &&... args) const override {
          return callee_ (cr::forward <Args> (args)...);
       }
 
-      virtual LambdaWrapper *clone (void *obj) const override {
-         if (!obj) {
-            return Memory::getAndConstruct <LambdaFunctor> (*this);
+      Holder *cloneInto (void *buf) const override {
+         if (buf) {
+            return mem::construct (static_cast <CallableHolder *> (buf), *this);
          }
-         return Memory::construct (reinterpret_cast <LambdaFunctor *> (obj), *this);
+         return mem::allocateAndConstruct <CallableHolder> (*this);
       }
 
-      virtual LambdaWrapper *move (void *obj) override {
-         return Memory::construct (reinterpret_cast <LambdaFunctor *> (obj), cr::move (*this));
+      Holder *moveInto (void *buf) override {
+         if (buf) {
+            return mem::construct (static_cast <CallableHolder *> (buf), cr::move (*this));
+         }
+         return mem::allocateAndConstruct <CallableHolder> (cr::move (*this));
       }
    };
 
 private:
-   LambdaWrapper *lambda_ {};
-   bool owns_ {};
+   Holder *holder_ {};
+   bool small_ {};
 
    union {
       double alignment_;
-      uint8_t alias_[kSmallBufferSize];
+      uint8_t buffer_[kSmallBufferSize];
    } storage_ {};
 
 private:
-   constexpr void *small () {
-      return storage_.alias_;
+   void *smallBuffer () {
+      return storage_.buffer_;
    }
 
-   constexpr bool isSmall () const {
-      return lambda_ == reinterpret_cast <LambdaWrapper *> (storage_.alias_);
-   }
-
-public:
-   void destroy () noexcept {
-      if (!lambda_) {
+   void destroyHolder () noexcept {
+      if (!holder_) {
          return;
       }
 
-      if (owns_) {
-         lambda_->~LambdaWrapper ();
+      if (small_) {
+         holder_->~Holder ();
       }
       else {
-         Memory::release (lambda_);
+         mem::destruct (holder_);
+         mem::release (holder_);
       }
-      lambda_ = nullptr;
-      owns_ = false;
+      holder_ = nullptr;
+      small_ = false;
    }
 
-   void moveApply (Lambda &&rhs) noexcept {
-      if (!rhs) {
-         lambda_ = nullptr;
-         owns_ = false;
-      }
-      else if (rhs.owns_) {
-         lambda_ = rhs.lambda_->move (small ());
-         owns_ = true;
-         rhs.lambda_ = nullptr;
-         rhs.owns_ = false;
+   template <typename U> void assignCallable (U &&fn) {
+      using Callable = CallableHolder <typename cr::decay <U>::type>;
+
+      if constexpr (sizeof (Callable) <= sizeof (storage_)) {
+         holder_ = mem::construct (static_cast <Callable *> (smallBuffer ()), cr::forward <U> (fn));
+         small_ = true;
       }
       else {
-         lambda_ = rhs.lambda_;
-         owns_ = false;
-         rhs.lambda_ = nullptr;
-         rhs.owns_ = false;
+         holder_ = mem::allocateAndConstruct <Callable> (cr::forward <U> (fn));
+         small_ = false;
       }
    }
 
-   template <typename U> void assign (U &&fn) {
-      destroy ();
-      using Type = LambdaFunctor <typename cr::decay <U>::type>;
-
-      if constexpr (sizeof (Type) > sizeof (storage_)) {
-         lambda_ = Memory::getAndConstruct <Type> (cr::forward <U> (fn));
-         owns_ = false;
-      }
-      else {
-         lambda_ = Memory::construct (reinterpret_cast <Type *> (small ()), cr::forward <U> (fn));
-         owns_ = true;
-      }
-   }
-
-public:
-   Lambda () : lambda_ { nullptr }, owns_ { false } {}
-   Lambda (nullptr_t) : lambda_ { nullptr }, owns_ { false } {}
-
-public:
-   Lambda (const Lambda &rhs) : lambda_ { nullptr }, owns_ { false } {
+   void copyFrom (const Lambda &rhs) {
       if (!rhs) {
          return;
       }
-      if (rhs.owns_) {
-         lambda_ = rhs.lambda_->clone (small ());
-         owns_ = true;
+
+      if (rhs.small_) {
+         holder_ = rhs.holder_->cloneInto (smallBuffer ());
+         small_ = true;
       }
       else {
-         lambda_ = rhs.lambda_->clone (nullptr);
-         owns_ = false;
+         holder_ = rhs.holder_->cloneInto (nullptr);
+         small_ = false;
       }
    }
 
-   Lambda (Lambda &&rhs) noexcept : lambda_ { nullptr }, owns_ { false } {
-      moveApply (cr::forward <Lambda> (rhs));
+   void moveFrom (Lambda &&rhs) noexcept {
+      if (!rhs) {
+         return;
+      }
+
+      if (rhs.small_) {
+         holder_ = rhs.holder_->moveInto (smallBuffer ());
+         small_ = true;
+
+         // destruct the moved-from object still alive in rhs small buffer
+         rhs.holder_->~Holder ();
+         rhs.holder_ = nullptr;
+         rhs.small_ = false;
+      }
+      else {
+         // heap-allocated, just steal the pointer
+         holder_ = rhs.holder_;
+         small_ = false;
+
+         rhs.holder_ = nullptr;
+      }
    }
 
-   template <typename U> Lambda (U &&obj) : lambda_ { nullptr }, owns_ { false } {
-      assign (cr::forward <U> (obj));
+public:
+   Lambda () = default;
+   Lambda (nullptr_t) {}
+
+   Lambda (const Lambda &rhs) {
+      copyFrom (rhs);
+   }
+
+   Lambda (Lambda &&rhs) noexcept {
+      moveFrom (cr::move (rhs));
+   }
+
+   template <typename U, typename = cr::enable_if_t<!cr::is_same <cr::remove_cv_t <cr::remove_reference_t <U>>, Lambda>::value>>
+   Lambda (U &&obj) {
+      assignCallable (cr::forward <U> (obj));
    }
 
    ~Lambda () {
-      destroy ();
+      destroyHolder ();
    }
 
 public:
    explicit operator bool () const {
-      return !!lambda_;
+      return !!holder_;
    }
 
    decltype (auto) operator () (Args... args) const {
-      assert (lambda_);
-      return lambda_->invoke (cr::forward <Args> (args)...);
+      assert (holder_);
+      return holder_->invoke (cr::forward <Args> (args)...);
    }
 
 public:
    Lambda &operator = (nullptr_t) {
-      destroy ();
+      destroyHolder ();
       return *this;
    }
 
-   Lambda &operator = (const Lambda &rhs) noexcept {
-      if (this == &rhs) {
-         return *this;
-      }
-      destroy ();
-      if (!rhs) {
-         return *this;
-      }
-      if (rhs.owns_) {
-         lambda_ = rhs.lambda_->clone (small ());
-         owns_ = true;
-      }
-      else {
-         lambda_ = rhs.lambda_->clone (nullptr);
-         owns_ = false;
+   Lambda &operator = (const Lambda &rhs) {
+      if (this != &rhs) {
+         destroyHolder ();
+         copyFrom (rhs);
       }
       return *this;
    }
 
    Lambda &operator = (Lambda &&rhs) noexcept {
-      if (this == &rhs) {
-         return *this;
+      if (this != &rhs) {
+         destroyHolder ();
+         moveFrom (cr::move (rhs));
       }
-      destroy ();
-      moveApply (cr::move (rhs));
       return *this;
    }
 
-   template <typename U, typename = cr::enable_if_t<!cr::is_same <cr::remove_cv_t <cr::remove_reference_t <U>>, Lambda>::value>> Lambda &operator = (U &&rhs) noexcept {
-      destroy ();
-      assign (cr::forward <U> (rhs));
+   template <typename U, typename = cr::enable_if_t<!cr::is_same <cr::remove_cv_t <cr::remove_reference_t <U>>, Lambda>::value>>
+   Lambda &operator = (U &&rhs) {
+      destroyHolder ();
+      assignCallable (cr::forward <U> (rhs));
       return *this;
    }
 };

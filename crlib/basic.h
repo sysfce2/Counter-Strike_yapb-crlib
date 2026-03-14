@@ -1,9 +1,4 @@
-//
-// crlib, simple class library for private needs.
-// Copyright © RWSH Solutions LLC <lab@rwsh.ru>.
-//
-// SPDX-License-Identifier: MIT
-//
+// SPDX-License-Identifier: Unlicense
 
 #pragma once
 
@@ -53,9 +48,9 @@ constexpr size_t bit_ceil (size_t n) noexcept {
    n |= n >> 8;
    n |= n >> 16;
 
-   if constexpr (sizeof (size_t) > 4) {
-      n |= n >> 32;
-   }
+#if defined(CR_ARCH_X64) || (SIZE_MAX > 0xffffffffu)
+   n |= n >> 32;
+#endif
 
    if (n == SIZE_MAX) {
       return n;

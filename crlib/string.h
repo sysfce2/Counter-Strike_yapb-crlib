@@ -1,9 +1,4 @@
-//
-// crlib, simple class library for private needs.
-// Copyright © RWSH Solutions LLC <lab@rwsh.ru>.
-//
-// SPDX-License-Identifier: MIT
-//
+// SPDX-License-Identifier: Unlicense
 
 #pragma once
 
@@ -22,7 +17,7 @@ class StringRef;
 class String;
 
 // helper for null-termination
-static const char kNullChar = '\0';
+static constexpr char kNullChar = '\0';
 
 // overloaded version of snprintf to take String and StringRef as char arrays
 class SNPrintfWrap : public Singleton <SNPrintfWrap> {
@@ -40,7 +35,7 @@ private:
 
 public:
    template <typename ...Args> int32_t exec (char *buffer, const size_t maxSize, const char *fmt, Args &&...args) {
-      if (buffer) {
+      if (buffer && maxSize > 0) {
          buffer[0] = kNullChar;
       }
       return snprintf (buffer, maxSize, fmt, cast (cr::forward <Args> (args))...);
@@ -50,6 +45,7 @@ public:
 // expose global format wrap
 CR_EXPOSE_GLOBAL_SINGLETON (SNPrintfWrap, fmtwrap);
 
+// detail helpers for string searching
 namespace detail {
    static constexpr size_t kInvalidIndex = static_cast <size_t> (-1);
 
@@ -70,14 +66,13 @@ namespace detail {
          return start;
       }
 
+      if (pat_len == 1) {
+         return find_char_impl (src, src_len, pat[0], start);
+      }
+
       const auto s = reinterpret_cast <const uint8_t *> (src);
       const auto p = reinterpret_cast <const uint8_t *> (pat);
       const auto first = p[0];
-
-      if (pat_len == 1) {
-         return find_char_impl (src, src_len, static_cast <char> (first), start);
-      }
-
       const auto last = p[pat_len - 1];
       const auto remaining = pat_len - 2;
 
@@ -217,11 +212,11 @@ namespace detail {
    }
 
    constexpr bool starts_with_impl (const char *src, size_t src_len, const char *pat, size_t pat_len) noexcept {
-      return pat_len <= src_len && strncmp (src, pat, pat_len) == 0;
+      return pat_len <= src_len && memcmp (src, pat, pat_len) == 0;
    }
 
    constexpr bool ends_with_impl (const char *src, size_t src_len, const char *pat, size_t pat_len) noexcept {
-      return pat_len <= src_len && strncmp (src + src_len - pat_len, pat, pat_len) == 0;
+      return pat_len <= src_len && memcmp (src + src_len - pat_len, pat, pat_len) == 0;
    }
 
    constexpr size_t count_char_impl (const char *src, size_t src_len, char ch) noexcept {
@@ -246,7 +241,19 @@ namespace detail {
       }
       return count;
    }
-} 
+
+   constexpr uint32_t fnv1a32_n (const char *str, size_t len) noexcept {
+      constexpr uint32_t prime = 0x1000193;
+      constexpr uint32_t basis = 0x811c9dc5;
+
+      auto hash = basis;
+
+      for (size_t i = 0; i < len; ++i) {
+         hash = (hash ^ static_cast <uint32_t> (static_cast <uint8_t> (str[i]))) * prime;
+      }
+      return hash;
+   }
+}
 
 // simple non-owning string class like std::string_view
 class StringRef {
@@ -285,9 +292,9 @@ private:
 public:
    constexpr StringRef () noexcept = default;
 
-   constexpr StringRef (const char *chars) : chars_ (chars), length_ (chars ? StringRef::lenstr (chars) : 0) {}
+   constexpr StringRef (const char *chars) : chars_ (chars ? chars : ""), length_ (chars ? StringRef::lenstr (chars) : 0) {}
 
-   constexpr StringRef (const char *chars, size_t length) : chars_ (chars), length_ (length) {}
+   constexpr StringRef (const char *chars, size_t length) : chars_ (chars ? chars : ""), length_ (chars ? length : 0) {}
 
    constexpr StringRef (nullptr_t) : chars_ (""), length_ (0) {}
 
@@ -298,7 +305,7 @@ public:
 
 public:
    constexpr StringRef (const StringRef &) = default;
-   constexpr  StringRef &operator = (const StringRef &) = default;
+   constexpr StringRef &operator = (const StringRef &) = default;
 
    constexpr StringRef (StringRef &&) = default;
    constexpr StringRef &operator = (StringRef &&) = default;
@@ -309,7 +316,10 @@ public:
    }
 
    bool operator == (const char *rhs) const {
-      return strcmp (chars_, rhs) == 0;
+      if (!rhs) {
+         return length_ == 0;
+      }
+      return strlen (rhs) == length_ && memcmp (chars_, rhs, length_) == 0;
    }
 
    constexpr bool operator != (const StringRef &rhs) const {
@@ -342,7 +352,7 @@ public:
    }
 
    constexpr uint32_t hash () const {
-      return fnv1a32 (chars ());
+      return detail::fnv1a32_n (chars_, length_);
    }
 
 public:
@@ -457,105 +467,190 @@ public:
    };
 
 private:
-   UniquePtr <char[]> chars_ {};
+   static inline char empty_[] = { kNullChar };
+
+   char *chars_ = empty_;
    size_t length_ {};
    size_t capacity_ {};
 
 private:
-   size_t getGrowFactor (const size_t length) const {
-      auto capacity = capacity_ ? capacity_ : cr::max <size_t> (12U, length + 1);
+   static size_t growCapacity (size_t current, size_t needed) {
+      auto capacity = current ? current : cr::max <size_t> (16U, needed);
 
-      while (length_ + length > capacity) {
-         capacity += capacity * 2 / 3;
+      while (capacity < needed) {
+         capacity += capacity / 2;
       }
-      return capacity + (length < 4 ? 8 : length);
+      return capacity;
    }
 
-   size_t lenstr (const char *str, const size_t length) {
-      return length > 0 ? length : (str ? strlen (str) : 0);
+
+   void initFromChars (const char *str, size_t length) {
+      if (!length || !str || length >= InvalidIndex) {
+         return;
+      }
+      capacity_ = cr::max <size_t> (16U, length + 1);
+      chars_ = mem::allocate <char> (capacity_);
+      length_ = length;
+
+      memcpy (chars_, str, length);
+      chars_[length] = kNullChar;
    }
 
-   void reset () {
-      capacity_ = 0;
+   void freeBuffer () {
+      if (chars_ != empty_) {
+         mem::release (chars_);
+      }
+      chars_ = empty_;
       length_ = 0;
+      capacity_ = 0;
    }
 
 public:
    String () = default;
-   ~String () = default;
 
-   String (const char *str, size_t length = 0) {
-      assign (str, length);
+   ~String () {
+      if (chars_ != empty_) {
+         mem::release (chars_);
+      }
+   }
+
+   String (const char *str) {
+      initFromChars (str, str ? strlen (str) : 0);
+   }
+
+   String (const char *str, size_t length) {
+      initFromChars (str, length);
    }
 
    String (const String &str) {
-      assign (str.chars ());
+      initFromChars (str.chars_, str.length_);
    }
 
    String (StringRef str) {
-      assign (str.chars (), str.length ());
+      initFromChars (str.chars (), str.length ());
    }
 
    String (const char ch) {
       assign (ch);
    }
 
-   String (String &&rhs) noexcept : chars_ (cr::move (rhs.chars_)), length_ (rhs.length_), capacity_ (rhs.capacity_) {
-      rhs.reset ();
+   String (String &&rhs) noexcept : chars_ (rhs.chars_), length_ (rhs.length_), capacity_ (rhs.capacity_) {
+      rhs.chars_ = empty_;
+      rhs.length_ = 0;
+      rhs.capacity_ = 0;
    }
-
-   String (UniquePtr <char[]> &&rhs, size_t length) noexcept : chars_ (cr::move (rhs)), length_ (length) {}
 
 public:
    void resize (const size_t amount) noexcept {
-      if (length_ + amount < capacity_) {
+      const size_t needed = length_ + amount + 1;
+
+      if (needed <= capacity_) {
          return;
       }
-      const size_t factor = getGrowFactor (amount) + length_;
+      const size_t newCapacity = growCapacity (capacity_, needed);
+      auto transfer = mem::allocate <char> (newCapacity);
 
-      if (chars_) {
-         auto transfer = makeUnique <char[]> (factor);
-         memcpy (&transfer[0], &chars_[0], length_);
+      if (length_ > 0) {
+         memcpy (transfer, chars_, length_);
+      }
+      transfer[length_] = kNullChar;
 
-         chars_ = cr::move (transfer);
+      if (chars_ != empty_) {
+         mem::release (chars_);
       }
-      else {
-         chars_ = makeUnique <char[]> (factor);
-         chars_[0] = kNullChar;
-      }
-      capacity_ = factor;
+      chars_ = transfer;
+      capacity_ = newCapacity;
    }
 
-   String &assign (const char *str, size_t length = 0) {
-      length = lenstr (str, length);
+   String &assign (const char *str) {
+      return assign (str, str ? strlen (str) : 0);
+   }
 
-      resize (length);
+   String &assign (const char *str, size_t length) {
+      if (!length || !str || length >= InvalidIndex) {
+         length_ = 0;
 
-      if (str) {
-         memcpy (&chars_[0], str, length);
+         if (chars_ != empty_) {
+            chars_[0] = kNullChar;
+         }
+         return *this;
       }
-      else {
-         chars_[0] = kNullChar;
+
+      if (str >= chars_ && str < chars_ + capacity_) {
+         auto copy = mem::allocate <char> (length + 1);
+
+         memcpy (copy, str, length);
+         copy[length] = kNullChar;
+
+         if (chars_ != empty_) {
+            mem::release (chars_);
+         }
+         chars_ = copy;
+         length_ = length;
+         capacity_ = length + 1;
+
+         return *this;
       }
+      const size_t needed = length + 1;
+
+      if (needed > capacity_) {
+         const size_t newCapacity = growCapacity (capacity_, needed);
+         auto transfer = mem::allocate <char> (newCapacity);
+
+         if (chars_ != empty_) {
+            mem::release (chars_);
+         }
+         chars_ = transfer;
+         capacity_ = newCapacity;
+      }
+      memcpy (chars_, str, length);
 
       length_ = length;
       chars_[length_] = kNullChar;
+
       return *this;
    }
 
    String &assign (const String &str, size_t length = 0) {
-      return assign (str.chars (), length);
+      if (&str == this) {
+         return *this;
+      }
+      return assign (str.chars_, length > 0 ? length : str.length_);
    }
 
    String &assign (const char ch) {
-      return assign (&ch, 1);
+      resize (1);
+
+      chars_[0] = ch;
+      chars_[1] = kNullChar;
+      length_ = 1;
+
+      return *this;
    }
 
-   String &append (const char *str, size_t length = 0) {
-      length = lenstr (str, length);
+   String &append (const char *str) {
+      return append (str, str ? strlen (str) : 0);
+   }
 
-      resize (length);
-      memcpy (chars_.get () + length_, str, length);
+   String &append (const char *str, size_t length) {
+
+      if (!length) {
+         return *this;
+      }
+
+      if (str >= chars_ && str < chars_ + capacity_) {
+         auto copy = mem::allocate <char> (length);
+         memcpy (copy, str, length);
+
+         resize (length);
+         memcpy (chars_ + length_, copy, length);
+
+         mem::release (copy);
+      }
+      else {
+         resize (length);
+         memcpy (chars_ + length_, str, length);
+      }
 
       length_ += length;
       chars_[length_] = kNullChar;
@@ -564,45 +659,50 @@ public:
    }
 
    String &append (const String &str, size_t length = 0) {
-      return append (str.chars (), length);
+      return append (str.chars_, length > 0 ? length : str.length_);
    }
 
    String &append (const char ch) {
-      return append (&ch, 1);
+      resize (1);
+
+      chars_[length_] = ch;
+      ++length_;
+      chars_[length_] = kNullChar;
+
+      return *this;
    }
 
    template <typename ...Args> String &assignf (const char *fmt, Args &&...args) {
       const size_t size = fmtwrap.exec (nullptr, 0, fmt, args...);
 
-      SmallArray <char> buffer (size + 1);
-      fmtwrap.exec (buffer.data (), size + 1, fmt, cr::forward <Args> (args)...);
+      resize (size);
+      fmtwrap.exec (chars_, size + 1, fmt, cr::forward <Args> (args)...);
 
-      return assign (buffer.data ());
+      length_ = size;
+      return *this;
    }
 
    template <typename ...Args> String &appendf (const char *fmt, Args &&...args) {
-      if (empty ()) {
-         return assignf (fmt, cr::forward <Args> (args)...);
-      }
-      const size_t size = fmtwrap.exec (nullptr, 0, fmt, args...) + length ();
+      const size_t size = fmtwrap.exec (nullptr, 0, fmt, args...);
 
-      SmallArray <char> buffer (size + 1);
-      fmtwrap.exec (buffer.data (), size + 1, fmt, cr::forward <Args> (args)...);
+      resize (size);
+      fmtwrap.exec (chars_ + length_, size + 1, fmt, cr::forward <Args> (args)...);
 
-      return append (buffer.data ());
+      length_ += size;
+      return *this;
    }
 
 public:
    const char &at (size_t index) const {
-      return chars_.get ()[index];
+      return chars_[index];
    }
 
    char &at (size_t index) {
-      return chars_.get ()[index];
+      return chars_[index];
    }
 
    const char *chars () const {
-      return chars_ ? chars_.get () : "\0";
+      return chars_;
    }
 
    size_t length () const {
@@ -618,11 +718,12 @@ public:
    }
 
    void clear () {
-      assign ("\0");
+      length_ = 0;
+      chars_[0] = kNullChar;
    }
 
    StringRef str () const {
-      return { chars (), length_ };
+      return { chars_, length_ };
    }
 
 public:
@@ -641,11 +742,11 @@ public:
          const size_t moveSize = length_ - index;
 
          if (moveSize > 0) {
-            memmove (chars_.get () + index + strLen,
-               chars_.get () + index,
+            memmove (chars_ + index + strLen,
+               chars_ + index,
                moveSize);
          }
-         memcpy (chars_.get () + index, str.chars (), strLen);
+         memcpy (chars_ + index, str.chars (), strLen);
 
          length_ += strLen;
          chars_[length_] = kNullChar;
@@ -661,8 +762,8 @@ public:
       const size_t moveSize = newLength - index;
 
       if (moveSize > 0) {
-         memmove (chars_.get () + index,
-            chars_.get () + index + count,
+         memmove (chars_ + index,
+            chars_ + index + count,
             moveSize);
       }
 
@@ -673,7 +774,7 @@ public:
    }
 
    size_t replace (StringRef needle, StringRef to) {
-      if (needle.empty () || to.empty ()) {
+      if (needle.empty ()) {
          return 0;
       }
       size_t replaced = 0, pos = 0;
@@ -685,9 +786,11 @@ public:
             break;
          }
          erase (pos, needle.length ());
-         insert (pos, to);
 
-         pos += to.length ();
+         if (!to.empty ()) {
+            insert (pos, to);
+            pos += to.length ();
+         }
          ++replaced;
       }
       return replaced;
@@ -737,7 +840,7 @@ public:
 
 public:
    uint32_t hash () const {
-      return StringRef::fnv1a32 (chars ());
+      return detail::fnv1a32_n (chars_, length_);
    }
 
    bool contains (StringRef rhs) const {
@@ -745,113 +848,106 @@ public:
    }
 
    bool startsWith (StringRef prefix) const {
-      const char *const ptr = chars_.get ();
-      return detail::starts_with_impl (ptr, length_, prefix.chars (), prefix.length ());
+      return detail::starts_with_impl (chars_, length_, prefix.chars (), prefix.length ());
    }
 
    bool endsWith (StringRef suffix) const {
-      const char *const ptr = chars_.get ();
-      return detail::ends_with_impl (ptr, length_, suffix.chars (), suffix.length ());
+      return detail::ends_with_impl (chars_, length_, suffix.chars (), suffix.length ());
    }
 
    size_t find (char pattern, size_t start = 0) const {
-      const char *const ptr = chars_.get ();
-      return detail::find_char_impl (ptr, length_, pattern, start);
+      return detail::find_char_impl (chars_, length_, pattern, start);
    }
 
    size_t find (StringRef pattern, size_t start = 0) const {
-      const char *const ptr = chars_.get ();
-      return detail::find_str_impl (ptr, length_, pattern.chars (), pattern.length (), start);
+      return detail::find_str_impl (chars_, length_, pattern.chars (), pattern.length (), start);
    }
 
    size_t rfind (char pattern) const {
-      const char *const ptr = chars_.get ();
-      return detail::rfind_char_impl (ptr, length_, pattern);
+      return detail::rfind_char_impl (chars_, length_, pattern);
    }
 
    size_t rfind (StringRef pattern) const {
-      const char *const ptr = chars_.get ();
-      return detail::rfind_str_impl (ptr, length_, pattern.chars (), pattern.length ());
+      return detail::rfind_str_impl (chars_, length_, pattern.chars (), pattern.length ());
    }
 
    size_t findFirstOf (StringRef pattern, size_t start = 0) const {
-      const char *const ptr = chars_.get ();
-      return detail::find_first_of_impl (ptr, length_, pattern.chars (), pattern.length (), start);
+      return detail::find_first_of_impl (chars_, length_, pattern.chars (), pattern.length (), start);
    }
 
    size_t findLastOf (StringRef pattern) const {
-      const char *const ptr = chars_.get ();
-      return detail::find_last_of_impl (ptr, length_, pattern.chars (), pattern.length ());
+      return detail::find_last_of_impl (chars_, length_, pattern.chars (), pattern.length ());
    }
 
    size_t findFirstNotOf (StringRef pattern, size_t start = 0) const {
-      const char *const ptr = chars_.get ();
-      return detail::find_first_not_of_impl (ptr, length_, pattern.chars (), pattern.length (), start);
+      return detail::find_first_not_of_impl (chars_, length_, pattern.chars (), pattern.length (), start);
    }
 
    size_t findLastNotOf (StringRef pattern) const {
-      const char *const ptr = chars_.get ();
-      return detail::find_last_not_of_impl (ptr, length_, pattern.chars (), pattern.length ());
+      return detail::find_last_not_of_impl (chars_, length_, pattern.chars (), pattern.length ());
    }
 
    size_t countChar (char ch) const {
-      const char *const ptr = chars_.get ();
-      return detail::count_char_impl (ptr, length_, ch);
+      return detail::count_char_impl (chars_, length_, ch);
    }
 
    size_t countStr (StringRef pattern) const {
-      const char *const ptr = chars_.get ();
-      return detail::count_str_impl (ptr, length_, pattern.chars (), pattern.length ());
+      return detail::count_str_impl (chars_, length_, pattern.chars (), pattern.length ());
    }
 
    String substr (size_t start, size_t count = InvalidIndex) const {
-      return str ().substr (start, count);
+      const auto ref = StringRef (chars_, length_).substr (start, count);
+      return String (ref.chars (), ref.length ());
    }
 
    Array <String> split (StringRef delim) const {
-      return str ().split <String> (delim);
+      return StringRef (chars_, length_).split <String> (delim);
    }
 
    Array <String> split (size_t maxLength) const {
-      return str ().split <String> (maxLength);
+      return StringRef (chars_, length_).split <String> (maxLength);
    }
 
 public:
    template <typename U> constexpr U as () const {
       if constexpr (cr::is_same <U, float>::value) {
-         return str ().as <float> ();
+         return static_cast <float> (atof (chars_));
       }
       else if constexpr (cr::is_same <U, int>::value) {
-         return str ().as <int> ();
+         return atoi (chars_);
       }
    }
 
-   // for range-based loops
 public:
    char *begin () {
-      return const_cast <char *> (chars ());
+      return chars_;
    }
 
-   char *begin () const {
-      return const_cast <char *> (chars ());
+   const char *begin () const {
+      return chars_;
    }
 
    char *end () {
-      return begin () + length_;
+      return chars_ + length_;
    }
 
-   char *end () const {
-      return begin () + length_;
+   const char *end () const {
+      return chars_ + length_;
    }
 
 public:
    String &operator = (String &&rhs) noexcept {
       if (this != &rhs) {
-         chars_ = cr::move (rhs.chars_);
+         if (chars_ != empty_) {
+            mem::release (chars_);
+         }
+         chars_ = rhs.chars_;
          length_ = rhs.length_;
          capacity_ = rhs.capacity_;
 
-         rhs.reset ();
+         rhs.chars_ = empty_;
+         rhs.length_ = 0;
+         rhs.capacity_ = 0;
       }
       return *this;
    }
@@ -877,11 +973,11 @@ public:
    }
 
    const char &operator [] (size_t index) const {
-      return at (index);
+      return chars_[index];
    }
 
    char &operator [] (size_t index) {
-      return at (index);
+      return chars_[index];
    }
 
    friend String operator + (const String &lhs, char rhs) {
@@ -905,47 +1001,48 @@ public:
    }
 
    friend bool operator == (const String &lhs, const String &rhs) {
-      return lhs.str ().equals (rhs);
+      return lhs.length_ == rhs.length_ && memcmp (lhs.chars_, rhs.chars_, lhs.length_) == 0;
    }
 
    friend bool operator == (const char *lhs, const String &rhs) {
-      return rhs.str ().equals (lhs);
+      return rhs == lhs;
    }
 
    friend bool operator == (const String &lhs, const char *rhs) {
-      return lhs.str ().equals (rhs);
+      if (!rhs) {
+         return lhs.length_ == 0;
+      }
+      return strlen (rhs) == lhs.length_ && memcmp (lhs.chars_, rhs, lhs.length_) == 0;
    }
 
    friend bool operator != (const String &lhs, const String &rhs) {
-      return !lhs.str ().equals (rhs);
+      return !(lhs == rhs);
    }
 
    friend bool operator != (const char *lhs, const String &rhs) {
-      return !rhs.str ().equals (lhs);
+      return !(rhs == lhs);
    }
 
    friend bool operator != (const String &lhs, const char *rhs) {
-      return !lhs.str ().equals (rhs);
+      return !(lhs == rhs);
    }
 
 public:
    static String join (const Array <String> &sequence, StringRef delim, const size_t start = 0) {
-      if (sequence.empty ()) {
+      if (start >= sequence.length ()) {
          return "";
       }
 
-      if (sequence.length () == 1) {
-         return sequence.at (0);
+      if (sequence.length () - start == 1) {
+         return sequence.at (start);
       }
       String result;
 
       for (size_t index = start; index < sequence.length (); ++index) {
          if (index != start) {
-            result += delim + sequence[index];
+            result.append (delim.chars (), delim.length ());
          }
-         else {
-            result += sequence[index];
-         }
+         result += sequence[index];
       }
       return result;
    }
@@ -1010,7 +1107,6 @@ public:
       return buffer;
    }
 
-   // checks if string is not empty
    bool isEmpty (const char *input) const noexcept {
       if (input == nullptr) {
          return true;
@@ -1032,19 +1128,19 @@ public:
       }
 
       if (!src) {
-         dst[0] = '\0';
+         dst[0] = kNullChar;
          return dst;
       }
       size_t srcLen = 0;
 
-      while (srcLen < dstCapacity - 1 && src[srcLen] != '\0') {
+      while (srcLen < dstCapacity - 1 && src[srcLen] != kNullChar) {
          ++srcLen;
       }
 
       for (size_t i = 0; i < srcLen; ++i) {
          dst[i] = src[i];
       }
-      dst[srcLen] = '\0';
+      dst[srcLen] = kNullChar;
 
       return dst;
    }
@@ -1056,10 +1152,10 @@ public:
 
       size_t dstLen = 0;
 
-      while (dstLen < dstCapacity - 1 && dst[dstLen] != '\0') {
+      while (dstLen < dstCapacity - 1 && dst[dstLen] != kNullChar) {
          ++dstLen;
       }
-      dst[dstCapacity - 1] = '\0';
+      dst[dstCapacity - 1] = kNullChar;
 
       if (dstLen >= dstCapacity - 1) {
          return dst;
@@ -1067,11 +1163,11 @@ public:
       size_t spaceLeft = dstCapacity - dstLen - 1;
       size_t i = 0;
 
-      while (i < spaceLeft && src[i] != '\0') {
+      while (i < spaceLeft && src[i] != kNullChar) {
          dst[dstLen + i] = src[i];
          ++i;
       }
-      dst[dstLen + i] = '\0';
+      dst[dstLen + i] = kNullChar;
 
       return dst;
    }
@@ -1088,7 +1184,6 @@ private:
    };
 
 private:
-   // sample implementation from unicode home page: https://web.archive.org/web/19970105220809/http://www.stonehand.com/unicode/standard/fss-utf.html
    struct Utf8Table {
       int32_t cmask, cval, shift;
       long lmask, lval;
@@ -1296,24 +1391,25 @@ public:
       String result (in);
 
       auto ptr = const_cast <char *> (result.chars ());
-      int32_t len = 0;
+      size_t pos = 0;
 
-      while (*ptr) {
+      while (pos < result.length ()) {
          wchar_t wide = 0;
 
-         multiByteToWideChar (&wide, ptr);
-         len += wideCharToMultiByte (ptr, toUpper (wide));
+         auto consumed = multiByteToWideChar (&wide, ptr + pos);
 
-         if (static_cast <size_t> (len) >= result.length ()) {
-            break;
+         if (consumed < 0) {
+            ++pos;
+            continue;
          }
+         wideCharToMultiByte (ptr + pos, toUpper (wide));
+         pos += static_cast <size_t> (consumed);
       }
-      return result.uppercase ();
+      return result;
    }
 };
 
-// expose global utf8 tools 
+// expose global utf8 tools
 CR_EXPOSE_GLOBAL_SINGLETON (Utf8Tools, utf8tools);
-
 
 CR_NAMESPACE_END

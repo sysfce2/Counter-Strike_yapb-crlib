@@ -39,15 +39,15 @@ template <> struct Hash <const char *> {
 
 template <> struct Hash <int32_t> {
    uint32_t operator () (int32_t key) const noexcept {
-      auto result = static_cast <uint32_t> (key);
+      auto x = static_cast <uint32_t> (key);
 
-      result ^= result >> 16;
-      result *= 0x119de1f3;
-      result ^= result >> 16;
-      result *= 0x119de1f3;
-      result ^= result >> 16;
+      x ^= x >> 16;
+      x *= 0x85ebca6b;
+      x ^= x >> 13;
+      x *= 0xc2b2ae35;
+      x ^= x >> 16;
 
-      return result;
+      return x;
    }
 };
 
@@ -67,6 +67,7 @@ namespace detail {
    template <typename K, typename V> struct HashEntry final : NonCopyable {
       K key {};
       V val {};
+      uint32_t hash {};
 
       HashEntryStatus status { HashEntryStatus::Empty };
 
@@ -74,13 +75,14 @@ namespace detail {
       ~HashEntry () = default;
 
       HashEntry (HashEntry &&rhs) noexcept
-         : key (cr::move (rhs.key)), val (cr::move (rhs.val)), status (rhs.status) {
+         : key (cr::move (rhs.key)), val (cr::move (rhs.val)), hash (rhs.hash), status (rhs.status) {
       }
 
       HashEntry &operator = (HashEntry &&rhs) noexcept {
          if (this != &rhs) {
             key = cr::move (rhs.key);
             val = cr::move (rhs.val);
+            hash = rhs.hash;
             status = rhs.status;
          }
          return *this;
@@ -98,7 +100,7 @@ private:
    Array <Entry> contents_ {};
 
    static constexpr size_t kInitialSize = 8;
-   static constexpr float kLoadFactor = 0.75f;
+   static constexpr float kLoadFactor = 0.5f;
    static constexpr size_t kMaxSize = 1 << 24;
    static constexpr size_t kInvalidIndex = static_cast <size_t> (-1);
 
@@ -113,12 +115,12 @@ private:
          return { 0, false };
       }
 
-      size_t index = hashValue & (contents_.length () - 1);
       size_t mask = contents_.length () - 1;
-      size_t steps = 0;
+      size_t index = hashValue & mask;
+      size_t step = 0;
       size_t firstDeleted = kInvalidIndex;
 
-      while (steps++ < contents_.length ()) {
+      while (step < contents_.length ()) {
          const auto &entry = contents_[index];
 
          if (entry.status == Status::Empty) {
@@ -133,11 +135,12 @@ private:
                firstDeleted = index;
             }
          }
-         else if (entry.key == key) {
+         else if (entry.hash == hashValue && entry.key == key) {
             return { index, true };
          }
 
-         index = (index + 1) & mask;
+         ++step;
+         index = (hashValue + step * (step + 1) / 2) & mask;
       }
 
       if (firstDeleted != kInvalidIndex) {
@@ -170,17 +173,20 @@ private:
 
       for (auto &oldEntry : oldContents) {
          if (oldEntry.status == Status::Occupied) {
-            uint32_t hashValue = hash_ (oldEntry.key);
+            uint32_t hashValue = oldEntry.hash;
 
             size_t index = hashValue & (contents_.length () - 1);
             size_t mask = contents_.length () - 1;
 
+            size_t step = 0;
             while (contents_[index].status == Status::Occupied) {
-               index = (index + 1) & mask;
+               ++step;
+               index = (hashValue + step * (step + 1) / 2) & mask;
             }
 
             contents_[index].key = cr::move (oldEntry.key);
             contents_[index].val = cr::move (oldEntry.val);
+            contents_[index].hash = hashValue;
             contents_[index].status = Status::Occupied;
 
             ++length_;
@@ -333,6 +339,7 @@ public:
             result = findPosition (key, hashValue);
          }
          contents_[result.index].key = key;
+         contents_[result.index].hash = hashValue;
          contents_[result.index].status = Status::Occupied;
          ++length_;
       }
@@ -366,6 +373,7 @@ public:
 
       contents_[result.index].key = key;
       contents_[result.index].val = val;
+      contents_[result.index].hash = hashValue;
       contents_[result.index].status = Status::Occupied;
       ++length_;
 
@@ -399,6 +407,7 @@ public:
 
       contents_[result.index].key = key;
       contents_[result.index].val = cr::move (val);
+      contents_[result.index].hash = hashValue;
       contents_[result.index].status = Status::Occupied;
       ++length_;
 
@@ -432,6 +441,34 @@ public:
       auto result = findPosition (key, hashValue);
 
       return result.found;
+   }
+
+   V *find (const K &key) noexcept {
+      if (contents_.empty ()) {
+         return nullptr;
+      }
+
+      uint32_t hashValue = hash_ (key);
+      auto result = findPosition (key, hashValue);
+
+      if (!result.found) {
+         return nullptr;
+      }
+      return &contents_[result.index].val;
+   }
+
+   const V *find (const K &key) const noexcept {
+      if (contents_.empty ()) {
+         return nullptr;
+      }
+
+      uint32_t hashValue = hash_ (key);
+      auto result = findPosition (key, hashValue);
+
+      if (!result.found) {
+         return nullptr;
+      }
+      return &contents_[result.index].val;
    }
 
    void clear () noexcept {

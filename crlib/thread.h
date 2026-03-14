@@ -1,9 +1,4 @@
-//
-// crlib, simple class library for private needs.
-// Copyright © RWSH Solutions LLC <lab@rwsh.ru>.
-//
-// SPDX-License-Identifier: MIT
-//
+// SPDX-License-Identifier: Unlicense
 
 #pragma once
 
@@ -33,6 +28,7 @@ public:
    }
 };
 
+// scoped unlock wrapper, unlocks on destruction
 template <typename T> class ScopedUnlock final : public NonCopyable {
 private:
    T &lockable_;
@@ -46,179 +42,132 @@ public:
 };
 
 // simple wrapper for critical sections
+#if defined(CR_WINDOWS) && defined(CR_HAS_WINXP_SUPPORT)
 class Mutex final : public NonCopyable {
 private:
-#if defined(CR_WINDOWS)
-#if defined(CR_HAS_WINXP_SUPPORT)
    CRITICAL_SECTION cs_;
-#else
-   SRWLOCK cs_ = SRWLOCK_INIT;
-#endif
-#else
-   pthread_mutex_t mutex_;
-#endif
 
 public:
-   Mutex () {
-#if defined(CR_WINDOWS)
-#if defined(CR_HAS_WINXP_SUPPORT)
-      InitializeCriticalSectionAndSpinCount (&cs_, 1);
-#endif
-#else
-      pthread_mutex_init (&mutex_, nullptr);
-#endif
-   }
-   ~Mutex () {
-#if defined(CR_WINDOWS)
-#if defined(CR_HAS_WINXP_SUPPORT)
-      DeleteCriticalSection (&cs_);
-#endif
-#else
-      pthread_mutex_destroy (&mutex_);
-#endif
-   }
+   Mutex () { InitializeCriticalSectionAndSpinCount (&cs_, 1); }
+   ~Mutex () { DeleteCriticalSection (&cs_); }
 
-   void lock () {
-#if defined(CR_WINDOWS)
-#if defined(CR_HAS_WINXP_SUPPORT)
-      EnterCriticalSection (&cs_);
-#else
-      AcquireSRWLockExclusive (&cs_);
-#endif
-#else
-      pthread_mutex_lock (&mutex_);
-#endif
-   }
+   void lock () { EnterCriticalSection (&cs_); }
+   void unlock () { LeaveCriticalSection (&cs_); }
+   bool tryLock () { return !!TryEnterCriticalSection (&cs_); }
 
-   void unlock () {
-#if defined(CR_WINDOWS)
-#if defined(CR_HAS_WINXP_SUPPORT)
-      LeaveCriticalSection (&cs_);
-#else
-      ReleaseSRWLockExclusive (&cs_);
-#endif
-#else
-      pthread_mutex_unlock (&mutex_);
-#endif
-   }
-
-   bool tryLock () {
-#if defined(CR_WINDOWS)
-#if defined(CR_HAS_WINXP_SUPPORT)
-      return !!TryEnterCriticalSection (&cs_);
-#else
-      return !!TryAcquireSRWLockExclusive (&cs_);
-#endif
-#else
-      return pthread_mutex_trylock (&mutex_) == 0;
-#endif
-   }
-
-   decltype (auto) raw () {
-#if defined(CR_WINDOWS)
-      return &cs_;
-#else
-      return &mutex_;
-#endif
-   }
+   decltype (auto) raw () { return &cs_; }
 };
 
+#elif defined(CR_WINDOWS)
+class Mutex final : public NonCopyable {
+private:
+   SRWLOCK cs_ = SRWLOCK_INIT;
+
+public:
+   Mutex () = default;
+   ~Mutex () = default;
+
+   void lock () { AcquireSRWLockExclusive (&cs_); }
+   void unlock () { ReleaseSRWLockExclusive (&cs_); }
+   bool tryLock () { return !!TryAcquireSRWLockExclusive (&cs_); }
+
+   decltype (auto) raw () { return &cs_; }
+};
+
+#else
+class Mutex final : public NonCopyable {
+private:
+   pthread_mutex_t mutex_;
+
+public:
+   Mutex () { pthread_mutex_init (&mutex_, nullptr); }
+   ~Mutex () { pthread_mutex_destroy (&mutex_); }
+
+   void lock () { pthread_mutex_lock (&mutex_); }
+   void unlock () { pthread_mutex_unlock (&mutex_); }
+   bool tryLock () { return pthread_mutex_trylock (&mutex_) == 0; }
+
+   decltype (auto) raw () { return &mutex_; }
+};
+#endif
+
 // conditional variable (signal)
+#if defined(CR_WINDOWS) && defined(CR_HAS_WINXP_SUPPORT)
 class Signal final : public NonCopyable {
 private:
    Mutex cs_;
-
-#if defined(CR_WINDOWS)
-#if defined(CR_HAS_WINXP_SUPPORT)
    HANDLE event_;
-#else
-   CONDITION_VARIABLE cv_;
-#endif
-#else
-   pthread_cond_t cv_;
-#endif
 
 public:
-   Signal () {
-#if defined(CR_WINDOWS)
-#if defined(CR_HAS_WINXP_SUPPORT)
-      event_ = CreateEvent (nullptr, FALSE, FALSE, nullptr);
-#else
-      InitializeConditionVariable (&cv_);
-#endif
-#else
-      pthread_cond_init (&cv_, nullptr);
-#endif
-   }
+   Signal () { event_ = CreateEvent (nullptr, FALSE, FALSE, nullptr); }
+   ~Signal () { CloseHandle (event_); }
 
-   ~Signal () {
-#if defined(CR_WINDOWS)
-#if defined(CR_HAS_WINXP_SUPPORT)
-      CloseHandle (event_);
-#endif
-#else
-      pthread_cond_destroy (&cv_);
-#endif
-   }
+   void lock () { cs_.lock (); }
+   void unlock () { cs_.unlock (); }
 
-   void lock () {
-      cs_.lock ();
-   }
+   void notify () { SetEvent (event_); }
 
-   void unlock () {
-      cs_.unlock ();
-   }
-
-   void notify () {
-#if defined(CR_WINDOWS)
-#if defined(CR_HAS_WINXP_SUPPORT)
-      SetEvent (event_);
-#else
-      WakeConditionVariable (&cv_);
-#endif
-#else
-      pthread_cond_signal (&cv_);
-#endif
-   }
-
-#if (defined(CR_WINDOWS) && !defined(CR_HAS_WINXP_SUPPORT)) || defined(CR_LINUX) || defined(CR_MACOS)
-   void broadcast () {
-#if defined(CR_WINDOWS)
-      WakeAllConditionVariable (&cv_);
-#else
-      pthread_cond_broadcast (&cv_);
-#endif
-   }
-#define THREAD_SIGNAL_HAS_BROADCAST
-#endif
+   // auto-reset event can only wake one waiter
+   void broadcast () { SetEvent (event_); }
 
    template <typename T> bool wait (T timeout) {
-#if defined(CR_WINDOWS)
-#if defined(CR_HAS_WINXP_SUPPORT)
-      ResetEvent (event_);
-
       unlock ();
       auto result = WaitForSingleObject (event_, timeout);
       lock ();
-#else
-      auto result = SleepConditionVariableSRW (&cv_, cs_.raw (), timeout, 0);
-#endif
 
-#if defined(CR_HAS_WINXP_SUPPORT)
-      if (result == WAIT_TIMEOUT) {
-         return false;
-      }
-      else if (result == WAIT_FAILED) {
-         return false;
-      }
-      return true;
+      return result == WAIT_OBJECT_0;
+   }
+
+   bool wait () {
+      return wait (INFINITE);
+   }
+};
+
+#elif defined(CR_WINDOWS)
+class Signal final : public NonCopyable {
+private:
+   Mutex cs_;
+   CONDITION_VARIABLE cv_;
+
+public:
+   Signal () { InitializeConditionVariable (&cv_); }
+   ~Signal () = default;
+
+   void lock () { cs_.lock (); }
+   void unlock () { cs_.unlock (); }
+
+   void notify () { WakeConditionVariable (&cv_); }
+   void broadcast () { WakeAllConditionVariable (&cv_); }
+
+   template <typename T> bool wait (T timeout) {
+      return SleepConditionVariableSRW (&cv_, cs_.raw (), timeout, 0) != FALSE;
+   }
+
+   bool wait () {
+      return wait (INFINITE);
+   }
+};
+
 #else
-      return result != FALSE;
-#endif
-#else
-#if defined(CR_LINUX)
+class Signal final : public NonCopyable {
+private:
+   Mutex cs_;
+   pthread_cond_t cv_;
+
+public:
+   Signal () { pthread_cond_init (&cv_, nullptr); }
+   ~Signal () { pthread_cond_destroy (&cv_); }
+
+   void lock () { cs_.lock (); }
+   void unlock () { cs_.unlock (); }
+
+   void notify () { pthread_cond_signal (&cv_); }
+   void broadcast () { pthread_cond_broadcast (&cv_); }
+
+   template <typename T> bool wait (T timeout) {
       struct timespec ts;
 
+#if defined(CR_POSIX) && !defined(CR_MACOS)
       if (clock_gettime (CLOCK_REALTIME, &ts) == -1) {
          return false;
       }
@@ -226,7 +175,6 @@ public:
       struct timeval tv;
       gettimeofday (&tv, nullptr);
 
-      struct timespec ts;
       ts.tv_sec = tv.tv_sec;
       ts.tv_nsec = tv.tv_usec * 1000;
 #endif
@@ -238,31 +186,14 @@ public:
          ts.tv_sec++;
          ts.tv_nsec -= 1000000000;
       }
-      auto result = pthread_cond_timedwait (&cv_, cs_.raw (), &ts);
-
-      if (result == ETIMEDOUT) {
-         return false;
-      }
-      else if (result == 0) {
-         return true;
-      }
-      return false;
-#endif
+      return pthread_cond_timedwait (&cv_, cs_.raw (), &ts) == 0;
    }
 
    bool wait () {
-#if defined(CR_WINDOWS)
-      return wait (INFINITE);
-#else
-      auto result = pthread_cond_wait (&cv_, cs_.raw ());
-
-      if (result == 0) {
-         return true;
-      }
-      return false;
-#endif
+      return pthread_cond_wait (&cv_, cs_.raw ()) == 0;
    }
 };
+#endif
 
 using MutexScopedLock = ScopedLock <Mutex>;
 using SignalScopedLock = ScopedLock <Signal>;
@@ -284,21 +215,63 @@ private:
 private:
 #if defined(CR_WINDOWS)
    static unsigned int __stdcall worker (void *pinvokable) {
-#else
-   static void *worker (void *pinvokable) {
-#endif
       assert (pinvokable);
       (*reinterpret_cast <Func *> (pinvokable)) ();
+      return 0;
+   }
+#else
+   static void *worker (void *pinvokable) {
+      assert (pinvokable);
+      (*reinterpret_cast <Func *> (pinvokable)) ();
+      return nullptr;
+   }
+#endif
+
+public:
+   Thread () = default;
+
+   explicit Thread (Func &&callback) {
+      start (cr::move (callback));
+   }
+
+   Thread (Thread &&rhs) noexcept {
+      thread_ = rhs.thread_;
+      invokable_ = cr::move (rhs.invokable_);
 
 #if defined(CR_WINDOWS)
-      return 0;
+      rhs.thread_ = nullptr;
 #else
-      return nullptr;
+      initialized_ = rhs.initialized_;
+      rhs.thread_ = 0;
+      rhs.initialized_ = false;
 #endif
    }
 
-public:
-   explicit Thread (Func &&callback) {
+   Thread &operator = (Thread &&rhs) noexcept {
+      if (this != &rhs) {
+         join ();
+
+         thread_ = rhs.thread_;
+         invokable_ = cr::move (rhs.invokable_);
+
+#if defined(CR_WINDOWS)
+         rhs.thread_ = nullptr;
+#else
+         initialized_ = rhs.initialized_;
+         rhs.thread_ = 0;
+         rhs.initialized_ = false;
+#endif
+      }
+      return *this;
+   }
+
+   ~Thread () noexcept {
+      join ();
+   }
+
+   void start (Func &&callback) {
+      join ();
+
       invokable_ = makeUnique <Func> (cr::move (callback));
 
 #if defined(CR_WINDOWS)
@@ -310,31 +283,6 @@ public:
       if (!ok ()) {
          invokable_.reset ();
       }
-   }
-
-   Thread (Thread &&rhs) noexcept {
-      thread_ = rhs.thread_;
-#if defined(CR_WINDOWS)
-      rhs.thread_ = nullptr;
-#else
-      initialized_ = rhs.initialized_;
-
-      rhs.thread_ = 0;
-      rhs.initialized_ = false;
-#endif
-      cr::swap (invokable_, rhs.invokable_);
-   }
-
-   ~Thread () noexcept {
-      if (!ok ()) {
-         return;
-      }
-#if defined(CR_WINDOWS)
-      CloseHandle (thread_);
-      thread_ = nullptr;
-#else
-      pthread_detach (thread_);
-#endif
    }
 
 public:
@@ -352,10 +300,26 @@ public:
       }
 #if defined(CR_WINDOWS)
       WaitForSingleObjectEx (thread_, INFINITE, FALSE);
+      CloseHandle (thread_);
+      thread_ = nullptr;
 #else
       pthread_join (thread_, nullptr);
       initialized_ = false;
 #endif
+   }
+
+   void detach () {
+      if (!ok ()) {
+         return;
+      }
+#if defined(CR_WINDOWS)
+      CloseHandle (thread_);
+      thread_ = nullptr;
+#else
+      pthread_detach (thread_);
+      initialized_ = false;
+#endif
+      invokable_.release ();
    }
 
    decltype (auto) handle () const {
@@ -408,13 +372,7 @@ public:
       {
          SignalScopedLock lock (signal_);
          running_ = false;
-         jobs_.clear ();
-
-#if !defined(THREAD_SIGNAL_HAS_BROADCAST)
-         signal_.notify ();
-#else
          signal_.broadcast ();
-#endif
       }
 
       for (auto &thread : threads_) {
@@ -428,11 +386,10 @@ public:
          SignalScopedLock lock (signal_);
          running_ = true;
       }
-      
+
       for (size_t i = 0; i < workers; ++i) {
          threads_.emplace ([this] () {
             for (;;) {
-               
                Func job {};
                {
                   SignalScopedLock lock (signal_);
@@ -442,9 +399,6 @@ public:
                   }
 
                   if (!running_ && jobs_.empty ()) {
-#if !defined(THREAD_SIGNAL_HAS_BROADCAST)
-                     signal_.notify ();
-#endif
                      return;
                   }
                   job = cr::move (jobs_.popFront ());

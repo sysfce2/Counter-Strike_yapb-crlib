@@ -1,9 +1,4 @@
-//
-// crlib, simple class library for private needs.
-// Copyright © RWSH Solutions LLC <lab@rwsh.ru>.
-//
-// SPDX-License-Identifier: MIT
-//
+// SPDX-License-Identifier: Unlicense
 
 #pragma once
 
@@ -11,6 +6,7 @@
 
 #include <crlib/string.h>
 #include <crlib/lambda.h>
+#include <crlib/twin.h>
 
 CR_NAMESPACE_BEGIN
 
@@ -22,7 +18,7 @@ private:
 
 public:
    explicit File () = default;
-   
+
    File (StringRef file, StringRef mode = "rt") {
       open (file, mode);
    }
@@ -33,39 +29,41 @@ public:
 
 public:
    bool open (StringRef file, StringRef mode) {
-      if (!openFile (file, mode)) {
+      close ();
+
+      handle_ = plat.openStdioFile (file.chars (), mode.chars ());
+
+      if (!handle_) {
          return false;
       }
       fseek (handle_, 0L, SEEK_END);
-      length_ = ftell (handle_);
+      auto pos = ftell (handle_);
+
+      length_ = pos > 0 ? static_cast <size_t> (pos) : 0;
       fseek (handle_, 0L, SEEK_SET);
 
       return true;
    }
 
    void close () {
-      if (handle_ != nullptr) {
+      if (handle_) {
          fclose (handle_);
          handle_ = nullptr;
       }
       length_ = 0;
    }
 
-   bool eof () const {
-      return !!feof (handle_);
-   }
+    bool eof () const {
+       return !handle_ || !!feof (handle_);
+    }
 
-   bool flush () const {
-      return !!fflush (handle_);
-   }
+    bool flush () const {
+       return handle_ && fflush (handle_) == 0;
+    }
 
-   int get () const {
-      return fgetc (handle_);
-   }
-
-   char *getString (char *buffer, int count) const {
-      return fgets (buffer, count, handle_);
-   }
+    int get () const {
+       return handle_ ? fgetc (handle_) : EOF;
+    }
 
    bool getLine (String &line) {
       int ch = 0;
@@ -80,6 +78,7 @@ public:
             break;
          }
       }
+
       if (!data.empty ()) {
          line.assign (data.data (), data.length ());
       }
@@ -87,100 +86,85 @@ public:
    }
 
    template <typename ...Args> size_t puts (const char *fmt, Args &&...args) {
-      if (!*this) {
+      if (!handle_) {
          return 0;
       }
-      return fputs (strings.format (fmt, cr::forward <Args> (args)...), handle_);
+      auto result = fputs (strings.format (fmt, cr::forward <Args> (args)...), handle_);
+      return result >= 0 ? static_cast <size_t> (result) : 0;
    }
 
    bool puts (const char *buffer) {
-      if (!*this) {
-         return 0;
-      }
-      if (fputs (buffer, handle_) < 0) {
+      if (!handle_) {
          return false;
       }
-      return true;
+      return fputs (buffer, handle_) >= 0;
    }
 
-   int putChar (int ch) {
-      return fputc (ch, handle_);
-   }
+    int putChar (int ch) {
+       return handle_ ? fputc (ch, handle_) : EOF;
+    }
 
-   size_t read (void *buffer, size_t size, size_t count = 1) {
-      return fread (buffer, size, count, handle_);
-   }
+    size_t read (void *buffer, size_t size, size_t count = 1) {
+       return handle_ ? fread (buffer, size, count, handle_) : 0;
+    }
 
-   size_t write (void *buffer, size_t size, size_t count = 1) {
-      return fwrite (buffer, size, count, handle_);
-   }
+    size_t write (const void *buffer, size_t size, size_t count = 1) {
+       return handle_ ? fwrite (buffer, size, count, handle_) : 0;
+    }
 
-   bool seek (long offset, int origin) {
-      if (fseek (handle_, offset, origin) != 0) {
-         return false;
-      }
-      return true;
-   }
+    bool seek (long offset, int origin) {
+       return handle_ && fseek (handle_, offset, origin) == 0;
+    }
 
-   void rewind () {
-      ::rewind (handle_);
-   }
+    void rewind () {
+       if (handle_) {
+          ::rewind (handle_);
+       }
+    }
 
    size_t length () const {
       return length_;
    }
 
-public:
    explicit operator bool () const {
       return handle_ != nullptr;
    }
 
 public:
-   static inline void makePath (const char  *path) {
-      auto dir = const_cast <char *> (path) + sizeof (kPathSeparator);
+   static inline void makePath (const char *path) {
+      String buffer (path);
 
-      for (auto str = dir; *str != kNullChar; ++str) {
-         if (*str ==  *kPathSeparator) {
-            *str = kNullChar;
-            plat.createDirectory (path);
-            *str = *kPathSeparator;
+      for (size_t i = 1; i < buffer.length (); ++i) {
+         if (buffer.at (i) == *kPathSeparator) {
+            buffer.at (i) = kNullChar;
+            plat.createDirectory (buffer.chars ());
+            buffer.at (i) = *kPathSeparator;
          }
       }
-      plat.createDirectory (path);
-   }
-
-private:
-   bool openFile (StringRef filename, StringRef mode) {
-      if (*this) {
-         close ();
-      }
-      handle_ = plat.openStdioFile (filename.chars (), mode.chars ());
-
-      return handle_ != nullptr;
+      plat.createDirectory (buffer.chars ());
    }
 };
 
-// wrapper for memory file for loading data into the memory
+// storage backend for memory-mapped file loading
 class MemFileStorage : public Singleton <MemFileStorage> {
-private:
+public:
    using LoadFunction = Lambda <uint8_t * (const char *, int *)>;
    using FreeFunction = Lambda <void (void *)>;
 
 private:
-   LoadFunction loadFun_ = nullptr;
-   FreeFunction freeFun_ = nullptr;
+   LoadFunction loadFun_ {};
+   FreeFunction freeFun_ {};
 
 public:
    explicit MemFileStorage () = default;
    ~MemFileStorage () = default;
 
 public:
-   void initizalize (LoadFunction loader, FreeFunction unloader) {
+   void initialize (LoadFunction loader, FreeFunction unloader) {
       loadFun_ = cr::move (loader);
       freeFun_ = cr::move (unloader);
    }
 
-public:
    uint8_t *load (StringRef file, int *size) {
       if (loadFun_) {
          return loadFun_ (file.chars (), size);
@@ -203,18 +187,18 @@ public:
          return nullptr;
       }
       *size = static_cast <int> (file.length ());
-      auto data = Memory::get <uint8_t> (*size);
+      auto data = mem::allocate <uint8_t> (*size);
 
       file.read (data, *size);
       return data;
    }
 
    static void defaultUnload (void *buffer) {
-      Memory::release (buffer);
+      mem::release (buffer);
    }
 
    static String loadToString (StringRef filename) {
-      int32_t result = 0;
+      int result = 0;
       auto buffer = defaultLoad (filename.chars (), &result);
 
       if (result > 0 && buffer) {
@@ -227,16 +211,12 @@ public:
    }
 };
 
+// in-memory read-only file
 class MemFile final : public NonCopyable {
-private:
-   enum : char {
-      Eof = static_cast <char> (-1)
-   };
-
 private:
    uint8_t *contents_ = nullptr;
    size_t length_ {};
-   size_t seek_ {};
+   size_t pos_ {};
 
 public:
    explicit MemFile () = default;
@@ -251,65 +231,43 @@ public:
 
 public:
    bool open (StringRef file) {
-      length_ = 0;
-      seek_ = 0;
-      contents_ = MemFileStorage::instance ().load (file.chars (), reinterpret_cast <int *> (&length_));
+      close ();
+
+      int size = 0;
+      contents_ = MemFileStorage::instance ().load (file.chars (), &size);
+      length_ = size > 0 ? static_cast <size_t> (size) : 0;
 
       if (!contents_) {
+         length_ = 0;
          return false;
       }
       return true;
    }
 
    void close () {
-      if (!contents_) {
-         return;
+      if (contents_) {
+         MemFileStorage::instance ().unload (contents_);
+         contents_ = nullptr;
       }
-      MemFileStorage::instance ().unload (contents_);
-
       length_ = 0;
-      seek_ = 0;
-      contents_ = nullptr;
+      pos_ = 0;
    }
 
-   char get () {
-      if (!contents_ || seek_ >= length_) {
-         return Eof;
+   int get () {
+      if (!contents_ || pos_ >= length_) {
+         return EOF;
       }
-      return static_cast <char> (contents_[seek_++]);
-   }
-
-   char *getString (char *buffer, size_t count) {
-      if (!contents_ || seek_ >= length_) {
-         return nullptr;
-      }
-      size_t index = 0;
-      buffer[0] = 0;
-
-      for (; index < count - 1;) {
-         if (seek_ < length_) {
-            buffer[index] = contents_[seek_++];
-
-            if (buffer[index++] == '\n') {
-               break;
-            }
-         }
-         else {
-            break;
-         }
-      }
-      buffer[index] = 0;
-      return index ? buffer : nullptr;
+      return static_cast <int> (contents_[pos_++]);
    }
 
    bool getLine (String &line) {
-      char ch;
+      int ch = 0;
       SmallArray <char> data (255);
 
       line.clear ();
 
-      while ((ch = get ()) != Eof && !eof ()) {
-         data.push (ch);
+      while ((ch = get ()) != EOF && !eof ()) {
+         data.push (static_cast <char> (ch));
 
          if (ch == '\n') {
             break;
@@ -323,40 +281,54 @@ public:
    }
 
    size_t read (void *buffer, size_t size, size_t count = 1) {
-      if (!contents_ || length_ <= seek_ || !buffer || !size || !count) {
+      if (!contents_ || pos_ >= length_ || !buffer || !size || !count) {
          return 0;
       }
-      size_t blocksRead = size * count <= length_ - seek_ ? size * count : length_ - seek_;
+      auto remaining = length_ - pos_;
+      auto requested = size * count;
+      auto bytes = requested <= remaining ? requested : remaining;
 
-      memcpy (buffer, &contents_[seek_], blocksRead);
-      seek_ += blocksRead;
+      memcpy (buffer, &contents_[pos_], bytes);
+      pos_ += bytes;
 
-      return blocksRead / size;
+      return bytes / size;
    }
 
    bool seek (size_t offset, int origin) {
-      if (!contents_ || seek_ >= length_) {
+      if (!contents_) {
          return false;
       }
-      if (origin == SEEK_SET) {
+
+      switch (origin) {
+      case SEEK_SET:
          if (offset >= length_) {
             return false;
          }
-         seek_ = offset;
-      }
-      else if (origin == SEEK_END) {
+         pos_ = offset;
+         break;
+
+      case SEEK_END:
          if (offset >= length_) {
             return false;
          }
-         seek_ = length_ - offset;
-      }
-      else {
-         if (seek_ + offset >= length_) {
+         pos_ = length_ - offset;
+         break;
+
+      case SEEK_CUR:
+         if (pos_ + offset >= length_) {
             return false;
          }
-         seek_ += offset;
+         pos_ += offset;
+         break;
+
+      default:
+         return false;
       }
       return true;
+   }
+
+   void rewind () {
+      pos_ = 0;
    }
 
    size_t length () const {
@@ -364,16 +336,11 @@ public:
    }
 
    bool eof () const {
-      return seek_ >= length_;
+      return pos_ >= length_;
    }
 
-   void rewind () {
-      seek_ = 0;
-   }
-
-public:
    explicit operator bool () const {
-      return !!contents_ && length_ > 0;
+      return contents_ != nullptr && length_ > 0;
    }
 };
 
@@ -385,7 +352,7 @@ namespace detail {
 #if defined(CR_WINDOWS)
       bool next {};
       String path {};
-      HANDLE handle {};
+      HANDLE handle = INVALID_HANDLE_VALUE;
       WIN32_FIND_DATAA data {};
 #else
       String path {};
@@ -399,10 +366,10 @@ namespace detail {
 // file enumerator
 class FileEnumerator : public NonCopyable {
 private:
-   UniquePtr <detail::FileEnumeratorEntry> entries_;
+   UniquePtr <detail::FileEnumeratorEntry> entry_;
 
 public:
-   FileEnumerator (StringRef mask) : entries_ (cr::makeUnique <detail::FileEnumeratorEntry> ()) {
+   FileEnumerator (StringRef mask) : entry_ (cr::makeUnique <detail::FileEnumeratorEntry> ()) {
       start (mask);
    }
 
@@ -412,28 +379,23 @@ public:
 
 public:
    void start (StringRef mask) {
-      auto lastSeperatorPos = mask.findLastOf (kPathSeparator);
-      Twin <String, String> pam {};
+      auto sep = mask.findLastOf (kPathSeparator);
 
-      if (lastSeperatorPos != StringRef::InvalidIndex) {
-         pam = {
-            mask.substr (0, lastSeperatorPos),
-            mask.substr (1 + lastSeperatorPos)
-         };
+      if (sep != StringRef::InvalidIndex) {
+         entry_->path = mask.substr (0, sep);
       }
       else {
-         pam = { ".", mask };
+         entry_->path = ".";
       }
-      entries_->path = pam.first;
 
 #if defined(CR_WINDOWS)
-      entries_->handle = FindFirstFileA (mask.chars (), &entries_->data);
-      entries_->next = entries_->handle != INVALID_HANDLE_VALUE;
+      entry_->handle = FindFirstFileA (mask.chars (), &entry_->data);
+      entry_->next = entry_->handle != INVALID_HANDLE_VALUE;
 #else
-      entries_->dir = opendir (entries_->path.chars ());
-      entries_->mask = pam.second;
+      entry_->mask = sep != StringRef::InvalidIndex ? mask.substr (sep + 1) : mask;
+      entry_->dir = opendir (entry_->path.chars ());
 
-      if (entries_->dir != nullptr) {
+      if (entry_->dir) {
          next ();
       }
 #endif
@@ -441,27 +403,27 @@ public:
 
    void close () {
 #if defined(CR_WINDOWS)
-      if (entries_->handle != INVALID_HANDLE_VALUE) {
-         FindClose (entries_->handle);
+      if (entry_->handle != INVALID_HANDLE_VALUE) {
+         FindClose (entry_->handle);
 
-         entries_->handle = INVALID_HANDLE_VALUE;
-         entries_->next = false;
+         entry_->handle = INVALID_HANDLE_VALUE;
+         entry_->next = false;
       }
 #else
-      if (entries_->dir != nullptr) {
-         closedir (entries_->dir);
-         entries_->dir = nullptr;
+      if (entry_->dir) {
+         closedir (entry_->dir);
+         entry_->dir = nullptr;
       }
 #endif
    }
 
    bool next () {
 #if defined(CR_WINDOWS)
-      entries_->next = !!FindNextFileA (entries_->handle, &entries_->data);
-      return entries_->next;
+      entry_->next = !!FindNextFileA (entry_->handle, &entry_->data);
+      return entry_->next;
 #else
-      while ((entries_->entry = readdir (entries_->dir)) != nullptr) {
-         if (!fnmatch (entries_->mask.chars (), entries_->entry->d_name, FNM_CASEFOLD | FNM_NOESCAPE | FNM_PERIOD)) {
+      while ((entry_->entry = readdir (entry_->dir)) != nullptr) {
+         if (!fnmatch (entry_->mask.chars (), entry_->entry->d_name, FNM_CASEFOLD | FNM_NOESCAPE | FNM_PERIOD)) {
             return true;
          }
       }
@@ -469,28 +431,23 @@ public:
 #endif
    }
 
-   bool stillValid () const {
-#if defined(CR_WINDOWS)
-      return entries_->next;
-#else
-      return entries_->dir != nullptr && entries_->entry != nullptr;
-#endif
-   }
-
    String getMatch () const {
       StringRef match {};
 
 #if defined(CR_WINDOWS)
-      match = entries_->data.cFileName;
+      match = entry_->data.cFileName;
 #else
-      match = entries_->entry->d_name;
+      match = entry_->entry->d_name;
 #endif
-      return String::join ({ entries_->path, match }, kPathSeparator);
+      return String::join ({ entry_->path, match }, kPathSeparator);
    }
 
-public:
    operator bool () const {
-      return stillValid ();
+#if defined(CR_WINDOWS)
+      return entry_->next;
+#else
+      return entry_->dir != nullptr && entry_->entry != nullptr;
+#endif
    }
 };
 

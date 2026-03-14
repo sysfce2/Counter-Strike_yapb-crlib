@@ -1,118 +1,85 @@
-//
-// crlib, simple class library for private needs.
-// Copyright © RWSH Solutions LLC <lab@rwsh.ru>.
-//
-// SPDX-License-Identifier: MIT
-//
+// SPDX-License-Identifier: Unlicense
 
 #pragma once
 
 #include <crlib/memory.h>
-#include <crlib/twin.h>
 
 CR_NAMESPACE_BEGIN
 
-template <typename T> class Deque : private NonCopyable {
+template <typename T> class Deque : public NonCopyable {
 private:
-   size_t capacity_ {};
    T *contents_ {};
-
-   Twin <size_t, size_t> index_ {};
+   size_t capacity_ {};
+   size_t head_ {};
+   size_t length_ {};
 
 private:
-   size_t pickFrontIndex () {
-      if (index_.first == 0) {
-         if (capacity_ && index_.second != capacity_ - 1) {
-            return capacity_ - 1;
-         }
-      }
-      else if (index_.first - 1 != index_.second) {
-         return index_.first - 1;
-      }
-      extendCapacity ();
-
-      return capacity_ - 1;
+   size_t wrap (size_t index) const {
+      return index < capacity_ ? index : index - capacity_;
    }
 
-   size_t pickRearIndex () {
-      if (index_.second < index_.first) {
-         if (index_.second + 1 != index_.first) {
-            return index_.second + 1;
-         }
-      }
-      else {
-         if (index_.second + 1 < capacity_) {
-            return index_.second + 1;
-         }
-         if (index_.first != 0) {
-            return 0;
-         }
-      }
-      extendCapacity ();
-
-      return index_.second + 1;
+   size_t tail () const {
+      return wrap (head_ + length_);
    }
 
-   void extendCapacity () {
-      auto capacity = capacity_ > 0 ? capacity_ * 2 : 8;
-      auto contents = Memory::get <T> (capacity);
+   void grow () {
+      const auto capacity = capacity_ > 0 ? capacity_ * 2 : 8;
+      auto contents = mem::allocate <T> (capacity);
 
-      if (index_.first < index_.second) {
-         for (size_t i = 0; i < index_.second - index_.first; ++i) {
-            Memory::construct (&contents[i], cr::move (contents_[i + index_.first]));
+      if (length_ > 0) {
+         if (head_ + length_ <= capacity_) {
+            mem::transfer (contents, &contents_[head_], length_);
          }
-         index_.second = index_.second - index_.first;
-         index_.first = 0;
+         else {
+            const auto firstPart = capacity_ - head_;
+
+            mem::transfer (contents, &contents_[head_], firstPart);
+            mem::transfer (&contents[firstPart], contents_, length_ - firstPart);
+         }
       }
-      else {
-         for (size_t i = 0; i < capacity_ - index_.first; ++i) {
-            Memory::construct (&contents[i], cr::move (contents_[i + index_.first]));
-         }
-            
-         for (size_t i = 0; i < index_.second; ++i) {
-            Memory::construct (&contents[capacity_ - index_.first + i], cr::move (contents_[i]));
-         }
-         index_.second = index_.second + (capacity_ - index_.first);
-         index_.first = 0;
-      }
-      Memory::release (contents_);
+      mem::release (contents_);
 
       contents_ = contents;
       capacity_ = capacity;
+      head_ = 0;
+   }
+
+   void destructElements () {
+      if (length_ == 0) {
+         return;
+      }
+
+      if (head_ + length_ <= capacity_) {
+         mem::destructArray (&contents_[head_], length_);
+      }
+      else {
+         const auto firstPart = capacity_ - head_;
+
+         mem::destructArray (&contents_[head_], firstPart);
+         mem::destructArray (contents_, length_ - firstPart);
+      }
    }
 
    void destroy () {
-      auto destruct = [this] (size_t start, size_t end) {
-         for (size_t i = start; i < end; ++i) {
-            Memory::destruct (&contents_[i]);
-         }
-      };
-
-      if (index_.first <= index_.second) {
-         destruct (index_.first, index_.second);
-      }
-      else {
-         destruct (index_.first, capacity_);
-         destruct (0, index_.second);
-      }
-      Memory::release (contents_);
+      destructElements ();
+      mem::release (contents_);
    }
 
    void reset () {
       contents_ = nullptr;
       capacity_ = 0;
-      index_.first = 0;
-      index_.second = 0;
+      head_ = 0;
+      length_ = 0;
    }
 
 public:
-   explicit Deque () : capacity_ (0), contents_ (nullptr)
-   { }
+   explicit Deque () = default;
 
-   Deque (Deque &&rhs) : capacity_ (rhs.capacity_), contents_ (rhs.contents_) {
-      index_.first = rhs.index_.first;
-      index_.second = rhs.index_.second;
-
+   Deque (Deque &&rhs) noexcept
+      : contents_ (rhs.contents_)
+      , capacity_ (rhs.capacity_)
+      , head_ (rhs.head_)
+      , length_ (rhs.length_) {
       rhs.reset ();
    }
 
@@ -122,40 +89,41 @@ public:
 
 public:
    bool empty () const {
-      return index_.first == index_.second;
+      return length_ == 0;
    }
 
-   template <typename ...Args> void emplaceLast (Args &&...args) {
-      auto rear = pickRearIndex ();
-
-      Memory::construct (&contents_[index_.second], cr::forward <Args> (args)...);
-      index_.second = rear;
+   size_t length () const {
+      return length_;
    }
 
    template <typename ...Args> void emplaceFront (Args &&...args) {
-      index_.first = pickFrontIndex ();
-      Memory::construct (&contents_[index_.first], cr::forward <Args> (args)...);
+      if (length_ == capacity_) {
+         grow ();
+      }
+      head_ = head_ == 0 ? capacity_ - 1 : head_ - 1;
+
+      mem::construct (&contents_[head_], cr::forward <Args> (args)...);
+      ++length_;
+   }
+
+   template <typename ...Args> void emplaceLast (Args &&...args) {
+      if (length_ == capacity_) {
+         grow ();
+      }
+      mem::construct (&contents_[tail ()], cr::forward <Args> (args)...);
+      ++length_;
    }
 
    void discardFront () {
-      Memory::destruct (&contents_[index_.first]);
+      mem::destruct (&contents_[head_]);
 
-      if (index_.first == capacity_ - 1) {
-         index_.first = 0;
-      }
-      else {
-         index_.first++;
-      }
+      head_ = wrap (head_ + 1);
+      --length_;
    }
 
    void discardLast () {
-      if (index_.second == 0) {
-         index_.second = capacity_ - 1;
-      }
-      else {
-         index_.second--;
-      }
-      Memory::destruct (&contents_[index_.second]);
+      --length_;
+      mem::destruct (&contents_[tail ()]);
    }
 
    T popFront () {
@@ -174,63 +142,40 @@ public:
 
 public:
    const T &front () const {
-      return contents_[index_.first];
-   }
-
-   const T &last () const {
-      if (index_.second == 0) {
-         return contents_[capacity_ - 1];
-      }
-      return contents_[index_.second - 1];
+      return contents_[head_];
    }
 
    T &front () {
-      return contents_[index_.first];
+      return contents_[head_];
+   }
+
+   const T &last () const {
+      return contents_[wrap (head_ + length_ - 1)];
    }
 
    T &last () {
-      if (index_.second == 0) {
-         return contents_[capacity_ - 1];
-      }
-      return contents_[index_.second - 1];
-   }
-
-   size_t length () const {
-      if (index_.first == index_.second) {
-         return 0;
-      }
-      return index_.first < index_.second ? index_.second - index_.first : index_.second + (capacity_ - index_.first);
+      return contents_[wrap (head_ + length_ - 1)];
    }
 
    void clear () {
-      if (index_.first <= index_.second) {
-         for (size_t i = index_.first; i < index_.second; ++i) {
-            Memory::destruct (&contents_[i]);
-         }
-      }
-      else {
-         for (size_t i = index_.first; i < capacity_; ++i) {
-            Memory::destruct (&contents_[i]);
-         }
-         for (size_t i = 0; i < index_.second; ++i) {
-            Memory::destruct (&contents_[i]);
-         }
-      }
-      index_.first = 0;
-      index_.second = 0;
+      destructElements ();
+
+      head_ = 0;
+      length_ = 0;
    }
 
 public:
-   Deque &operator = (Deque &&rhs) {
-      destroy ();
+   Deque &operator = (Deque &&rhs) noexcept {
+      if (this != &rhs) {
+         destroy ();
 
-      contents_ = rhs.contents_;
-      capacity_ = rhs.capacity_;
+         contents_ = rhs.contents_;
+         capacity_ = rhs.capacity_;
+         head_ = rhs.head_;
+         length_ = rhs.length_;
 
-      index_.first = rhs.index_.first;
-      index_.second = rhs.index_.second;
-
-      rhs.reset ();
+         rhs.reset ();
+      }
       return *this;
    }
 };

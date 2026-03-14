@@ -1,9 +1,4 @@
-//
-// crlib, simple class library for private needs.
-// Copyright © RWSH Solutions LLC <lab@rwsh.ru>.
-//
-// SPDX-License-Identifier: MIT
-//
+// SPDX-License-Identifier: Unlicense
 
 #pragma once
 
@@ -48,8 +43,10 @@ public:
    }
 
    constexpr void reset (T *ptr = nullptr) {
-      destroy ();
-      ptr_ = ptr;
+      if (ptr_ != ptr) {
+         destroy ();
+         ptr_ = ptr;
+      }
    }
 
 private:
@@ -67,14 +64,12 @@ public:
    }
 
    template <typename U> constexpr UniquePtr &operator = (UniquePtr <U> &&rhs) noexcept {
-      if (this != &rhs) {
-         reset (rhs.release ());
-      }
+      reset (rhs.release ());
       return *this;
    }
 
    constexpr UniquePtr &operator = (nullptr_t) {
-      destroy ();
+      reset ();
       return *this;
    }
 
@@ -91,6 +86,7 @@ public:
    }
 };
 
+// array specialization
 template <typename T> class UniquePtr <T[]> final : public NonCopyable {
 private:
    T *ptr_ {};
@@ -98,13 +94,10 @@ private:
 public:
    constexpr UniquePtr () = default;
 
-   explicit constexpr UniquePtr (T *ptr) : ptr_ (ptr)
+   constexpr explicit UniquePtr (T *ptr) : ptr_ (ptr)
    { }
 
    constexpr UniquePtr (UniquePtr &&rhs) noexcept : ptr_ (rhs.release ())
-   { }
-
-   template <typename U> constexpr UniquePtr (UniquePtr <U> &&rhs) noexcept : ptr_ (rhs.release ())
    { }
 
    ~UniquePtr () {
@@ -124,8 +117,10 @@ public:
    }
 
    constexpr void reset (T *ptr = nullptr) {
-      destroy ();
-      ptr_ = ptr;
+      if (ptr_ != ptr) {
+         destroy ();
+         ptr_ = ptr;
+      }
    }
 
 private:
@@ -142,15 +137,8 @@ public:
       return *this;
    }
 
-   template <typename U> constexpr UniquePtr &operator = (UniquePtr <U> &&rhs) noexcept {
-      if (this != &rhs) {
-         reset (rhs.release ());
-      }
-      return *this;
-   }
-
    constexpr UniquePtr &operator = (nullptr_t) {
-      destroy ();
+      reset ();
       return *this;
    }
 

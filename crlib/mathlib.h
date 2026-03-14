@@ -1,9 +1,4 @@
-//
-// crlib, simple class library for private needs.
-// Copyright © RWSH Solutions LLC <lab@rwsh.ru>.
-//
-// SPDX-License-Identifier: MIT
-//
+// SPDX-License-Identifier: Unlicense
 
 #pragma once
 
@@ -17,7 +12,7 @@ CR_NAMESPACE_BEGIN
 constexpr float kFloatOnEpsilon = 0.01f;
 constexpr float kFloatEqualEpsilon = 0.001f;
 constexpr float kFloatEpsilon = 1.192092896e-07f;
-constexpr float kMathPi = 3.141592653583f;
+constexpr float kMathPi = 3.14159265358979323846f;
 constexpr float kDegreeToRadians = kMathPi / 180.0f;
 constexpr float kRadiansToDegree = 180.0f / kMathPi;
 
@@ -33,8 +28,11 @@ template <typename T> constexpr T abs (const T &a) {
    if constexpr (is_same <T, float>::value) {
       return ::fabsf (a);
    }
-   else if constexpr (is_same <T, int>::value) {
-      return ::abs (a);
+   else if constexpr (is_same <T, double>::value) {
+      return ::fabs (a);
+   }
+   else {
+      return a < T {} ? -a : a;
    }
 }
 
@@ -116,7 +114,7 @@ CR_FORCE_INLINE float tanf (const float value) {
 #endif
 }
 
-CR_FORCE_INLINE float log10 (const float value) {
+CR_FORCE_INLINE float log10f (const float value) {
 #if defined(CR_HAS_SIMD_SSE)
    return _mm_cvtss_f32 (simd::log10_ps (_mm_load_ss (&value)));
 #else
@@ -139,7 +137,7 @@ CR_FORCE_INLINE
 #endif
 float ceilf (const float value) {
 #if defined(CR_HAS_SIMD_SSE)
-   if (cpuflags.sse42) {
+   if (cpuflags.sse41) {
       return _mm_cvtss_f32 (_mm_ceil_ps (_mm_load_ss (&value)));
    }
    return _mm_cvtss_f32 (simd::ceil_ps (_mm_load_ss (&value)));
@@ -155,7 +153,7 @@ CR_FORCE_INLINE
 #endif
 float floorf (const float value) {
 #if defined(CR_HAS_SIMD_SSE)
-   if (cpuflags.sse42) {
+   if (cpuflags.sse41) {
       return _mm_cvtss_f32 (_mm_floor_ps (_mm_load_ss (&value)));
    }
    return _mm_cvtss_f32 (simd::floor_ps (_mm_load_ss (&value)));
@@ -202,33 +200,27 @@ constexpr float deg2rad (const float d) {
 namespace detail {
 #if defined(CR_HAS_SIMD_SSE)
    template <int D> CR_SIMD_TARGET ("sse4.1") float sse4_wrapAngleFn (float x) {
-      __m128 v0 = _mm_load_ss (&x);
-      __m128 v1 = _mm_set_ss (static_cast <float> (D));
+      const auto v0 = _mm_load_ss (&x);
+      const auto v1 = _mm_set_ss (static_cast <float> (D));
 
-      __m128 mul0 = _mm_mul_ss (_mm_set_ss (2.0f), v1);
-      __m128 div0 = _mm_div_ss (v0, mul0);
-      __m128 add0 = _mm_add_ss (div0, _mm_set_ss (0.5f));
-      __m128 flr0 = _mm_floor_ss (_mm_setzero_ps (), add0);
+      const auto mul0 = _mm_mul_ss (_mm_set_ss (2.0f), v1);
+      const auto div0 = _mm_div_ss (v0, mul0);
+      const auto add0 = _mm_add_ss (div0, _mm_set_ss (0.5f));
+      const auto flr0 = _mm_floor_ss (_mm_setzero_ps (), add0);
 
-      __m128 mul1 = _mm_mul_ss (mul0, flr0);
-      __m128 sub0 = _mm_sub_ss (v0, mul1);
-
-      return _mm_cvtss_f32 (sub0);
+      return _mm_cvtss_f32 (_mm_sub_ss (v0, _mm_mul_ss (mul0, flr0)));
    }
 
    template <int D> CR_FORCE_INLINE float sse2_wrapAngleFn (float x) {
-      __m128 v0 = _mm_load_ss (&x);
-      __m128 v1 = _mm_set_ss (static_cast <float> (D));
+      const auto v0 = _mm_load_ss (&x);
+      const auto v1 = _mm_set_ss (static_cast <float> (D));
 
-      __m128 mul0 = _mm_mul_ss (_mm_set_ss (2.0f), v1);
-      __m128 div0 = _mm_div_ss (v0, mul0);
-      __m128 add0 = _mm_add_ss (div0, _mm_set_ss (0.5f));
-      __m128 flr0 = simd::floor_ps (add0);
+      const auto mul0 = _mm_mul_ss (_mm_set_ss (2.0f), v1);
+      const auto div0 = _mm_div_ss (v0, mul0);
+      const auto add0 = _mm_add_ss (div0, _mm_set_ss (0.5f));
+      const auto flr0 = simd::floor_ps (add0);
 
-      __m128 mul1 = _mm_mul_ss (mul0, flr0);
-      __m128 sub0 = _mm_sub_ss (v0, mul1);
-
-      return _mm_cvtss_f32 (sub0);
+      return _mm_cvtss_f32 (_mm_sub_ss (v0, _mm_mul_ss (mul0, flr0)));
    }
 #endif
 
@@ -238,7 +230,7 @@ namespace detail {
 
    template <int D> CR_FORCE_INLINE float _wrapAngleFn (float x) {
    #if defined(CR_HAS_SIMD_SSE)
-      if (cpuflags.sse42) {
+      if (cpuflags.sse41) {
          return sse4_wrapAngleFn <D> (x);
       }
       return sse2_wrapAngleFn <D> (x);
