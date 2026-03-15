@@ -54,7 +54,17 @@ private:
       memcpy (dst, src, sizeof (uint64_t));
    }
 
+   static void safeCopy (uint8_t *dst, const uint8_t *src, int32_t count) {
+      memcpy (dst, src, count);
+   }
+
    static void wildCopy (uint8_t *dst, const uint8_t *src, int32_t count) {
+      if (count < 8) {
+         for (int32_t i = 0; i < count; ++i) {
+            dst[i] = src[i];
+         }
+         return;
+      }
       copy8 (dst, src);
 
       for (int32_t i = 8; i < count; i += 8) {
@@ -174,7 +184,7 @@ private:
       else {
          emitByte (op, (run << 5) + token);
       }
-      wildCopy (op, &in[anchor], run);
+      safeCopy (op, &in[anchor], run);
       op += run;
    }
 
@@ -257,7 +267,7 @@ public:
          else {
             emitByte (op, run << 5);
          }
-         wildCopy (op, &in[anchor], run);
+         safeCopy (op, &in[anchor], run);
          op += run;
       }
       return static_cast <int32_t> (op - out);
@@ -283,7 +293,7 @@ public:
             if ((opEnd - op) < run || (ipEnd - ip) < run) {
                return UncompressFailure;
             }
-            wildCopy (op, ip, run);
+            safeCopy (op, ip, run);
 
             op += run;
             ip += run;

@@ -24,9 +24,12 @@ jobs:
           - os: windows-latest
             arch: x86
             name: Windows x86
-          - os: macos-latest
+          - os: macos-13
             arch: x86_64
             name: macOS x86_64
+          - os: macos-latest
+            arch: arm64
+            name: macOS ARM64
 
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
@@ -75,9 +78,9 @@ jobs:
           cpp = 'g++'
 
           [built-in options]
-          c_args = ['-m32']
+          c_args = ['-m32', '-msse2']
           c_link_args = ['-m32']
-          cpp_args = ['-m32']
+          cpp_args = ['-m32', '-msse2']
           cpp_link_args = ['-m32']
 
           [host_machine]
@@ -96,7 +99,7 @@ jobs:
         run: meson compile -C builddir
 
       - name: Test
-        run: meson test -C builddir --verbose
+        run: meson test -C builddir --verbose crlib_tests
 
   test-cross:
     strategy:
@@ -129,4 +132,4 @@ jobs:
           run: |
             meson setup builddir
             meson compile -C builddir
-            meson test -C builddir --verbose
+            meson test -C builddir --verbose crlib_tests

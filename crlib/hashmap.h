@@ -57,6 +57,24 @@ template <typename T> struct EmptyHash {
    }
 };
 
+template <typename T> struct KeyEqual {
+   bool operator () (const T &a, const T &b) const noexcept {
+      return a == b;
+   }
+};
+
+template <> struct KeyEqual <const char *> {
+   bool operator () (const char *a, const char *b) const noexcept {
+      if (a == b) {
+         return true;
+      }
+      if (!a || !b) {
+         return false;
+      }
+      return strcmp (a, b) == 0;
+   }
+};
+
 namespace detail {
    enum class HashEntryStatus : uint8_t {
       Empty,
@@ -90,12 +108,13 @@ namespace detail {
    };
 };
 
-template <typename K, typename V, typename H = Hash <K>> class HashMap {
+template <typename K, typename V, typename H = Hash <K>, typename E = KeyEqual <K>> class HashMap {
 private:
    using Entry = detail::HashEntry <K, V>;
    using Status = detail::HashEntryStatus;
 
    H hash_ {};
+   E equal_ {};
    size_t length_ {};
    Array <Entry> contents_ {};
 
@@ -135,7 +154,7 @@ private:
                firstDeleted = index;
             }
          }
-         else if (entry.hash == hashValue && entry.key == key) {
+         else if (entry.hash == hashValue && equal_ (entry.key, key)) {
             return { index, true };
          }
 
@@ -214,7 +233,7 @@ public:
    }
 
    HashMap (HashMap &&rhs) noexcept
-      : hash_ (cr::move (rhs.hash_)), length_ (rhs.length_), contents_ (cr::move (rhs.contents_)) {
+      : hash_ (cr::move (rhs.hash_)), equal_ (cr::move (rhs.equal_)), length_ (rhs.length_), contents_ (cr::move (rhs.contents_)) {
       rhs.length_ = 0;
    }
 
@@ -234,6 +253,7 @@ public:
          contents_ = cr::move (rhs.contents_);
          length_ = rhs.length_;
          hash_ = cr::move (rhs.hash_);
+         equal_ = cr::move (rhs.equal_);
          rhs.length_ = 0;
       }
       return *this;
