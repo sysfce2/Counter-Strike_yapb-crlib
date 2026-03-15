@@ -54,7 +54,7 @@ TEST_CASE("Detour remains invalid after install with null function", "[detour]")
 // On non-x86 / shim platforms: all methods return safe defaults
 // (the shim Detour always has valid()==false, detoured()==false)
 // ---------------------------------------------------------------------------
-#if defined(CR_ARCH_ARM) || defined(CR_ARCH_PPC) || defined(CR_ARCH_RISCV) || defined(CR_PSVITA)
+#if defined(CR_ARCH_NON_X86) || (defined(CR_MACOS) && defined(CR_ARCH_X64))
 TEST_CASE("Detour shim initialize does not crash", "[detour]") {
     Detour<IntFn> d;
     d.initialize("", "", nullptr);
@@ -67,7 +67,7 @@ TEST_CASE("Detour shim initialize does not crash", "[detour]") {
 // On x86 / x64: initialize with a real function pointer fills original_
 // but valid() is still false until install() provides a detour_ pointer
 // ---------------------------------------------------------------------------
-#if !defined(CR_ARCH_NON_X86)
+#if !defined(CR_ARCH_NON_X86) && !(defined(CR_MACOS) && defined(CR_ARCH_X64))
 static int sampleFunction(int x) {
     return x + 1;
 }

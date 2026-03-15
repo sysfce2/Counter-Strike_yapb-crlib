@@ -4,7 +4,7 @@
 
 #include <crlib/basic.h>
 
-#if defined(CR_ARCH_NON_X86)
+#if defined(CR_ARCH_NON_X86) || (defined(CR_MACOS) && defined(CR_ARCH_X64))
 
 CR_NAMESPACE_BEGIN
 
@@ -84,7 +84,7 @@ private:
    void *original_ { nullptr };
    void *detour_ { nullptr };
    Array <uint8_t> savedBytes_ {};
-   bool overwritten_ { false };
+   bool patched_ { false };
 
 #if defined(CR_ARCH_X64)
    Array <uint8_t> jmpBuffer_ { 0x48, 0xb8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xe0 };
@@ -163,52 +163,63 @@ public:
    }
 
    bool detoured () const {
-      return overwritten_;
+      return patched_;
    }
 
    bool detour () {
       if (!valid ()) {
          return false;
       }
-      return overwriteMemory (jmpBuffer_, true);
+      return patchMemory (jmpBuffer_, true);
    }
 
    bool restore () {
       if (!valid ()) {
          return false;
       }
-      return overwriteMemory (savedBytes_, false);
+      return patchMemory (savedBytes_, false);
    }
 
    template <typename... Args> decltype (auto) operator () (Args &&...args) {
-      ScopedRestore sw { this };
+      ScopedRestore sr { this };
       return reinterpret_cast <T *> (original_) (cr::forward <Args> (args)...);
    }
 
 private:
-   bool overwriteMemory (const Array <uint8_t> &to, const bool overwritten) noexcept {
+   bool patchMemory (const Array<uint8_t> &to, const bool patched) noexcept {
       MutexScopedLock lock (cs_);
-      overwritten_ = overwritten;
+      patched_ = patched;
 
 #if defined(CR_WINDOWS)
       unsigned long oldProtect {};
-
       if (!VirtualProtect (original_, to.length (), PAGE_EXECUTE_READWRITE, &oldProtect)) {
          return false;
       }
       memcpy (original_, to.data (), to.length ());
+      FlushInstructionCache (GetCurrentProcess (), original_, to.length ());
+
       return VirtualProtect (original_, to.length (), oldProtect, &oldProtect) != 0;
+
 #else
-      if (mprotect (reinterpret_cast <void *> (pageStart_), pageSize_, PROT_READ | PROT_WRITE | PROT_EXEC) == -1) {
+      auto pageAddr = reinterpret_cast <void *> (pageStart_);
+
+      if (mprotect (pageAddr, pageSize_, PROT_READ | PROT_WRITE) == -1) {
          return false;
       }
-       memcpy (original_, to.data (), to.length ());
+      memcpy (original_, to.data (), to.length ());
 
-       #if defined(CR_CXX_CLANG) || defined(CR_CXX_GCC)
-         __builtin___clear_cache (reinterpret_cast<char *> (original_), reinterpret_cast<char *> (original_) + to.length ());
-       #endif
-		  
-       return mprotect (reinterpret_cast <void *> (pageStart_), pageSize_, PROT_READ | PROT_EXEC) != -1;
+#if defined(CR_CXX_CLANG) || defined(CR_CXX_GCC)
+      __builtin___clear_cache (
+         reinterpret_cast <char *>(original_),
+         reinterpret_cast <char *>(original_) + to.length ()
+      );
+#endif
+
+      if (mprotect (pageAddr, pageSize_, PROT_READ | PROT_EXEC) == -1) {
+         return false;
+      }
+
+      return true;
 #endif
    }
 };
