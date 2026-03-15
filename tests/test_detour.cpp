@@ -67,7 +67,7 @@ TEST_CASE("Detour shim initialize does not crash", "[detour]") {
 // On x86 / x64: initialize with a real function pointer fills original_
 // but valid() is still false until install() provides a detour_ pointer
 // ---------------------------------------------------------------------------
-#if !defined(CR_ARCH_ARM) && !defined(CR_ARCH_PPC) && !defined(CR_ARCH_RISCV) && !defined(CR_PSVITA)
+#if !defined(CR_ARCH_NON_X86)
 static int sampleFunction(int x) {
     return x + 1;
 }
