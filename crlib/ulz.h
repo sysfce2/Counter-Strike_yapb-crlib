@@ -61,6 +61,7 @@ private:
 
    static void wildCopy (uint8_t *dst, const uint8_t *src, int32_t count) {
       int32_t i = 0;
+      for (; i + 8 <= count; i += 8) {
          copy8 (dst + i, src + i);
       }
       for (; i < count; ++i) {
