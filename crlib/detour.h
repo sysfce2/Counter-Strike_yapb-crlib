@@ -4,7 +4,7 @@
 
 #include <crlib/basic.h>
 
-#if defined(CR_PSVITA) || defined(CR_ARCH_ARM) || defined(CR_ARCH_PPC) || defined(CR_ARCH_RISCV)
+#if defined(CR_ARCH_NON_X86)
 
 CR_NAMESPACE_BEGIN
 
@@ -202,8 +202,13 @@ private:
       if (mprotect (reinterpret_cast <void *> (pageStart_), pageSize_, PROT_READ | PROT_WRITE | PROT_EXEC) == -1) {
          return false;
       }
-      memcpy (original_, to.data (), to.length ());
-      return mprotect (reinterpret_cast <void *> (pageStart_), pageSize_, PROT_READ | PROT_EXEC) != -1;
+       memcpy (original_, to.data (), to.length ());
+
+       #if defined(CR_CXX_CLANG) || defined(CR_CXX_GCC)
+         __builtin___clear_cache (reinterpret_cast<char *> (original_), reinterpret_cast<char *> (original_) + to.length ());
+       #endif
+		  
+       return mprotect (reinterpret_cast <void *> (pageStart_), pageSize_, PROT_READ | PROT_EXEC) != -1;
 #endif
    }
 };
