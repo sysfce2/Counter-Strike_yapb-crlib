@@ -362,19 +362,23 @@ TEST_CASE("Signal wait after notify waits", "[thread]") {
 // Thread — additional tests
 // ---------------------------------------------------------------------------
 TEST_CASE("Thread detach method", "[thread]") {
-    volatile bool ran = false;
+    Signal done;
+    bool ran = false;
     
-    Thread t([&ran]() {
+    Thread t([&done, &ran]() {
         testSleep(10);
         ran = true;
+        done.notify();
     });
     
     REQUIRE(t.ok());
     t.detach();
     REQUIRE(!t.ok());
     
-    // Give detached thread time to run
-    testSleep(50);
+    {
+        SignalScopedLock lock(done);
+        REQUIRE(done.wait(1000));
+    }
     REQUIRE(ran);
 }
 
