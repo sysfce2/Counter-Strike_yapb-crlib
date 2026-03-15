@@ -406,8 +406,9 @@ TEST_CASE("File puts with format string", "[files]") {
     {
         File f(fname, "w");
         REQUIRE(f);
-        size_t written = f.puts("Number: %d, String: %s", 42, "hello");
-        REQUIRE(written > 0);
+        f.puts("Number: %d, String: %s", 42, "hello");
+        // fputs returns non-negative on success, not byte count
+        // Content verification below ensures write succeeded
     }
     {
         File f(fname, "r");

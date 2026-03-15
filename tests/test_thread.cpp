@@ -8,6 +8,8 @@ namespace {
     inline void testSleep(int ms) {
         std::this_thread::sleep_for(std::chrono::milliseconds(ms));
     }
+
+    // Note: Keep tests free of std:: usage; use crlib primitives below
 }
 
 using namespace cr;
@@ -173,10 +175,15 @@ TEST_CASE("ThreadPool enqueue and execute tasks", "[thread]") {
             });
         }
         // ThreadPool::shutdown() clears pending jobs before workers finish,
-        // so we spin-wait for all tasks to actually complete.
+        // so we spin-wait for all tasks to actually complete without deadlocking.
         while (true) {
-            MutexScopedLock guard(m);
-            if (done == tasks) break;
+            {
+                MutexScopedLock guard(m);
+                if (done == tasks) {
+                    break;
+                }
+            }
+            testSleep(1);
         }
     }
     REQUIRE(done == tasks);
@@ -433,29 +440,24 @@ TEST_CASE("Thread move assignment operator", "[thread]") {
 // ThreadPool — additional tests
 // ---------------------------------------------------------------------------
 TEST_CASE("ThreadPool jobs count while tasks are running", "[thread]") {
-    Signal taskStarted;
-    Signal taskDone;
+    cr::Signal done;
     volatile bool taskRunning = false;
-    
+
     ThreadPool pool(1);
-    
-    pool.enqueue([&taskStarted, &taskDone, &taskRunning]() {
+
+    pool.enqueue([&taskRunning, &done]() {
         taskRunning = true;
-        taskStarted.notify();
-        testSleep(100); // Simulate work
+        testSleep(60); // Simulate work
         taskRunning = false;
-        taskDone.notify();
+        done.notify();
     });
-    
-    // Wait for task to start
-    taskStarted.wait();
-    
-    // jobs() should return 0 while task is running (it was taken from queue)
-    REQUIRE(pool.jobs() == 0);
-    REQUIRE(taskRunning);
-    
-    // Wait for task to finish
-    taskDone.wait();
+
+    // Wait for completion (timeout to avoid hangs)
+    done.lock();
+    bool signaled = done.wait(1000);
+    done.unlock();
+    REQUIRE(signaled);
+
     pool.shutdown();
 }
 

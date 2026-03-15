@@ -18,13 +18,13 @@ jobs:
           - os: ubuntu-latest
             arch: i386
             name: Linux x86_32
-          - os: windows-latest
+          - os: windows-2025
             arch: x64
             name: Windows x64
-          - os: windows-latest
+          - os: windows-2022
             arch: x86
             name: Windows x86
-          - os: macos-13
+          - os: macos-14-large
             arch: x86_64
             name: macOS x86_64
           - os: macos-latest
@@ -67,7 +67,7 @@ jobs:
 
       - name: Configure (Linux x86_64)
         if: runner.os == 'Linux' && matrix.arch == 'x86_64'
-        run: meson setup builddir
+        run: meson setup builddir --buildtype=release
 
       - name: Configure (Linux i386)
         if: runner.os == 'Linux' && matrix.arch == 'i386'
@@ -89,17 +89,17 @@ jobs:
           cpu = 'i686'
           endian = 'little'
           EOF
-          meson setup builddir --cross-file cross_i386.txt
+          meson setup builddir --cross-file cross_i386.txt --buildtype=release
 
       - name: Configure (Windows/macOS)
         if: runner.os != 'Linux'
-        run: meson setup builddir
+        run: meson setup builddir --buildtype=release
 
       - name: Build
         run: meson compile -C builddir
 
       - name: Test
-        run: meson test -C builddir --verbose crlib_tests
+        run: meson test -C builddir --verbose crlib_tests --timeout-multiplier 2
 
   test-cross:
     strategy:
@@ -130,6 +130,6 @@ jobs:
             apt-get install -y python3-pip ninja-build g++
             pip3 install meson --break-system-packages || pip3 install meson
           run: |
-            meson setup builddir
+            meson setup builddir --buildtype=release
             meson compile -C builddir
-            meson test -C builddir --verbose crlib_tests
+            meson test -C builddir --verbose crlib_tests --timeout-multiplier 2

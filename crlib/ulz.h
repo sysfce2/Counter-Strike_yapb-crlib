@@ -1,4 +1,9 @@
-// SPDX-License-Identifier: Unlicense
+//
+// crlib, simple class library for private needs.
+// Copyright © RWSH Solutions LLC <lab@rwsh.ru>.
+//
+// SPDX-License-Identifier: MIT
+//
 
 #pragma once
 
@@ -54,21 +59,12 @@ private:
       memcpy (dst, src, sizeof (uint64_t));
    }
 
-   static void safeCopy (uint8_t *dst, const uint8_t *src, int32_t count) {
-      memcpy (dst, src, count);
-   }
-
    static void wildCopy (uint8_t *dst, const uint8_t *src, int32_t count) {
-      if (count < 8) {
-         for (int32_t i = 0; i < count; ++i) {
-            dst[i] = src[i];
-         }
-         return;
-      }
-      copy8 (dst, src);
-
-      for (int32_t i = 8; i < count; i += 8) {
+      int32_t i = 0;
          copy8 (dst + i, src + i);
+      }
+      for (; i < count; ++i) {
+         dst[i] = src[i];
       }
    }
 
@@ -184,7 +180,7 @@ private:
       else {
          emitByte (op, (run << 5) + token);
       }
-      safeCopy (op, &in[anchor], run);
+      wildCopy (op, &in[anchor], run);
       op += run;
    }
 
@@ -267,7 +263,7 @@ public:
          else {
             emitByte (op, run << 5);
          }
-         safeCopy (op, &in[anchor], run);
+         wildCopy (op, &in[anchor], run);
          op += run;
       }
       return static_cast <int32_t> (op - out);
@@ -293,7 +289,7 @@ public:
             if ((opEnd - op) < run || (ipEnd - ip) < run) {
                return UncompressFailure;
             }
-            safeCopy (op, ip, run);
+            wildCopy (op, ip, run);
 
             op += run;
             ip += run;

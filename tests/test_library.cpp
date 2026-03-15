@@ -196,11 +196,16 @@ TEST_CASE("SharedLibrary hasModule returns false for nonexistent module", "[libr
 // ---------------------------------------------------------------------------
 // hasModule for loaded module on Unix
 // ---------------------------------------------------------------------------
-#if !defined(CR_WINDOWS)
-TEST_CASE("SharedLibrary hasModule returns true for loaded libc.so on Unix", "[library]") {
+#if defined(CR_LINUX)
+TEST_CASE("SharedLibrary hasModule returns true for loaded libc.so on Linux", "[library]") {
     bool hasLibc6 = SharedLibrary::hasModule("libc.so.6");
     bool hasLibc = SharedLibrary::hasModule("libc.so");
     bool result = hasLibc6 || hasLibc;
+    REQUIRE(result);
+}
+#elif defined(CR_MACOS)
+TEST_CASE("SharedLibrary hasModule returns true for loaded libSystem on macOS", "[library]") {
+    bool result = SharedLibrary::hasModule("libSystem.B.dylib");
     REQUIRE(result);
 }
 #endif
@@ -288,13 +293,13 @@ TEST_CASE("SharedLibrary load with unloadable=false prevents unloading", "[libra
 
 TEST_CASE("SharedLibrary locate with invalid address returns false", "[library]") {
     SharedLibrary lib;
-    bool ok = lib.locate(reinterpret_cast<void*>(0xDEADBEEF));
+    bool ok = lib.locate(reinterpret_cast<void*>(static_cast<uintptr_t>(0xDEADBEEF)));
     REQUIRE(!ok);
     REQUIRE(!lib);
 }
 
 TEST_CASE("SharedLibrary path with invalid address returns empty string", "[library]") {
-    String p = SharedLibrary::path(reinterpret_cast<void*>(0xDEADBEEF));
+    String p = SharedLibrary::path(reinterpret_cast<void*>(static_cast<uintptr_t>(0xDEADBEEF)));
     REQUIRE(p.empty());
 }
 

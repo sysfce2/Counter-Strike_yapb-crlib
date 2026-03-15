@@ -53,17 +53,18 @@ public:
       length_ = 0;
    }
 
-    bool eof () const {
-       return !handle_ || !!feof (handle_);
-    }
+   bool eof () const {
+      return !handle_ || !!feof (handle_);
+   }
 
-    bool flush () const {
-       return handle_ && fflush (handle_) == 0;
-    }
 
-    int get () const {
-       return handle_ ? fgetc (handle_) : EOF;
-    }
+   bool flush () const {
+      return handle_ && fflush (handle_) == 0;
+   }
+
+   int get () const {
+      return handle_ ? fgetc (handle_) : EOF;
+   }
 
    bool getLine (String &line) {
       int ch = 0;
@@ -100,27 +101,33 @@ public:
       return fputs (buffer, handle_) >= 0;
    }
 
-    int putChar (int ch) {
-       return handle_ ? fputc (ch, handle_) : EOF;
-    }
+   int putChar (int ch) {
+      return handle_ ? fputc (ch, handle_) : EOF;
+   }
 
-    size_t read (void *buffer, size_t size, size_t count = 1) {
-       return handle_ ? fread (buffer, size, count, handle_) : 0;
-    }
+   size_t read (void *buffer, size_t size, size_t count = 1) {
+      return handle_ ? fread (buffer, size, count, handle_) : 0;
+   }
 
-    size_t write (const void *buffer, size_t size, size_t count = 1) {
-       return handle_ ? fwrite (buffer, size, count, handle_) : 0;
-    }
+   size_t write (const void *buffer, size_t size, size_t count = 1) {
+      return handle_ ? fwrite (buffer, size, count, handle_) : 0;
+   }
 
-    bool seek (long offset, int origin) {
-       return handle_ && fseek (handle_, offset, origin) == 0;
-    }
+   bool seek (long offset, int origin) {
+      if (!handle_) {
+         return false;
+      }
+      if (origin != SEEK_SET && origin != SEEK_CUR && origin != SEEK_END) {
+         return false;
+      }
+      return fseek (handle_, offset, origin) == 0;
+   }
 
-    void rewind () {
-       if (handle_) {
-          ::rewind (handle_);
-       }
-    }
+   void rewind () {
+      if (handle_) {
+         ::rewind (handle_);
+      }
+   }
 
    size_t length () const {
       return length_;
@@ -148,7 +155,7 @@ public:
 // storage backend for memory-mapped file loading
 class MemFileStorage : public Singleton <MemFileStorage> {
 public:
-   using LoadFunction = Lambda <uint8_t * (const char *, int *)>;
+   using LoadFunction = Lambda <uint8_t *(const char *, int *)>;
    using FreeFunction = Lambda <void (void *)>;
 
 private:

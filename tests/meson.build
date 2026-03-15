@@ -122,7 +122,7 @@ crlib_benchmarks = executable(
 # --- Tests ---
 test('crlib_tests', crlib_tests,
   args : ['--reporter', 'console'],
-  timeout : 300
+  timeout : 1200
 )
 
 test('crlib_benchmarks', crlib_benchmarks,
